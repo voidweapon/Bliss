@@ -27,6 +27,7 @@
 
 # Visual Studio cache directory
 .vs/
+.idea/
 
 # Gradle cache directory
 .gradle/
@@ -74,3 +75,9 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 *.bkp
+
+# Benchmark 
+/BlissBenchMark/.idea
+/BlissBenchMark/.vs
+/BlissBenchMark/bin
+/Unity/UserSettings
