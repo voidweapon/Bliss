@@ -86,3 +86,4 @@ crashlytics-build.properties
 /Bliss.ProjectRule/Bliss.ProjectRule.TestData/bin
 /Bliss.UnitTest/Bliss.UnitTest/bin
 /BlissBenchMark/BenchmarkDotNet.Artifacts
+/Unity/UserSettings
