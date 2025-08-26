@@ -65,6 +65,14 @@ namespace Bliss.Pool
             pool.Recycle(obj);
         }
         
+        public void Clear(Type type)
+        {
+            if(_pools.TryGetValue(type, out var pool))
+            {
+                pool.Clear();
+            }
+        }
+        
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private Pool GetPool(Type objectType)
@@ -114,6 +122,17 @@ namespace Bliss.Pool
                     }
                     Interlocked.Decrement(ref _numItems);
                 }
+            }
+            
+            public void Clear()
+            {
+                // 清空 FastItem
+                Interlocked.Exchange(ref _fastItem, null);
+
+                // 清空队列
+                while (_items.TryDequeue(out _)) { }
+                // 重置计数
+                Interlocked.Exchange(ref _numItems, 0);
             }
         }
     }

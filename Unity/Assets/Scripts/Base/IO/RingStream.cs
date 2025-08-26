@@ -5,6 +5,9 @@ using System.IO;
 
 namespace Bliss.IO
 {
+    /// <summary>
+    /// 
+    /// </summary>
     public class RingStream : Stream
     {
         public override bool CanRead => true;
