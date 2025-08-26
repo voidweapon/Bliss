@@ -1,5 +1,7 @@
 using System;
-namespace Bliss.ObjectPool
+using System.Diagnostics.CodeAnalysis;
+
+namespace Bliss.Pool
 {
     /// <summary>
     /// 可以由对象池创建的对象
@@ -9,11 +11,11 @@ namespace Bliss.ObjectPool
         /// <summary>
         /// 对象是否由对象池创建
         /// </summary>
-        bool IsFromPool { get; internal set; }
+        bool IsFromPool { get; set; }
         
         /// <summary>
         /// 对象是否已经在对象池中
         /// </summary>
-        bool IsInPool { get; internal set; }
+        bool IsInPool { get;  set; }
     }
 }

@@ -1,7 +1,9 @@
 {
     "name": "Bliss.Core",
     "rootNamespace": "Bliss",
-    "references": [],
+    "references": [
+        "GUID:d37b055a4c37143d99ab80e4a0304aae"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

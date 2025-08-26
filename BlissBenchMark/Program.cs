@@ -6,6 +6,6 @@ class Program
 {
     static void Main(string[] args)
     {
-        BenchmarkRunner.Run<ConcurrentQueueBenchmark>();
+        BenchmarkRunner.Run<BlockCopyBenchmark>();
     }
 }
