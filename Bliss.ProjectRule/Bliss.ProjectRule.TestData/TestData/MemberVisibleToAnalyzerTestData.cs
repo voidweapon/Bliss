@@ -10,7 +10,7 @@ public interface ITestMember
 
 public class TestMember : ITestMember
 {
-    [Bliss.MemberVisibleTo(typeof(ConsumerA), MemberVisibleToAttribute.EAccess.Get)]
+    [Bliss.MemberVisibleTo(typeof(ConsumerA), MemberVisibleToAttribute.EAccess.Set)]
     public int HP { get; set; }
 
     [Bliss.MemberVisibleTo(typeof(ConsumerA), MemberVisibleToAttribute.EAccess.Set)]
@@ -24,6 +24,11 @@ public class TestMember : ITestMember
         
         int mp = MP;
         MP = 2 + 3;
+
+        {
+            int xx = 11;
+            xx += 22;
+        }
     }
 
     public void TestMethod()

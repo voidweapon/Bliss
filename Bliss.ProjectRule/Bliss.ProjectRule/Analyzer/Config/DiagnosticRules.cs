@@ -19,4 +19,41 @@ namespace Bliss.ProjectRule.Analyzer
                 true,
                 Description);
     }
+    
+    public static class EntitySystemOfAnalyzerRule
+    {
+        private const string Title = "EntitySystemOf标签只能添加到分部静态类上";
+
+        private const string MessageFormat = "实体逻辑类: {0} 必须是 static partial class";
+
+        private const string Description = "EntitySystemOf标签只能添加到分部静态类上.";
+
+        public static readonly DiagnosticDescriptor Rule =
+            new DiagnosticDescriptor(DiagnosticIds.EntitySystemOfRuleId,
+                Title,
+                MessageFormat,
+                DiagnosticCategories.SourceGenerate,
+                DiagnosticSeverity.Error,
+                true,
+                Description);
+    }
+    
+    
+    public static class EntitySystemMethodAnalyzerRule
+    {
+        private const string Title = "EntitySystem缺少生命周期函数";
+
+        private const string MessageFormat = "实体逻辑类: {0} 缺少生命周期函数: {1}";
+
+        private const string Description = "EntitySystem缺少生命周期函数.";
+
+        public static readonly DiagnosticDescriptor Rule =
+            new DiagnosticDescriptor(DiagnosticIds.EntitySystemMethodRuleId,
+                Title,
+                MessageFormat,
+                DiagnosticCategories.EntitySystem,
+                DiagnosticSeverity.Error,
+                true,
+                Description);
+    }
 }

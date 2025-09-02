@@ -7,7 +7,7 @@ namespace Bliss.ProjectRule.Analyzer
 
         public static readonly string[] All = new string[]
         {
-            Core, "RuleTest"
+            Core, "Bliss.ProjectRule.TestData",
         };
     }
 }
