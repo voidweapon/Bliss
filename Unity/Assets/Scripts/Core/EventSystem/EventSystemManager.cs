@@ -10,6 +10,11 @@ namespace Bliss.EventSystems
     {
         private MultiMapList<Type, EventInfo> _allStaticEvents = new MultiMapList<Type, EventInfo>();
         
+        /// <summary>
+        /// (Argument Type, InvokeType) -> Invoke Handle Obj
+        /// </summary>
+        private Dictionary<(Type, long), IInvokeHandler> _allStaticInvokers = new Dictionary<(Type, long), IInvokeHandler>();
+        
         public void Init()
         {
             foreach (var type in TypeManager.Instance.GetTypes(typeof(EventAttribute)))
@@ -37,6 +42,11 @@ namespace Bliss.EventSystems
         internal bool TryGetStaticEvents(Type eventType, out List<EventInfo> events)
         { 
             return _allStaticEvents.TryGetValue(eventType, out  events);
+        }
+
+        internal bool TryGetInvoke(Type argType, long invokeType, out IInvokeHandler invokeHandler)
+        {
+            return _allStaticInvokers.TryGetValue((argType, invokeType), out invokeHandler);
         }
         
         internal class EventInfo

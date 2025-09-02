@@ -8,7 +8,17 @@ using ET;
 
 namespace Bliss
 {
-    public class EventSystem : Entity
+
+    [EntitySystemOf(typeof(EventSystem))]
+    public static partial class EventSystemLogic
+    {
+        public static void Update(this EventSystem self)
+        {
+            self.UpdateInner();
+        }
+    }
+
+    public class EventSystem : Entity, IUpdate
     {
         private Queue<AEventDataPack> _lateEventQueue = new Queue<AEventDataPack>();
         
@@ -104,6 +114,47 @@ namespace Bliss
             catch (Exception e)
             {
                 Log.Error(e);
+            }
+        }
+
+        public void Invoke<TArg>(TArg arg, long invokeType) where TArg : struct
+        {
+            if (!EventSystemManager.Instance.TryGetInvoke(typeof(TArg), invokeType, out var invokeHandler))
+            {
+                throw new Exception($"Not Found Invoke Handler ArgumentType={typeof(TArg).FullName} invokeType={invokeType}");
+            }
+
+            if (invokeHandler is not AInvokeHandlerHandler<TArg> handler)
+            {
+                throw new Exception($"invokeHandler is  not AInvokeHandler: {invokeHandler.GetType()} {typeof(TArg).FullName}");
+            }
+            
+            handler.Handle(arg);
+        }
+
+        public TResult Invoke<TArg, TResult>(TArg arg, long invokeType) where TArg : struct
+        {
+            if (!EventSystemManager.Instance.TryGetInvoke(typeof(TArg), invokeType, out var invokeHandler))
+            {
+                throw new Exception($"Not Found Invoke Handler ArgumentType={typeof(TArg).FullName} invokeType={invokeType}");
+            }
+
+            if (invokeHandler is not AInvokeHandlerHandler<TArg, TResult> handler)
+            {
+                throw new Exception($"invokeHandler is  not AInvokeHandler: {invokeHandler.GetType()} {typeof(TArg).FullName}");
+            }
+            
+            return  handler.Handle(arg);
+        }
+        
+        internal void UpdateInner()
+        {
+            int count = _lateEventQueue.Count;
+            while (count > 0)
+            {
+                count--;
+                var eventData = _lateEventQueue.Dequeue();
+                eventData.Run();
             }
         }
 

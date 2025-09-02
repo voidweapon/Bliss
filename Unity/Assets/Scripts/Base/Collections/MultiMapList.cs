@@ -9,6 +9,15 @@ namespace Bliss.Base.Collections
     /// </summary>
     public class MultiMapList<TKey, TValue>: Dictionary<TKey, List<TValue>>
     {
+        public MultiMapList() 
+        {
+            
+        }
+        public MultiMapList(int capacity) : base(capacity)
+        {
+            
+        }
+        
         public void Add(TKey key, TValue value)
         {
             if (!this.TryGetValue(key, out var list))

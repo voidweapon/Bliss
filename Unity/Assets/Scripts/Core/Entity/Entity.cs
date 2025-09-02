@@ -60,13 +60,13 @@ namespace Bliss
         /// </summary>
         protected ILogicScene _logicScene;
 
-        protected ILogicScene LogicScene
+        public ILogicScene LogicScene
         {
             get
             {
                 return _logicScene;
             }
-            set
+            protected set
             {
                 if (value == null)
                 {
