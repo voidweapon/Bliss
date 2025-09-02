@@ -175,13 +175,58 @@ namespace Bliss
             return entity;
         }
         
-        public T AddChildWithId<T>(int id, bool isFromPool = false) where T : Entity
+        public T AddChild<T, TArg>(TArg arg, bool isFromPool = false) where T : Entity
+        {
+            T entity = (T)Entity.Create(typeof(T), isFromPool);
+            entity.Id = Bliss.Id.IdGenerator.Instance.GenerateId();
+            entity.Parent = this;
+            GetEntitySystem().Awake(entity, arg);
+            return entity;
+        }
+        
+        public T AddChildWithId<T>(long id, bool isFromPool = false) where T : Entity
         {
             T entity = (T)Entity.Create(typeof(T), isFromPool);
             entity.Id = Id;
             entity.Parent = this;
             GetEntitySystem().Awake(entity);
             return entity;
+        }
+        
+        public T AddChildWithId<T, TArg>(long id, TArg arg, bool isFromPool = false) where T : Entity
+        {
+            T entity = (T)Entity.Create(typeof(T), isFromPool);
+            entity.Id = Id;
+            entity.Parent = this;
+            GetEntitySystem().Awake(entity);
+            return entity;
+        }
+
+        public T GetChild<T>(long id) where T : Entity
+        {
+            if (_children == null)
+            {
+                return null;
+            }
+            _children.TryGetValue(id, out Entity child);
+            return child as T;
+        }
+
+        public void RemoveChild(long id)
+        {
+            if (_children == null)
+            {
+                return;
+            }
+
+
+            if (!_children.TryGetValue(id, out Entity child))
+            {
+                return;
+            }
+
+            _children.Remove(id);
+            child.Dispose();
         }
         
         /// <summary>
@@ -350,6 +395,29 @@ namespace Bliss
             }
             
             return component;
+        }
+
+        public void RemoveComponent<TComponent>() where TComponent : Entity
+        {
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            if (_components == null)
+            {
+                return;
+            }
+
+            Type type = typeof (TComponent);
+            
+            if (!_components.TryGetValue(this.GetLongHashCode(type), out var component))
+            {
+                return;
+            }
+
+            RemoveFromComponents(component);
+            component.Dispose();
         }
         
         #endregion

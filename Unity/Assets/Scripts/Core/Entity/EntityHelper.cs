@@ -1,3 +1,5 @@
+using Bliss.Timer;
+
 namespace Bliss
 {
     public static class EntityHelper
@@ -21,6 +23,16 @@ namespace Bliss
         public static EventSystem RootEventSystem(this Entity entity)
         {
             return entity.Root().GetComponent<EventSystem>();
+        }
+        
+        public static TimerComponent RootTimerComponent(this Entity entity)
+        {
+            return entity.Root().GetComponent<TimerComponent>();
+        }
+        
+        public static CoroutineLockComponent RootCoroutineLockComponent(this Entity entity)
+        {
+            return entity.Root().GetComponent<CoroutineLockComponent>();
         }
     }
 }
