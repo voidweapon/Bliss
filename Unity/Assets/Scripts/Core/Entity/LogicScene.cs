@@ -2,6 +2,7 @@ namespace Bliss
 {
     public interface ILogicScene
     {
+        Root Root { get; set; }
         ELogicSceneType SceneType { get; set; } 
     }
     
@@ -14,7 +15,7 @@ namespace Bliss
         /// </summary>
         public string Name;
 
-        public LogicScene()
+        internal LogicScene()
         {
             
         }

@@ -7,13 +7,13 @@ namespace Bliss.Base.Collections
     /// key -> List Sorted Collection
     /// <para><c>not thread-safe</c></para>
     /// </summary>
-    public class SortedMultiMap<TKey, TValue>: SortedDictionary<TKey, List<TValue>>
+    public class SortedMultiMapList<TKey, TValue>: SortedDictionary<TKey, List<TValue>>
     {
         private readonly List<TValue> Empty = new();
         private readonly int maxPoolCount;
         private readonly Queue<List<TValue>> pool;
 
-        public SortedMultiMap(int maxPoolCount = 0)
+        public SortedMultiMapList(int maxPoolCount = 0)
         {
             this.maxPoolCount = maxPoolCount;
             this.pool = new Queue<List<TValue>>(maxPoolCount);

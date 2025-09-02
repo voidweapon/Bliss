@@ -1,0 +1,13 @@
+using System;
+
+namespace Bliss
+{
+    public interface ISystem
+    {
+        Type GetEntityType();
+
+        Type GetSystemCategoryType();
+        
+        ESystemUpdateGroup GetUpdateGroup();
+    }
+}

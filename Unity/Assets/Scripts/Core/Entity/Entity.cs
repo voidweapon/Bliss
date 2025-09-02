@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Bliss.Id;
 using Bliss.Pool;
 
 namespace Bliss
@@ -8,15 +9,19 @@ namespace Bliss
 
     public enum EEntityStatus
     {
-        
+        //是否是池化对象
     }
     
     public class Entity : DisposableObject, IPoolableObject
     {
         public bool IsFromPool { get; set; }
         public bool IsInPool { get; set; }
-        
         public bool IsComponent { get; private set; }
+
+        /// <summary>
+        /// 对象是否是序列化出来的
+        /// </summary>
+        public bool IsSerialized { get; private set; }
 
         public bool IsDisposed => InstanceId == 0;
 
@@ -24,12 +29,12 @@ namespace Bliss
         public long InstanceId { get; protected set; }
         
             
-        protected Entity()
+        protected  Entity()
         {
            
         }
 
-        protected static Entity Create(Type type, bool isFromPool)
+        private static Entity Create(Type type, bool isFromPool)
         {
             Entity entity;
             if (isFromPool)
@@ -43,6 +48,7 @@ namespace Bliss
 
             entity.Id = 0;
             entity.InstanceId = 0;
+            entity.IsSerialized = false;
             
             return entity;
         }
@@ -52,7 +58,55 @@ namespace Bliss
         /// <summary>
         /// 挂载在哪个场景上
         /// </summary>
-        protected ILogicScene LogicScene;
+        protected ILogicScene _logicScene;
+
+        protected ILogicScene LogicScene
+        {
+            get
+            {
+                return _logicScene;
+            }
+            set
+            {
+                if (value == null)
+                {
+                    throw new Exception($"logicScene cant set null: {GetType().FullName}");
+                }
+                
+                if (_logicScene == value)
+                {
+                    return;
+                }
+                
+                var prevLogicScene = _logicScene;
+                _logicScene = value;
+                
+                if (prevLogicScene == null)
+                {
+                    if (InstanceId == 0)
+                    {
+                        InstanceId = IdGenerator.Instance.GenerateInstanceId();
+                    }
+                }
+
+                if (_children != null)
+                {
+                    foreach (var child in _children.Values)
+                    {
+                        child.LogicScene = _logicScene;
+                    }
+                }
+
+                if (_components != null)
+                {
+                    foreach (var component in _components.Values)
+                    {
+                        component.LogicScene = _logicScene;
+                    }
+                }
+                
+            }
+        }
 
 
         #endregion
@@ -117,6 +171,16 @@ namespace Bliss
             T entity = (T)Entity.Create(typeof(T), isFromPool);
             entity.Id = Bliss.Id.IdGenerator.Instance.GenerateId();
             entity.Parent = this;
+            GetEntitySystem().Awake(entity);
+            return entity;
+        }
+        
+        public T AddChildWithId<T>(int id, bool isFromPool = false) where T : Entity
+        {
+            T entity = (T)Entity.Create(typeof(T), isFromPool);
+            entity.Id = Id;
+            entity.Parent = this;
+            GetEntitySystem().Awake(entity);
             return entity;
         }
         
@@ -165,7 +229,6 @@ namespace Bliss
         
 
         #endregion
-
 
         #region Entity Component
         protected SortedDictionary<long, Entity> _components;
@@ -251,18 +314,158 @@ namespace Bliss
             return component;
         }
 
-        public T AddComponent<T>(bool isFromPool = false) where T : Entity
+        public TComponent AddComponent<TComponent>(bool isFromPool = false) where TComponent : Entity
         {
-            Entity component = Create(typeof(T), isFromPool);
+            Entity component = Create(typeof(TComponent), isFromPool);
             component.Id = Id;
             component.SetComponentParent(this);
-            
-            return component as T;
+            GetEntitySystem().Awake(component);
+            return (TComponent)component;
         }
 
-        private Entity _componentParent;
-        #endregion
+        public TComponent AddComponentWithId<TComponent>(int id, bool isFromPool = false) where TComponent : Entity
+        {
+            Entity component = Create(typeof(TComponent), isFromPool);
+            component.Id = id;
+            component.SetComponentParent(this);
+            GetEntitySystem().Awake(component);
+            return (TComponent)component;
+        }
         
+        public TComponent GetComponent<TComponent>() where TComponent : Entity
+        {
+            return (TComponent)GetComponent(typeof(TComponent));
+        }
+
+        public Entity GetComponent(Type componentType)
+        {
+            if (_components == null)
+            {
+                return null;
+            } 
+            
+            if (!_components.TryGetValue(GetLongHashCode(componentType), out Entity component))
+            {
+                return null;
+            }
+            
+            return component;
+        }
+        
+        #endregion
+
+        public override void BeforeSerialize()
+        {
+            base.BeforeSerialize();
+            GetEntitySystem().Serialize(this);
+
+            if (_components != null && _components.Count > 0)
+            {
+                foreach (Entity component in _components.Values)
+                {
+                    if (component is not ISerializableEntity)
+                    {
+                        continue;
+                    }
+                    
+                    component.BeforeSerialize();
+                }
+            }
+            
+            if (_children != null && _children.Count > 0)
+            {
+                foreach (Entity child in _children.Values)
+                {
+                    if (child is not ISerializableEntity)
+                    {
+                        continue;
+                    }
+                    
+                    child.BeforeSerialize();
+                }
+            }
+        }
+
+        // public override void AfterDeserialize()
+        // {
+        //     base.AfterDeserialize();
+        //     
+        //     if (_components != null && _components.Count > 0)
+        //     {
+        //         foreach (Entity component in _components.Values)
+        //         {
+        //             component.AfterDeserialize();
+        //         }
+        //     }
+        //     
+        //     if (_children != null && _children.Count > 0)
+        //     {
+        //         foreach (Entity child in _children.Values)
+        //         {
+        //             child.AfterDeserialize();
+        //         }
+        //     }
+        //     
+        //     GetEntitySystem().Deserialize(this);
+        // }
+
+        public override void Dispose()
+        {
+            if(IsDisposed)
+            {
+              return;  
+            }
+
+            InstanceId = 0;
+
+            if (_children != null)
+            {
+                foreach (var child in _children.Values)
+                {
+                    child.Dispose();
+                }
+                _children.Clear();
+                ObjectPool.Instance.Recycle(_children);
+                _children = null;
+            }
+
+            if (_components != null)
+            {
+                foreach (var component in _components.Values)
+                {
+                    component.Dispose();
+                }
+                _components.Clear();
+                ObjectPool.Instance.Recycle(_components);
+                _components = null;
+            }
+
+            // 触发Destroy事件
+            GetEntitySystem().Destroy(this);
+            
+            _logicScene = null;
+
+            if (_parent != null && !_parent.IsDisposed)
+            {
+                if (IsComponent)
+                {
+                    _parent.RemoveFromComponents(this);
+                }
+                else
+                {
+                    _parent.RemoveFromChildren(this);
+                }
+            }
+
+            _parent = null;
+            base.Dispose();
+
+            //重置运行时状态
+            IsSerialized = false;
+            
+            ObjectPool.Instance.Recycle(this);
+        }
+
         protected virtual long GetLongHashCode(Type type)
         {
             return type.TypeHandle.Value.ToInt64();
@@ -285,6 +488,12 @@ namespace Bliss
             {
                 throw new Exception($"cant set parent because parent domain is null: {GetType().FullName} {value.GetType().FullName}");
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private EntitySystem GetEntitySystem()
+        {
+            return LogicScene.Root.EntitySystem;
         }
     }
 }

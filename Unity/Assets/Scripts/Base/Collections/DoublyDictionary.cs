@@ -3,7 +3,11 @@ using System.Collections.Generic;
 
 namespace Bliss.Base.Collections
 {
-public class DoublyDictionary<TKey, TValue>
+	/// <summary>
+	/// key -> value -> key Collection
+	/// <para><c>not thread-safe</c></para>
+	/// </summary>
+	public class DoublyDictionary<TKey, TValue>
 	{
 		private readonly Dictionary<TKey, TValue> kv = new();
 		private readonly Dictionary<TValue, TKey> vk = new();

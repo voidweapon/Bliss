@@ -1,10 +1,19 @@
 namespace Bliss
 {
+    public interface ISingletonInit
+    {
+        void Init();
+    }
+    
+    public interface ISingletonInit<T>
+    {
+        void Init(T param);
+    }
+    
     public abstract class ASingleton : DisposableObject
     {
         internal abstract void Register();
     }
-
 
     public abstract class Singleton<T> : ASingleton where T : Singleton<T>
     {

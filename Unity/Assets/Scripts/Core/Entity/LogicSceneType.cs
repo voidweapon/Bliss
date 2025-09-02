@@ -1,6 +1,9 @@
+using System;
+
 namespace Bliss
 {
-    public enum ELogicSceneType : ulong
+    [Flags]
+    public enum ELogicSceneType : long
     {
         None = 0,
         

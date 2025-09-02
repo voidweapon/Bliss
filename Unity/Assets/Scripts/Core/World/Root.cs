@@ -29,6 +29,8 @@ namespace Bliss
         private Queue<int> _addQueue = new Queue<int>();
         private Queue<int> _removeQueue = new Queue<int>();
         
+        public EntitySystem EntitySystem { get; private set; }
+        
 
         internal Root(int id, int zone, ELogicSceneType sceneType, string name)
         {
@@ -36,6 +38,7 @@ namespace Bliss
             Zone = zone;
             Scene = new LogicScene(this, id, sceneType, name);
             RootNode = this;
+            EntitySystem = new EntitySystem();
         }
 
         public Root CreateChild(int id, ELogicSceneType sceneType, string name)
@@ -60,6 +63,8 @@ namespace Bliss
 
         internal void Update()
         {
+            EntitySystem.Update();
+            
             int count = _updateQueue.Count;
             for (int i = 0; i < count; i++)
             {
@@ -83,6 +88,8 @@ namespace Bliss
 
         internal void LateUpdate()
         {
+            EntitySystem.LateUpdate();
+            
             int count = _updateQueue.Count;
             for (int i = 0; i < count; i++)
             {

@@ -3,19 +3,28 @@ using System.ComponentModel;
 
 namespace Bliss
 {
-    public abstract class DisposableObject : BObject, IDisposable, ISupportInitialize
+    public abstract class DisposableObject : BObject, IDisposable, ISupportSerialize
     {
         public virtual void Dispose()
         {
             
         }
 
-        public virtual void BeginInit()
+        /// <summary>
+        /// 在序列话之前调用
+        /// 可以在里面做序列话的准备工作
+        /// </summary>
+        public virtual void BeforeSerialize()
         {
             
         }
 
-        public virtual void EndInit()
+        
+        /// <summary>
+        /// 在反序列化之后调用
+        /// 可以在里面做一些对象初始化工作
+        /// </summary>
+        public virtual void AfterDeserialize()
         {
             
         }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using Bliss;
 
@@ -8,6 +9,7 @@ namespace Bliss
     {
         private void Awake()
         {
+            Debug.Log($"{typeof(List<int>)}");
             DontDestroyOnLoad(gameObject);
             
             Log.Logger = new UnityLogger();
