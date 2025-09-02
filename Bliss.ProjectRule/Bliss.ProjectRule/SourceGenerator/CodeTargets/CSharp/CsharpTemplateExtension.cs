@@ -43,6 +43,7 @@ internal class CsharpTemplateExtension : ScriptObject
         for (int i = offset; i < generic_types.Count; i++)
         {
             var generic_type =  generic_types[i];
+            generic_type = generic_type.Replace('.', '_');
             sb.Append($"_{generic_type}");
         }
         
