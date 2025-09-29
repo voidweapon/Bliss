@@ -1,0 +1,19 @@
+{
+    "name": "Bliss.Model",
+    "rootNamespace": "Bliss",
+    "references": [
+        "GUID:d37b055a4c37143d99ab80e4a0304aae",
+        "GUID:b29d92c5f98f74ee09d1e1ebd807d906",
+        "GUID:a0af8d77fa80e44e5ab8c9bd5b42bec9",
+        "GUID:d8b63aba1907145bea998dd612889d6b"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

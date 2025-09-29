@@ -124,52 +124,24 @@ namespace Bliss
 
         #region Update Call
 
+        public void EarlyUpdate()
+        {
+            UpdateSystemUpdateGroup<IEarlyUpdate, IEarlyUpdateSystem>(ESystemUpdateGroup.EarlyUpdate);
+        }
+
         public void Update()
         {
-            Queue<EntityWeakRef<Entity>> updateQueue = _updateQueue[(int)ESystemUpdateGroup.Update];
-            int thisFrameCount = updateQueue.Count;
-            while (thisFrameCount > 0)
-            {
-                var entity = (Entity)updateQueue.Dequeue();
-                thisFrameCount--;
-                
-                if (entity == null || entity.IsDisposed)
-                {
-                    continue;
-                }
-
-                if (entity is not IUpdate)
-                {
-                    continue;
-                }
-
-                try
-                {
-                    var updateSystems = EntitySystemManager.Instance.GetEntitySystems(entity.GetType(), typeof(IUpdateSystem));
-                    if (updateSystems == null)
-                    {
-                        continue;
-                    }
-                    updateQueue.Enqueue(entity);
-
-                    foreach (var system in updateSystems)
-                    {
-                        var updateSystem = (IUpdateSystem)system;
-                        if (updateSystem == null)
-                        {
-                            continue;
-                        }
-                        updateSystem.Run(entity);
-                    }
-                }
-                catch (Exception e)
-                {
-                    throw new Exception($"entity system update fail: {entity.GetType().FullName}", e);
-                }
-            }
+            UpdateSystemUpdateGroup<IUpdate, IUpdateSystem>(ESystemUpdateGroup.Update);
         }
 
         public void LateUpdate()
+        {
+            UpdateSystemUpdateGroup<ILateUpdate, ILateUpdateSystem>(ESystemUpdateGroup.LateUpdate);
+        }
+
+        private void UpdateSystemUpdateGroup<TEntity, TSystem>(ESystemUpdateGroup updateGroup) 
+            where TEntity : IEntitySystemConstraint 
+            where TSystem : IUpdateGroupSystem
         {
             Queue<EntityWeakRef<Entity>> lateUpdateQueue = _updateQueue[(int)ESystemUpdateGroup.LateUpdate];
             int thisFrameCount = lateUpdateQueue.Count;
@@ -183,14 +155,14 @@ namespace Bliss
                     continue;
                 }
 
-                if (entity is not ILateUpdate)
+                if (entity is not TEntity)
                 {
                     continue;
                 }
 
                 try
                 {
-                    var lateUpdateSystems = EntitySystemManager.Instance.GetEntitySystems(entity.GetType(), typeof(ILateUpdateSystem));
+                    var lateUpdateSystems = EntitySystemManager.Instance.GetEntitySystems(entity.GetType(), typeof(TSystem));
                     if (lateUpdateSystems == null)
                     {
                         continue;
@@ -199,21 +171,21 @@ namespace Bliss
 
                     foreach (var system in lateUpdateSystems)
                     {
-                        var updateSystem = (ILateUpdateSystem)system;
+                        var updateSystem = (TSystem)system;
                         if (updateSystem == null)
                         {
                             continue;
                         }
                         updateSystem.Run(entity);
+                        updateSystem.Run(entity);
                     }
                 }
                 catch (Exception e)
                 {
-                    throw new Exception($"entity system lateUpdate fail: {entity.GetType().FullName}", e);
+                    throw new Exception($"entity system ${updateGroup} fail: {entity.GetType().FullName}", e);
                 }
             }
         }
-
         #endregion
     }
 }

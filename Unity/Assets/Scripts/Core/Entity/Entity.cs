@@ -187,7 +187,7 @@ namespace Bliss
         public T AddChildWithId<T>(long id, bool isFromPool = false) where T : Entity
         {
             T entity = (T)Entity.Create(typeof(T), isFromPool);
-            entity.Id = Id;
+            entity.Id = id;
             entity.Parent = this;
             GetEntitySystem().Awake(entity);
             return entity;
@@ -196,7 +196,7 @@ namespace Bliss
         public T AddChildWithId<T, TArg>(long id, TArg arg, bool isFromPool = false) where T : Entity
         {
             T entity = (T)Entity.Create(typeof(T), isFromPool);
-            entity.Id = Id;
+            entity.Id = id;
             entity.Parent = this;
             GetEntitySystem().Awake(entity);
             return entity;
@@ -365,6 +365,15 @@ namespace Bliss
             component.Id = Id;
             component.SetComponentParent(this);
             GetEntitySystem().Awake(component);
+            return (TComponent)component;
+        }
+        
+        public TComponent AddComponent<TComponent, TParam>(TParam param, bool isFromPool = false) where TComponent : Entity
+        {
+            Entity component = Create(typeof(TComponent), isFromPool);
+            component.Id = Id;
+            component.SetComponentParent(this);
+            GetEntitySystem().Awake(component, param);
             return (TComponent)component;
         }
 

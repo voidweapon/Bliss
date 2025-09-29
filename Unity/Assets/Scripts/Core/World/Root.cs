@@ -36,7 +36,7 @@ namespace Bliss
         {
             Id = id;
             Zone = zone;
-            Scene = new LogicScene(this, id, sceneType, name);
+            Scene = new LogicScene(this, id, 1, sceneType, name);
             RootNode = this;
             EntitySystem = new EntitySystem();
         }
@@ -61,32 +61,37 @@ namespace Bliss
             _removeQueue.Enqueue(id);
         }
 
+        internal void EarlyUpdate()
+        {
+            UpdateTiming(TimingEarly);
+
+            void TimingEarly(Root root)
+            {
+                root.EarlyUpdate();
+            }
+        }
+        
         internal void Update()
         {
-            EntitySystem.Update();
-            
-            int count = _updateQueue.Count;
-            for (int i = 0; i < count; i++)
-            {
-                var rootId =  _updateQueue.Dequeue();
-                var item  = Get(rootId);
-                
-                if (item == null)
-                {
-                    continue;
-                }
+            UpdateTiming(TimingUpdate);
 
-                if (item.IsDisposed)
-                {
-                    continue;
-                }
-                
-                item.Update();
-                _updateQueue.Enqueue(rootId);
+            void TimingUpdate(Root root)
+            {
+                root.Update();
             }
         }
 
         internal void LateUpdate()
+        {
+            UpdateTiming(TimingLate);
+
+            void TimingLate(Root root)
+            {
+                root.LateUpdate();
+            }
+        }
+        
+        private void UpdateTiming(Action<Root> updateAction)
         {
             EntitySystem.LateUpdate();
             
@@ -106,7 +111,7 @@ namespace Bliss
                     continue;
                 }
                 
-                item.LateUpdate();
+                updateAction(item);
                 _updateQueue.Enqueue(rootId);
             }
             
@@ -125,6 +130,8 @@ namespace Bliss
                 _updateQueue.Enqueue(rootId);
             }
         }
+        
+        
         
         public void Dispose()
         {

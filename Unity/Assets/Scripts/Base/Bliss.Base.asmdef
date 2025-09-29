@@ -2,11 +2,12 @@
     "name": "Bliss.Base",
     "rootNamespace": "Bliss",
     "references": [
+        "GUID:a0af8d77fa80e44e5ab8c9bd5b42bec9",
         "GUID:d8b63aba1907145bea998dd612889d6b"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
-    "allowUnsafeCode": false,
+    "allowUnsafeCode": true,
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,

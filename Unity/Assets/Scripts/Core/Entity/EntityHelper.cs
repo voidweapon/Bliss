@@ -18,12 +18,6 @@ namespace Bliss
         {
             return entity.LogicScene.Root.Scene;
         }
-
-
-        public static EventSystem RootEventSystem(this Entity entity)
-        {
-            return entity.Root().GetComponent<EventSystem>();
-        }
         
         public static TimerComponent RootTimerComponent(this Entity entity)
         {

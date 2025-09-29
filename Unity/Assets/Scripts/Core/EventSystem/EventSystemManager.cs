@@ -2,11 +2,12 @@ using System;
 using System.Collections.Generic;
 using Bliss.Base.Collections;
 using Bliss.Core;
+using Bliss.Core.EventSystem;
 
-namespace Bliss.EventSystems
+namespace Bliss
 {
     [SingletonManger]
-    public class EventSystemManager : Singleton<EventSystemManager>, ISingletonInit
+    public partial class EventSystem : ISingletonInit
     {
         private MultiMapList<Type, EventInfo> _allStaticEvents = new MultiMapList<Type, EventInfo>();
         
@@ -35,6 +36,29 @@ namespace Bliss.EventSystems
                     EventInfo eventInfo = new EventInfo(obj, eventAttribute.SceneType);
 
                     _allStaticEvents.Add(eventType, eventInfo);
+                }
+            }
+            
+            foreach (var type in TypeManager.Instance.GetTypes(typeof(InvokeAttribute)))
+            {
+                IInvokeHandler obj = Activator.CreateInstance(type) as IInvokeHandler;
+                if (obj == null)
+                {
+                    throw new Exception($"type not is IInvokeHandler: {type.Name}");
+                }
+                
+                object[] attrs = type.GetCustomAttributes(typeof(InvokeAttribute), false);
+                foreach (object attr in attrs)
+                {
+                    InvokeAttribute invokeAttribute = attr as InvokeAttribute;
+                    try
+                    {
+                        _allStaticInvokers.Add((obj.ArgumentType, invokeAttribute.InvokeHandleType), obj);
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error($"invoke duplicate invoke handle type {invokeAttribute.InvokeHandleType}: {e}");
+                    }
                 }
             }
         }

@@ -10,4 +10,9 @@ namespace Bliss
         
         ESystemUpdateGroup GetUpdateGroup();
     }
+
+    public interface IUpdateGroupSystem : ISystem
+    {
+        void Run(Entity entity);
+    }
 }

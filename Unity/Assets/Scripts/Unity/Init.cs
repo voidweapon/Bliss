@@ -1,7 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
-using Bliss;
+using Bliss.Base;
+using Bliss.Core;
+using ET;
+using YooAsset;
 
 namespace Bliss
 {
@@ -9,20 +13,12 @@ namespace Bliss
     {
         private void Awake()
         {
-            Debug.Log($"{typeof(List<int>)}");
-            DontDestroyOnLoad(gameObject);
-            
-            Log.Logger = new UnityLogger();
-            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
-            {
-                Log.Error(e.ExceptionObject.ToString());
-            };
-            
-            World.Instance.AddSingleton<RootManager>();
+            InitFramework().Coroutine();
         }
 
         public void Update()
         {
+            World.Instance.EarlyUpdate();
             World.Instance.Update();
         }
         
@@ -40,6 +36,27 @@ namespace Bliss
         public void OnApplicationQuit()
         {
             World.Instance.Dispose();
+        }
+
+        private async ETTask InitFramework()
+        {
+            DontDestroyOnLoad(gameObject);
+            
+            Log.Logger = new UnityLogger();
+            ETTask.ExceptionHandler += Log.Error;
+            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+            {
+                Log.Error(e.ExceptionObject.ToString());
+            };
+            
+            World.Instance.AddSingleton<RootManager>();
+
+            await World.Instance.AddSingleton<SimpleResourcesComponent, EPlayMode>(EPlayMode.EditorSimulateMode).CreatePackageAsync("DefaultPackage", true);
+            
+            World.Instance.AddSingleton<CodeLoader>();
+            await CodeLoader.Instance.DownloadDllsAsync();
+            
+            CodeLoader.Instance.Start();
         }
     }
 }

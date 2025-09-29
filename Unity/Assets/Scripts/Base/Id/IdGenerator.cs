@@ -14,34 +14,34 @@ namespace Bliss.Id
         public long ToLong()
         {
             ulong result = 0;
-            result |= (ushort) this.Process;
+            result |= (ushort) Process;
             result <<= 30;
-            result |= this.Time;
+            result |= Time;
             result <<= 20;
-            result |= this.Value;
+            result |= Value;
             return (long) result;
         }
 
         public IdStruct(uint time, short process, uint value)
         {
-            this.Process = process;
-            this.Time = time;
-            this.Value = value;
+            Process = process;
+            Time = time;
+            Value = value;
         }
 
         public IdStruct(long id)
         {
             ulong result = (ulong) id; 
-            this.Value = (uint) (result & IdGenerator.Mask20bit);
+            Value = (uint) (result & IdGenerator.Mask20bit);
             result >>= 20;
-            this.Time = (uint) result & IdGenerator.Mask30bit;
+            Time = (uint) result & IdGenerator.Mask30bit;
             result >>= 30;
-            this.Process = (short) (result & IdGenerator.Mask14bit);
+            Process = (short) (result & IdGenerator.Mask14bit);
         }
 
         public override string ToString()
         {
-            return $"process: {this.Process}, time: {this.Time}, value: {this.Value}";
+            return $"process: {Process}, time: {Time}, value: {Value}";
         }
 
         public static explicit operator long(IdStruct id)
@@ -63,29 +63,29 @@ namespace Bliss.Id
         public long ToLong()
         {
             ulong result = 0;
-            result |= this.Time;
+            result |= Time;
             result <<= 32;
-            result |= this.Value;
+            result |= Value;
             return (long) result;
         }
 
         public InstanceIdStruct(uint time, uint value)
         {
-            this.Time = time;
-            this.Value = value;
+            Time = time;
+            Value = value;
         }
 
         public InstanceIdStruct(long id)
         {
             ulong result = (ulong) id; 
-            this.Value = (uint)(result & uint.MaxValue);
+            Value = (uint)(result & uint.MaxValue);
             result >>= 32;
-            this.Time = (uint)(result & uint.MaxValue);
+            Time = (uint)(result & uint.MaxValue);
         }
 
         public override string ToString()
         {
-            return $"time: {this.Time}, value: {this.Value}";
+            return $"time: {Time}, value: {Value}";
         }
         
         public static explicit operator long(InstanceIdStruct id)
@@ -112,7 +112,6 @@ namespace Bliss.Id
             }
         }
 
-        public long FrameTime;
         public short Process;
         
         public const int MaxZone = 1024;
@@ -128,39 +127,39 @@ namespace Bliss.Id
         
         private IdGenerator()
         {
-            long epoch1970tick = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks / 10000;
-            this.epoch2022 = new DateTime(2022, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks / 10000 - epoch1970tick;
+            long epoch1970Tick = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks / 10000;
+            epoch2022 = new DateTime(2022, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks / 10000 - epoch1970Tick;
         }
         
-        private uint TimeSince2022()
+        private uint TimeSince2022(long frameTimeSince1970MS)
         {
-            uint a = (uint)((FrameTime - this.epoch2022) / 1000);
+            uint a = (uint)((frameTimeSince1970MS - epoch2022) / 1000);
             return a;
         }
         
-        public long GenerateId()
+        public long GenerateId(long frameTimeSince1970MS)
         {
-            uint time = TimeSince2022();
+            uint time = TimeSince2022(frameTimeSince1970MS);
             int v = 0;
             
             // 这里必须加锁
             lock (this)
             {
-                if (++this.value > Mask20bit - 1)
+                if (++value > Mask20bit - 1)
                 {
-                    this.value = 0;
+                    value = 0;
                 }
-                v = this.value;
+                v = value;
             }
             
             IdStruct idStruct = new(time, Process, (uint)v);
             return idStruct.ToLong();
         }
         
-        public long GenerateInstanceId()
+        public long GenerateInstanceId(long frameTimeSince1970MS)
         {
-            uint time = this.TimeSince2022();
-            uint v = (uint)Interlocked.Add(ref this.instanceIdValue, 1);
+            uint time = TimeSince2022(frameTimeSince1970MS);
+            uint v = (uint)Interlocked.Add(ref instanceIdValue, 1);
             InstanceIdStruct instanceIdStruct = new(time, v);
             return instanceIdStruct.ToLong();
         }

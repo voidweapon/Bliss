@@ -15,7 +15,7 @@ namespace Bliss.Timer
         public long DurationMS;
         
         /// <summary>
-        /// 计时器处理器标识
+        /// 计时器处理器类型标识
         /// </summary>
         public int TimerHandlerIdentifier;
         

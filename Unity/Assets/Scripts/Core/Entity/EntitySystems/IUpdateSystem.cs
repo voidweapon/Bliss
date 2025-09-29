@@ -7,9 +7,9 @@ namespace Bliss
         
     }
     
-    public interface IUpdateSystem : ISystem
+    public interface IUpdateSystem : IUpdateGroupSystem
     {
-        void Run(Entity entity);
+        
     }
 
     

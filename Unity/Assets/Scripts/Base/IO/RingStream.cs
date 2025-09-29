@@ -1,13 +1,26 @@
 using System;
 using System.Buffers;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 
 namespace Bliss.IO
 {
-    /// <summary>
-    /// 
-    /// </summary>
+
+    /*
+                _headInChunk                                   _tailInChunk
+                     |                                              |
+                     | <------------------Data--------------------> |
+                     v                                              v
+       +---------------+---------------+---------------+---------------+
+       |               |               |               |               |
+       +---------------+---------------+---------------+---------------+
+               ^                                                ^
+               |                                                |
+               |                                                |
+           HeadChunk                                        TailChunk
+
+     */
     public class RingStream : Stream
     {
         public override bool CanRead => true;
@@ -29,6 +42,17 @@ namespace Bliss.IO
             }
         }
 
+        public int HeadChunkLength
+        {
+            get
+            {
+                return ChunkSize - _headInChunk;
+            }
+        }
+        
+        public int HeadChunkPosition => _headInChunk;
+        public int TailChunkPosition => _tailInChunk;
+        
         public int ChunkSize { get; private set; } = 8192;
         
         private bool _isOpen = false;
@@ -40,16 +64,21 @@ namespace Bliss.IO
         
         public RingStream()
         {
-            init();
+            Init();
         }
         
         public RingStream(int chunkSize)
         {
+            if (chunkSize <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(chunkSize));
+            }
+            
             ChunkSize = chunkSize;
-            init();
+            Init();
         }
 
-        private void init()
+        private void Init()
         {
             _headInChunk = 0;
             _tailInChunk = 0;
@@ -72,7 +101,7 @@ namespace Bliss.IO
             throw new NotImplementedException();
         }
 
-        private byte[] HeadChunk
+        public byte[] HeadChunk
         {
             get
             {
@@ -84,7 +113,7 @@ namespace Bliss.IO
             }
         }
 
-        private byte[] TailChunk
+        public byte[] TailChunk
         {
             get
             {
@@ -96,18 +125,47 @@ namespace Bliss.IO
             }
         }
         
+        
+        /// <summary>
+        /// Remove Data from <see cref="HeadChunkPosition"/>
+        /// </summary>
+        /// <param name="count"></param>
+        public void Pull(int count)
+        {
+            _headInChunk += count;
+            while (_headInChunk >= ChunkSize)
+            {
+                _headInChunk -= ChunkSize;
+                DequeueChunk();
+            }
+        }
+
+        /// <summary>
+        /// Write Data from  <see cref="TailChunkPosition"/>
+        /// </summary>
+        /// <param name="count"></param>
+        public void Put(int count)
+        {
+            _tailInChunk += count;
+            while (_tailInChunk >= ChunkSize)
+            {
+                _tailInChunk -= ChunkSize;
+                EnqueueChunk();
+            }
+        }
+        
         /// <summary>
         /// 从当前流中读取字节块并将数据写入缓冲区。
         /// </summary>
-        /// <param name="buffer"></param>
+        /// <param name="destinationBuffer"></param>
         /// <param name="offset"></param>
         /// <param name="count"></param>
         /// <returns></returns>
-        public override int Read(byte[] buffer, int offset, int count)
+        public override int Read(byte[] destinationBuffer, int offset, int count)
         {
-            if (buffer.Length < offset + count)
+            if (destinationBuffer.Length < offset + count)
             {
-                throw new ArgumentException($"buff length {buffer.Length} exceeds buffer size {offset + count}");
+                throw new ArgumentException($"buff length {destinationBuffer.Length} exceeds buffer size {offset + count}");
             }
 
             count = System.Math.Min((int)Length, count);
@@ -118,13 +176,13 @@ namespace Bliss.IO
                 int readCount = count - read;
                 if (_headInChunk + readCount < ChunkSize)
                 {
-                    Array.Copy(HeadChunk, _headInChunk, buffer, offset + read, readCount);
+                    Array.Copy(HeadChunk, _headInChunk, destinationBuffer, offset + read, readCount);
                     read += readCount;
                     _headInChunk += readCount;
                 }
                 else
                 {
-                    Array.Copy(HeadChunk, _headInChunk, buffer, offset + read, ChunkSize - _headInChunk);
+                    Array.Copy(HeadChunk, _headInChunk, destinationBuffer, offset + read, ChunkSize - _headInChunk);
                     read += ChunkSize - _headInChunk;
                     DequeueChunk();
                     _headInChunk = 0;
@@ -134,6 +192,35 @@ namespace Bliss.IO
             return count;
         }
 
+        public override int Read(Span<byte> destinationBuffer)
+        {
+            int count = System.Math.Min((int)Length, destinationBuffer.Length);
+            int read = 0;
+            while (read < count)
+            {
+                int readCount = count - read;
+                if (_headInChunk + readCount < ChunkSize)
+                {
+                    HeadChunk.AsSpan(_headInChunk, readCount).CopyTo(destinationBuffer);
+                    destinationBuffer =  destinationBuffer.Slice(readCount);
+                    read += readCount;
+                    _headInChunk += readCount;
+                }
+                else
+                {
+                    readCount = ChunkSize - _headInChunk;
+                    HeadChunk.AsSpan(_headInChunk, readCount).CopyTo(destinationBuffer);
+                    destinationBuffer = destinationBuffer.Slice(readCount);
+
+                    read += readCount;
+                    DequeueChunk();
+                    _headInChunk = 0;
+                }
+            }
+            
+            return count;
+        }
+        
         /// <summary>
         /// 从当前流中读取字节块并将数据写入目标流
         /// </summary>
@@ -148,6 +235,7 @@ namespace Bliss.IO
             while (read < count)
             {
                 int readCount = count - read;
+
                 if (_headInChunk + readCount < ChunkSize)
                 {
                     destinationStream.Write(HeadChunk, _headInChunk, readCount);
@@ -185,18 +273,15 @@ namespace Bliss.IO
                 }
                 
                 int writeCount = count - written;
-                if (_tailInChunk + writeCount < ChunkSize)
+
+                if (_tailInChunk + writeCount >= ChunkSize)
                 {
-                    Array.Copy(buffer, offset + written, TailChunk, _tailInChunk, writeCount);
-                    written += writeCount;
-                    _tailInChunk += writeCount;
+                    writeCount =  ChunkSize - _tailInChunk;
                 }
-                else
-                {
-                    Array.Copy(buffer, offset + written, TailChunk, _tailInChunk, ChunkSize - _tailInChunk);
-                    written += (ChunkSize - _tailInChunk);
-                    _tailInChunk = ChunkSize;
-                }
+                
+                Array.Copy(buffer, offset + written, TailChunk, _tailInChunk, writeCount);
+                written += writeCount;
+                _tailInChunk += writeCount;
             }
         }
 
@@ -220,18 +305,14 @@ namespace Bliss.IO
                 }
                 
                 int writeCount = count - written;
-                if (_tailInChunk + writeCount < ChunkSize)
+                if (_tailInChunk + writeCount >= ChunkSize)
                 {
-                    sourceStream.Read(TailChunk, _tailInChunk, writeCount);
-                    written += writeCount;
-                    _tailInChunk += writeCount;
+                    writeCount = ChunkSize - _tailInChunk;
                 }
-                else
-                {
-                    sourceStream.Read(TailChunk, _tailInChunk, ChunkSize - _tailInChunk);
-                    written += (ChunkSize - _tailInChunk);
-                    _tailInChunk = ChunkSize;
-                }
+                
+                writeCount = sourceStream.Read(TailChunk, _tailInChunk, writeCount);
+                written += writeCount;
+                _tailInChunk = writeCount;
             }
         }
 

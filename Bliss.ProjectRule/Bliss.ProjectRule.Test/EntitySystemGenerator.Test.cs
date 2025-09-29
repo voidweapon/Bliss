@@ -46,6 +46,11 @@ public interface IAwake<T> : IEntitySystemConstraint
 
 }
 
+public interface IAwake<T, TParam0> : IEntitySystemConstraint
+{
+
+}
+
 public interface IUpdate : IEntitySystemConstraint
 {
 
@@ -53,7 +58,12 @@ public interface IUpdate : IEntitySystemConstraint
 
 
 
-public class Entity : IAwake<int>,  IUpdate
+public class Entity : IAwake<int, EntityInitData>,  IUpdate
+{
+
+}
+
+public struct EntityInitData 
 {
 
 }

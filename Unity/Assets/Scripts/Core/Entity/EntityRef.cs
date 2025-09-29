@@ -2,6 +2,7 @@ using System;
 
 namespace Bliss
 {
+    [WeakRefConstraint]
     public struct EntityRef<T> where T : Entity
     {
         private long _instanceId;
@@ -50,6 +51,7 @@ namespace Bliss
         }
     }
     
+    [WeakRefConstraint]
     public struct EntityWeakRef<T> where T : Entity
     {
         private long _instanceId;

@@ -29,6 +29,13 @@ namespace Bliss.Timer
         internal Dictionary<long, TimerAction> TimerActionMap = new Dictionary<long, TimerAction>();
         
         /// <summary>
+        /// 短时计时器
+        /// 过期时间为一帧的计时器
+        /// </summary>
+        internal Dictionary<long, TimerAction> LateTimerActionMap = new Dictionary<long, TimerAction>();
+        internal Queue<long> LateTimerIds = new Queue<long>();
+        
+        /// <summary>
         /// Temp collections for record timeout time
         /// </summary>
         internal Queue<long> TimeoutTimes = new Queue<long>();
@@ -106,6 +113,19 @@ namespace Bliss.Timer
             }
         }
 
+        private static void LateUpdateTImer(this TimerComponent self)
+        {
+            int thisTickCount = self.LateTimerIds.Count;
+            for (int i = 0; i < thisTickCount; i++)
+            {
+                var timerId = self.LateTimerIds.Dequeue();
+                if (self.LateTimerActionMap.TryGetValue(timerId, out var timerAction))
+                {
+                    self.Run(timerId, ref timerAction);
+                }
+            }
+        }
+
         /// <summary>
         /// 开启无限计时器， 执行间隔<see cref="intervalMS"/>
         /// </summary>
@@ -142,7 +162,7 @@ namespace Bliss.Timer
             self.EnsureInterval(intervalMS);
             
             long timerId = self.GetId();
-            TimerAction timer = new TimerAction(ETimerType.RepeatedTimer, timeNow, intervalMS, timerHandleType, userData);
+            TimerAction timer = new TimerAction(ETimerType.OnceTimer, timeNow, intervalMS, timerHandleType, userData);
             
             self.AddTimer(timerId, ref timer);
             return timerId;
@@ -161,31 +181,32 @@ namespace Bliss.Timer
             self.EnsureInterval(durationMS);
             long timeNow = self.GetNow();
             long timerId = self.GetId();
-            TimerAction timer = new TimerAction(ETimerType.RepeatedTimer, timeNow, durationMS, timerHandleType, userData);
+            TimerAction timer = new TimerAction(ETimerType.OnceTimer, timeNow, durationMS, timerHandleType, userData);
             
             self.AddTimer(timerId, ref timer);
             return timerId;
         }
-
+        
         /// <summary>
         /// 等待直到到达过期时间
         /// </summary>
         /// <param name="self"></param>
         /// <param name="expireAtMS">过期时间戳</param>
         /// <param name="cancellationToken"></param>
-        public static async ETTask WaitUntilAsync(this TimerComponent self, long expireAtMS,
+        /// <returns>True: Timer Execute;  False: Timer Canceled</returns>
+        public static async ETTask<bool> WaitUntilAsync(this TimerComponent self, long expireAtMS,
             ETCancellationToken cancellationToken = null)
         {
             long timeNow = self.GetNow();
             if (timeNow >= expireAtMS)
             {
-                return;
+                return true;
             }
             
             long intervalMS = expireAtMS - timeNow;
             self.EnsureInterval(intervalMS);
 
-            ETTask tcs = ETTask.Create(true);
+            var tcs = ETTask<bool>.Create(true);
             long timerId = self.GetId();
             TimerAction timer = new(ETimerType.OnceWaitTimer, timeNow, intervalMS, 0, tcs);
             self.AddTimer(timerId, ref timer);
@@ -194,14 +215,14 @@ namespace Bliss.Timer
             {
                 if (self.Remove(timerId))
                 {
-                    tcs.SetResult();
+                    tcs.SetResult(false);
                 }
             }
 
             try
             {
                 cancellationToken?.Add(CancelAction);
-                await tcs;
+                return await tcs;
             }
             finally
             {
@@ -215,34 +236,65 @@ namespace Bliss.Timer
         /// <param name="self"></param>
         /// <param name="durationMS">持续时间</param>
         /// <param name="cancellationToken"></param>
-        public static async ETTask WaitDurationAsync(this TimerComponent self, long durationMS,
+        /// <returns>True: Timer Execute;  False: Timer Canceled</returns>
+        public static async ETTask<bool> WaitDurationAsync(this TimerComponent self, long durationMS,
             ETCancellationToken cancellationToken = null)
         {
             long timeNow = self.GetNow();
             if (durationMS <= 0)
             {
-                return;
+                return true;
             }
             
             self.EnsureInterval(durationMS);
 
-            ETTask tcs = ETTask.Create(true);
+            var tcs = ETTask<bool>.Create(true);
             long timerId = self.GetId();
-            TimerAction timer = new(ETimerType.OnceWaitTimer, timeNow, durationMS, 0, tcs);
+            TimerAction timer = new TimerAction(ETimerType.OnceWaitTimer, timeNow, durationMS, 0, tcs);
             self.AddTimer(timerId, ref timer);
 
             void CancelAction()
             {
                 if (self.Remove(timerId))
                 {
-                    tcs.SetResult();
+                    tcs.SetResult(false);
                 }
             }
 
             try
             {
                 cancellationToken?.Add(CancelAction);
-                await tcs;
+                return await tcs;
+            }
+            finally
+            {
+                cancellationToken?.Remove(CancelAction);
+            }
+        }
+        
+        public static async ETTask<bool> WaitNextFrameAsync(this TimerComponent self,
+            ETCancellationToken cancellationToken = null)
+        {
+            long timeNow = self.GetNow();
+            
+            var tcs = ETTask<bool>.Create(true);
+            long timerId = self.GetId();
+            TimerAction timer = new TimerAction(ETimerType.OnceWaitTimer, timeNow, 0, 0, tcs);
+
+            self.LateTimerActionMap.Add(timerId, timer);
+            
+            void CancelAction()
+            {
+                if (self.LateTimerActionMap.Remove(timerId))
+                {
+                    tcs.SetResult(false);
+                }
+            }
+
+            try
+            {
+                cancellationToken?.Add(CancelAction);
+                return await tcs;
             }
             finally
             {
@@ -263,17 +315,17 @@ namespace Bliss.Timer
             switch (timerAction.TimerType)
             {
                 case ETimerType.OnceTimer:
-                    self.RootEventSystem().Invoke(new TimerCallback() { Userdata = timerAction.UserData }, timerAction.TimerHandlerIdentifier);
+                    EventSystem.Instance.Invoke(timerAction.TimerHandlerIdentifier, new TimerCallback() { Userdata = timerAction.UserData });
                     break;
                 case ETimerType.OnceWaitTimer:
-                    ETTask tcs = timerAction.UserData as ETTask;
-                    tcs.SetResult();
+                    ETTask<bool> tcs = timerAction.UserData as ETTask<bool>;
+                    tcs.SetResult(true);
                     break;
                 case ETimerType.RepeatedTimer:
                     long timeNow = self.GetNow();
                     timerAction.StartTimeMS = timeNow;
                     self.AddTimer(timerId, ref timerAction);
-                    self.RootEventSystem().Invoke(new TimerCallback() { Userdata = timerAction.UserData }, timerAction.TimerHandlerIdentifier);
+                    EventSystem.Instance.Invoke(timerAction.TimerHandlerIdentifier, new TimerCallback() { Userdata = timerAction.UserData });
                     break;
             }
         }

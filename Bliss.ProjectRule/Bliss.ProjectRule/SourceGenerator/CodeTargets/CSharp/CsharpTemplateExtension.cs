@@ -30,7 +30,7 @@ internal class CsharpTemplateExtension : ScriptObject
         {
             return string.Empty;
         }
-        return $"<{string.Join(",", generic_types)}>";
+        return $"<{string.Join(", ", generic_types)}>";
     }
 
     public static string generic_define_name(List<string> generic_types, int offset)

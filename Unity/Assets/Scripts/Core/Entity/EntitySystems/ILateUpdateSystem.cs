@@ -7,9 +7,8 @@ namespace Bliss
         
     }
     
-    public interface ILateUpdateSystem : ISystem
+    public interface ILateUpdateSystem : IUpdateGroupSystem
     {
-        void Run(Entity entity);
     }
     
     public abstract class ALateUpdateSystem<TEntity> : SystemObject, ILateUpdateSystem where TEntity : Entity, ILateUpdate

@@ -29,32 +29,43 @@ namespace Bliss
             }
             _singletons.Clear();
         }
-
-
-        public void AddSingleton<T>() where T : ASingleton, new()
+        
+        public T AddSingleton<T>() where T : ASingleton, ISingletonInit, new()
         {
             var singleton = new T();
+            singleton.Init();
             AddSingleton(singleton);
+            return singleton;
+        }
+        
+        public T AddSingleton<T, TParam>(TParam param) where T : ASingleton, ISingletonInit<TParam>, new()
+        {
+            var singleton = new T();
+            singleton.Init(param);
+            AddSingleton(singleton);
+            return singleton;
         }
 
         public void AddSingleton(ASingleton singleton)
         {
-            _singletons.Add(singleton.GetType(), singleton);
+            _singletons[singleton.GetType()] = singleton;
             singleton.Register();
         }
 
+        public void EarlyUpdate()
+        {
+            RootManager.Instance.EarlyUpdate();
+        }
 
         public void Update()
         {
             TimeInfo.Instance.Update();
-            IdGenerator.Instance.FrameTime = TimeInfo.Instance.FrameTime;
             RootManager.Instance.Update();
         }
 
         public void LateUpdate()
         {
             RootManager.Instance.LateUpdate();
-
         }
     }
 }

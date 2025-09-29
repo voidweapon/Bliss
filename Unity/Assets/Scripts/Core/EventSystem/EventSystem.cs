@@ -2,26 +2,16 @@ using System;
 using System.Collections.Generic;
 using Bliss.Base.Collections;
 using Bliss.Core;
-using Bliss.EventSystems;
 using Bliss.Pool;
+using Bliss.Timer;
 using ET;
 
 namespace Bliss
 {
 
-    [EntitySystemOf(typeof(EventSystem))]
-    public static partial class EventSystemLogic
-    {
-        public static void Update(this EventSystem self)
-        {
-            self.UpdateInner();
-        }
-    }
 
-    public class EventSystem : Entity, IUpdate
+    public partial class EventSystem : Singleton<EventSystem>
     {
-        private Queue<AEventDataPack> _lateEventQueue = new Queue<AEventDataPack>();
-        
         /// <summary>
         /// 推送一个立即触发的事件
         /// </summary>
@@ -32,7 +22,7 @@ namespace Bliss
         public void Push<TScene, TEvent>(TScene scene, TEvent eventData)
             where TScene : class, ILogicScene where TEvent : struct
         {
-            if (!EventSystemManager.Instance.TryGetStaticEvents(typeof(TEvent), out var events))
+            if (!TryGetStaticEvents(typeof(TEvent), out var events))
             {
                 return;
             }
@@ -54,24 +44,6 @@ namespace Bliss
                 aEvent.Handle(scene, eventData).Coroutine();
             }
         }
-
-        /// <summary>
-        /// 推送一个下一帧触发的事件
-        /// </summary>
-        /// <param name="scene"></param>
-        /// <param name="eventData"></param>
-        /// <typeparam name="TScene"></typeparam>
-        /// <typeparam name="TEvent"></typeparam>
-        public void PushLate<TScene, TEvent>(TScene scene, TEvent eventData) 
-            where TScene : class, ILogicScene where TEvent : struct
-        {
-            _lateEventQueue.Enqueue(new EventDataPack<TScene, TEvent>()
-            {
-                Scene = scene,
-                EventData = eventData,
-                System = this
-            });
-        }
         
         /// <summary>
         /// 推送一个立即触发的异步事件
@@ -83,7 +55,7 @@ namespace Bliss
         public async ETTask PushAsync<TScene, TEvent>(TScene scene, TEvent eventData)
             where TScene : class, ILogicScene where TEvent : struct
         {
-            if (!EventSystemManager.Instance.TryGetStaticEvents(typeof(TEvent), out var events))
+            if (!TryGetStaticEvents(typeof(TEvent), out var events))
             {
                 return;
             }
@@ -91,7 +63,7 @@ namespace Bliss
             using ListComponent<ETTask> list = ListComponent<ETTask>.Create();
             ELogicSceneType sceneType = scene.SceneType;
             
-            foreach (EventSystemManager.EventInfo eventInfo in events)
+            foreach (EventInfo eventInfo in events)
             {
                 if (!eventInfo.SceneType.HasFlag(sceneType))
                 {
@@ -116,10 +88,37 @@ namespace Bliss
                 Log.Error(e);
             }
         }
-
-        public void Invoke<TArg>(TArg arg, long invokeType) where TArg : struct
+        
+        /// <summary>
+        /// 推送一个下一帧触发的事件
+        /// </summary>
+        /// <param name="scene"></param>
+        /// <param name="eventData"></param>
+        /// <typeparam name="TScene"></typeparam>
+        /// <typeparam name="TEvent"></typeparam>
+        public void PushLate<TScene, TEvent>(TScene scene, TEvent eventData) 
+            where TScene : class, ILogicScene where TEvent : struct
         {
-            if (!EventSystemManager.Instance.TryGetInvoke(typeof(TArg), invokeType, out var invokeHandler))
+            InnerPushLateAsync(scene, eventData).Coroutine();
+        }
+
+        private async ETTask InnerPushLateAsync<TScene, TEvent>(TScene scene, TEvent eventData)
+            where TScene : class, ILogicScene where TEvent : struct
+        {
+            await scene.Root.Scene.GetComponent<TimerComponent>().WaitNextFrameAsync();
+            Push(scene, eventData);
+        }
+        
+        public async ETTask PushLateAsync<TScene, TEvent>(TScene scene, TEvent eventData) 
+            where TScene : class, ILogicScene where TEvent : struct
+        {
+            await scene.Root.Scene.GetComponent<TimerComponent>().WaitNextFrameAsync();
+            await PushAsync(scene, eventData);
+        }
+
+        public void Invoke<TArg>(long invokeType, TArg arg) where TArg : struct
+        {
+            if (!TryGetInvoke(typeof(TArg), invokeType, out var invokeHandler))
             {
                 throw new Exception($"Not Found Invoke Handler ArgumentType={typeof(TArg).FullName} invokeType={invokeType}");
             }
@@ -132,9 +131,9 @@ namespace Bliss
             handler.Handle(arg);
         }
 
-        public TResult Invoke<TArg, TResult>(TArg arg, long invokeType) where TArg : struct
+        public TResult Invoke<TArg, TResult>(long invokeType, TArg arg) where TArg : struct
         {
-            if (!EventSystemManager.Instance.TryGetInvoke(typeof(TArg), invokeType, out var invokeHandler))
+            if (!TryGetInvoke(typeof(TArg), invokeType, out var invokeHandler))
             {
                 throw new Exception($"Not Found Invoke Handler ArgumentType={typeof(TArg).FullName} invokeType={invokeType}");
             }
@@ -146,18 +145,6 @@ namespace Bliss
             
             return  handler.Handle(arg);
         }
-        
-        internal void UpdateInner()
-        {
-            int count = _lateEventQueue.Count;
-            while (count > 0)
-            {
-                count--;
-                var eventData = _lateEventQueue.Dequeue();
-                eventData.Run();
-            }
-        }
-
         
         private abstract class AEventDataPack
         {

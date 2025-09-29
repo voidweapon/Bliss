@@ -5,7 +5,7 @@ using Bliss.Base.Collections;
 
 namespace Bliss.Core
 {
-    public class TypeManager : Singleton<TypeManager>, ISingletonInit<Assembly[]>
+    public class TypeManager : Singleton<TypeManager>, ISingletonInit<List<Assembly>>
     {
         /// <summary>
         /// Type Full Name -> Type
@@ -17,7 +17,7 @@ namespace Bliss.Core
         /// </summary>
         private MultiMapSet<Type, Type> _typeCategorySet = new MultiMapSet<Type, Type>();
 
-        public void Init(Assembly[] assemblies)
+        public void Init(List<Assembly> assemblies)
         {
             var addTypes = AssemblyHelper.GetAssemblyTypes(assemblies);
             foreach ((string fullName, Type type) in addTypes)
@@ -49,6 +49,20 @@ namespace Bliss.Core
         public Type GetType(string typeName)
         {
             return this._types[typeName];
+        }
+
+        /// <summary>
+        /// 重新创建被标记为<see cref="SingletonMangerAttribute"/>到Singleton
+        /// </summary>
+        public void CreateAutoSingletonManager()
+        {
+            var hashSet = GetTypes(typeof (SingletonMangerAttribute));
+            foreach (Type type in hashSet)
+            {
+                object obj = Activator.CreateInstance(type);
+                ((ISingletonInit)obj).Init();
+                World.Instance.AddSingleton((ASingleton)obj);
+            }
         }
     }
 }

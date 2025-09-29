@@ -11,15 +11,18 @@ namespace Bliss
         private const int WarningLevel = 4;
         
         public static ILogger Logger { get; set; }
+        public static int LogLevel { get; set; } = 1;
         
         private static ILogger GetLog()
         {
             return Logger;
         }
 
+        
+        
         private static int GetLogLevel()
         {
-            return TraceLevel;            
+            return LogLevel;            
         }
         
         private static int EnableLogConsole()

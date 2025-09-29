@@ -88,3 +88,9 @@ crashlytics-build.properties
 /Unity/UserSettings
 /Unity/HybridCLRData
 /Tools/Configs/Generate
+/Server/App/bin
+/Server/Base/bin
+/Server/Core/bin
+/Server/CoreModel/bin
+/Server/Model/bin
+/Bin

@@ -20,12 +20,14 @@ namespace Bliss
             
         }
 
-        public LogicScene(Root root, int id, ELogicSceneType sceneType, string name)
+        internal LogicScene(Root root, int id,  int instanceId, ELogicSceneType sceneType, string name)
         {
             Root = root;
             Id = id;
+            InstanceId = instanceId;
             SceneType = sceneType;
-            Name = name; 
+            Name = name;
+            _logicScene = this;
         }
     }
 }

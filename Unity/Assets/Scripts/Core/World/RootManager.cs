@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
+using ET;
 
 namespace Bliss
 {
-    public class RootManager : Singleton<RootManager>
+    public class RootManager : Singleton<RootManager>, ISingletonInit
     {
         /// <summary>
         /// Root ID -> Child Root
@@ -21,31 +23,52 @@ namespace Bliss
         
         private int idGenerator = 10000000;
         
+        public void Init()
+        {
+            
+        }
+
+        protected  override void Destroy()
+        {
+            foreach (var kv in _children)
+            {
+                kv.Value.Dispose();
+            }
+            _children.Clear();
+        }
+        
+        internal void EarlyUpdate()
+        {
+            UpdateTiming(EarlyUUpdateAction);
+
+            void EarlyUUpdateAction(Root root)
+            {
+                root.EarlyUpdate();
+            }
+        }
+        
         internal void Update()
         {
-            int count = _updateQueue.Count;
-            for (int i = 0; i < count; i++)
-            {
-                var rootId =  _updateQueue.Dequeue();
-                var item  = Get(rootId);
-                
-                if (item == null)
-                {
-                    continue;
-                }
+            UpdateTiming(UpdateAction);
 
-                if (item.IsDisposed)
-                {
-                    continue;
-                }
-                
-                item.Update();
-                _updateQueue.Enqueue(rootId);
+            void UpdateAction(Root root)
+            {
+                root.Update();
             }
         }
 
         internal void LateUpdate()
         {
+            UpdateTiming(LateUpdateAction);
+
+            void LateUpdateAction(Root root)
+            {
+                root.LateUpdate();
+            }
+        }
+
+        private void UpdateTiming(Action<Root> updateAction)
+        {
             int count = _updateQueue.Count;
             for (int i = 0; i < count; i++)
             {
@@ -62,7 +85,7 @@ namespace Bliss
                     continue;
                 }
                 
-                item.LateUpdate();
+                updateAction(item);
                 _updateQueue.Enqueue(rootId);
             }
             
@@ -74,19 +97,27 @@ namespace Bliss
         }
 
 
-        public int Create(int zone, ELogicSceneType sceneType, string name)
+        public async ETTask<int> Create(int zone, ELogicSceneType sceneType, string name)
         {
             int id = ++idGenerator;
             var root =  new Root(id, zone, sceneType, name);
             _children.Add(id, root);
             _addQueue.Enqueue(id);
             
+            await EventSystem.Instance.Invoke<Invoke_RootInit, ETTask>((long)sceneType, new Invoke_RootInit()
+            {
+                Root = root
+            });
+            
             return id;
         }
 
         public void Remove(int id)
         {
-            
+            if (_children.Remove(id, out var root))
+            {
+                root.Dispose();
+            }
         }
 
         internal Root Get(int id)
