@@ -118,7 +118,7 @@ namespace Bliss.Core.Network
             bufferRef.Dispose();
         }
 
-        public override void Send(uint connectionId, SocketBufferRef socketBufferRef)
+        public override void Send(uint connectionId, SocketBufferRef socketBufferRef, bool isReliable)
         {
             if (!CheckValid())
             {
@@ -130,7 +130,7 @@ namespace Bliss.Core.Network
                 return;
             }
             
-            connection.Send(socketBufferRef);
+            connection.Send(socketBufferRef, isReliable);
         }
 
         internal void Output(byte[] buffer, int offset, int size, IPEndPoint remoteEndPoint)
@@ -190,33 +190,37 @@ namespace Bliss.Core.Network
 
         private void ProcessConnectionlessPacket(ReadOnlySpan<byte> bufferSpan)
         {
-            bufferSpan.ReadByte(out _)
+            bufferSpan.ReadByte(out var protoType)
                 .ReadUInt(out uint clientId);
 
             if (TryGetConnection(clientId, out var connection))
             {
-                if (connection is UdpNetConnection udpConnection)
+                if (connection is UdpNetConnection udpConnection && protoType == (byte)EProtocolType.Handshake)
                 {
-                    udpConnection.InputRaw(bufferSpan);
+                    udpConnection.InputHandshakeRaw(bufferSpan);
+                    return;
                 }
-                return;
             }
-            
-            IPEndPoint remoteEndPoint = (IPEndPoint) _receiveEndPoint;
-            _connectHandler.InputConnectionless(bufferSpan, remoteEndPoint);
-            
-            if(_connectHandler.IsPassedChallenge(clientId, remoteEndPoint, out uint connectionId))
+
+            if (_connectHandler != null)
             {
-                CreateAcceptedConnection(connectionId, clientId, remoteEndPoint);
-                _receiveEndPoint = new IPEndPoint(IPAddress.Any, 0);
+                IPEndPoint remoteEndPoint = (IPEndPoint)_receiveEndPoint;
+                _connectHandler.InputConnectionless(bufferSpan, remoteEndPoint);
+
+                if (_connectHandler.IsPassedChallenge(clientId, remoteEndPoint, out uint connectionId))
+                {
+                    CreateAcceptedConnection(connectionId, clientId, remoteEndPoint);
+                    _receiveEndPoint = new IPEndPoint(IPAddress.Any, 0);
+                }
+
+                _connectHandler.ResetChallenge();
             }
-            _connectHandler.ResetChallenge();
         }
 
         private void ProcessConnectedPacket(ReadOnlySpan<byte> bufferSpan, EProtocolType protocolType)
         {
-            
-            bufferSpan.ReadByte(out var _)
+            bufferSpan.ReadByte(out var protoType)
+                .ReadBool(out bool isReliable)
                 .ReadUInt(out uint clientId)
                 .ReadUInt(out uint remoteId)
                 .ReadUInt(out uint conversationId);
@@ -226,8 +230,8 @@ namespace Bliss.Core.Network
             UdpNetConnection udpConnection = connection as UdpNetConnection;
             bool haveValidConnection = udpConnection != null 
                                        && udpConnection.ConnectionId == remoteId
-                                       && udpConnection.ConversationId == conversationId
-                                       && udpConnection.RemoteId == clientId;
+                                       && udpConnection.RemoteId == clientId
+                                       && udpConnection.ConversationId == conversationId;
             
             switch (protocolType)
             {
@@ -238,7 +242,8 @@ namespace Bliss.Core.Network
                     }
                     else
                     {
-                        ProcessConnectionlessPacket(bufferSpan);
+                        //没有有效的Connection，通知对方断开
+                        SendDisconnect(remoteId, clientId, (IPEndPoint) _receiveEndPoint);
                     }
                     break;
                 case EProtocolType.Fin:

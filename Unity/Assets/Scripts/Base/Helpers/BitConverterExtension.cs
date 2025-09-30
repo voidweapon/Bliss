@@ -233,6 +233,18 @@ namespace Bliss
             return buffer.Slice(sizeof(ulong));
         }
         
+        public static Span<byte> WriteSpanTo(this Span<byte> buffer, Span<byte> sourceBuffer)
+        {
+            sourceBuffer.CopyTo(buffer);
+            return buffer.Slice(sourceBuffer.Length);
+        }
+        
+        public static Span<byte> WriteReadOnlySpanTo(this Span<byte> buffer, ReadOnlySpan<byte> sourceBuffer)
+        {
+            sourceBuffer.CopyTo(buffer);
+            return buffer.Slice(sourceBuffer.Length);
+        }
+        
         public static Span<byte> WriteStringTo(this Span<byte> buffer, string value)
         {
             int length = Encoding.ASCII.GetBytes(value, buffer.ToArray());

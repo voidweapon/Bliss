@@ -249,14 +249,14 @@ namespace Bliss.Core.Network
         }
         
         
-        public override void Send(uint connectionId, SocketBufferRef socketBufferRef)
+        public override void Send(uint connectionId, SocketBufferRef socketBufferRef, bool isReliable)
         {
             if (!TryGetConnection(connectionId, out var connection))
             {
                 return;
             }
             
-            connection.Send(socketBufferRef);
+            connection.Send(socketBufferRef, true);
         }
     }
 

@@ -332,7 +332,7 @@ namespace Bliss.Core.Network
         
         #endregion
 
-        public sealed override void Send(SocketBufferRef socketBufferRef)
+        public sealed override void Send(SocketBufferRef socketBufferRef, bool isReliable)
         {
             if (IsDisposed)
             {
@@ -358,15 +358,7 @@ namespace Bliss.Core.Network
             
             socketBufferRef.Dispose();
         }
-
-        // public override void Input(SocketBufferRef socketBufferRef)
-        // {
-        //     SocketBuffer buffer = socketBufferRef.Target;
-        //     int bytesReceived = buffer.DataPosition - buffer.TailPosition;
-        //     
-        //     base.Input(socketBufferRef);
-        // }
-
+        
         private void OnError(int error)
         {
             uint connectionId = ConnectionId;

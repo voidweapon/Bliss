@@ -16,9 +16,14 @@ namespace Bliss.Core.Network
         private long _createTime;
         private ENetConnectionState _state;
         private ConnectHandler _connectHandler;
-        private Queue<SocketBufferRef> _waitSendQueue = new Queue<SocketBufferRef>();
+        private Queue<(bool, SocketBufferRef)> _waitSendQueue = new Queue<(bool, SocketBufferRef)>();
         private KCP _kcp;
         private int MaxWaitSendSize = 1024 * 1024;
+        
+        /// <summary>
+        /// 握手超时时间  毫秒
+        /// </summary>
+        private const long ConnectTimeoutTime = 10 * 1000;
         
         /// <summary>
         /// Init Incoming Connection
@@ -116,8 +121,8 @@ namespace Bliss.Core.Network
 
             while (_waitSendQueue.Count > 0)
             {
-                var buffer = _waitSendQueue.Dequeue();
-                Send(buffer);
+                (bool isReliable, SocketBufferRef buffer) = _waitSendQueue.Dequeue();
+                Send(buffer, isReliable);
             }
         }
 
@@ -128,15 +133,24 @@ namespace Bliss.Core.Network
                 return;
             }
 
+            //处理握手包重发
             uint nextUpdateTime = timeNow + 1000;
             if (_connectHandler != null
                 && ConnectionType == EIpNetConnectionType.Local
                 && _state != ENetConnectionState.Open)
             {
+
+                if (timeNow > _createTime + ConnectTimeoutTime)
+                {
+                    OnError(ConnectionError.ERR_HANDSHAKE_TIMEOUT);
+                    return;
+                }
+                
                 _connectHandler.Update(timeNow);
                 nextUpdateTime = _connectHandler.Check(timeNow);
             }
 
+            //处理kcp update
             if (_kcp != null)
             {
                 if (_kcp.ikcp_state() == -1)
@@ -149,8 +163,6 @@ namespace Bliss.Core.Network
                 nextUpdateTime = System.Math.Min(_kcp.ikcp_check(timeNow), nextUpdateTime);
             }
             
-            
-            
             _udpDriver.ScheduleUpdate(ConnectionId, nextUpdateTime);
         }
 
@@ -160,7 +172,8 @@ namespace Bliss.Core.Network
         /// Upper Level Send to this 
         /// </summary>
         /// <param name="socketBufferRef"></param>
-        public sealed override void Send(SocketBufferRef socketBufferRef)
+        /// <param name="isReliable"></param>
+        public sealed override void Send(SocketBufferRef socketBufferRef, bool isReliable)
         {
             if (IsDisposed || _state == ENetConnectionState.Invalid)
             {
@@ -169,10 +182,23 @@ namespace Bliss.Core.Network
             
             if (_state == ENetConnectionState.Pending)
             {
-                _waitSendQueue.Enqueue(socketBufferRef);
+                _waitSendQueue.Enqueue((isReliable, socketBufferRef));
                 return;
             }
 
+
+            if (isReliable)
+            {
+                SendReliable(socketBufferRef);
+            }
+            else
+            {
+                SendUnreliable(socketBufferRef);
+            }
+        }
+
+        private void SendReliable(SocketBufferRef socketBufferRef)
+        {
             if (_kcp.ikcp_waitsnd() > MaxWaitSendSize)
             {
                 OnError(ConnectionError.ERR_SENDBUFF_TOOLARGE);
@@ -200,15 +226,40 @@ namespace Bliss.Core.Network
             skBuffer.Reserve(messageSize);
             skBuffer.Push(len);
             Marshal.Copy((IntPtr)buffer, skBuffer.GetBuffer(), ProtocolDefine.MsgPacketHeaderSize, len);
-            
+
+            bool isReliable = true;
             skBuffer.Push(ProtocolDefine.MsgPacketHeaderSize)
                 .WriteByteTo((byte)EProtocolType.Msg)
+                .WriteBoolTo(isReliable)
                 .WriteUIntTo(ConnectionId)
                 .WriteUIntTo(RemoteId);
             
             OutputRaw(skBuffer.GetBuffer(), 0, messageSize);
             bufferRef.Dispose();
             return len;
+        }
+
+        private void SendUnreliable(SocketBufferRef socketBufferRef)
+        {
+            SocketBuffer messageBuf = socketBufferRef.Target;
+            int messageSize = messageBuf.TrueLength + ProtocolDefine.MsgPacketHeaderSize;
+            
+            SocketBufferRef bufferRef = _udpDriver.RentBuffer(messageSize);
+            SocketBuffer skBuffer = bufferRef.Target;
+            skBuffer.Reserve(messageSize);
+            
+
+            skBuffer.Push(messageBuf.TrueLength)
+                .WriteSpanTo(skBuffer.Push(messageBuf.TrueLength));
+            
+            bool isReliable = false;
+            skBuffer.Push(ProtocolDefine.MsgPacketHeaderSize)
+                .WriteByteTo((byte)EProtocolType.Msg)
+                .WriteBoolTo(isReliable)
+                .WriteUIntTo(ConnectionId)
+                .WriteUIntTo(RemoteId);
+            
+            OutputRaw(skBuffer.GetBuffer(), 0, messageSize);
         }
         
         internal void OutputRaw(byte[] buffer, int offset, int size)
@@ -221,7 +272,7 @@ namespace Bliss.Core.Network
 
         #region Receive Data From Remote
 
-        internal void InputRaw(ReadOnlySpan<byte> bufferSpan)
+        internal void InputHandshakeRaw(ReadOnlySpan<byte> bufferSpan)
         {
             if (IsDisposed || _state == ENetConnectionState.Invalid)
             {
@@ -233,23 +284,61 @@ namespace Bliss.Core.Network
                 _connectHandler.Input(bufferSpan);
                 return;
             }
-            
+        }
+
+        internal void InputRaw(ReadOnlySpan<byte> bufferSpan)
+        {
+            if (IsDisposed || _state == ENetConnectionState.Invalid)
+            {
+                return;
+            }
+
+            bufferSpan.ReadByte(out _)
+                .ReadBool(out bool isReliable);
+
+            if (isReliable)
+            {
+                InputReliableRaw(bufferSpan);
+            }
+            else
+            {
+                InputUnreliableRaw(bufferSpan);
+            }
+        }
+        
+        private void InputReliableRaw(ReadOnlySpan<byte> bufferSpan)
+        {
             bufferSpan = bufferSpan.Slice(ProtocolDefine.MsgPacketHeaderSize);
             _kcp.ikcp_input(bufferSpan);
             _udpDriver.ScheduleUpdate(ConnectionId, 0);
             
             while (ReceiveNextReliable(out var bufferRef))
             {
-                Input(bufferRef);
+                if (bufferRef != null) Input(bufferRef.Value);
             }
         }
+        
+        private void InputUnreliableRaw(ReadOnlySpan<byte> bufferSpan)
+        {
+            bufferSpan = bufferSpan.Slice(ProtocolDefine.MsgPacketHeaderSize);
+            SocketBufferRef bufferRef = _udpDriver.RentBuffer(bufferSpan.Length);
+            
+            SocketBuffer buffer = bufferRef.Target;
+            buffer.Reserve(bufferSpan.Length);
+            
+            buffer.Push(bufferSpan.Length)
+                .WriteReadOnlySpanTo(bufferSpan);
+            
+            Input(bufferRef);
+        }
+        
 
-        private bool ReceiveNextReliable(out SocketBufferRef result)
+        private bool ReceiveNextReliable(out SocketBufferRef? result)
         {
             int messageLength = _kcp.ikcp_peeksize();
             if (messageLength <= 0)
             {
-                result = new SocketBufferRef();
+                result = null;
                 return false;
             }
                 

@@ -9,6 +9,6 @@ namespace Bliss.Core.Network
 
     public static class ProtocolDefine
     {
-        public const int MsgPacketHeaderSize = sizeof(byte) + sizeof(uint) + sizeof(uint);
+        public const int MsgPacketHeaderSize = sizeof(byte) + sizeof(bool) + sizeof(uint) + sizeof(uint);
     }
 }

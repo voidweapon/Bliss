@@ -137,6 +137,22 @@ namespace Bliss
             });
         }
 
+        public static void Send(this NetworkComponent self, uint connectionId, SocketBufferRef bufferRef, bool isReliable)
+        {
+            if (!self.CheckDispose())
+            {
+                return;
+            }
+            
+            self.NetThreadOpQueue.Enqueue(new NetThreadOperation()
+            {
+                OpType = ENetThreadOpType.SendMessage,
+                ConnectionId = connectionId,
+                BufferRef = bufferRef,
+                IsReliable = isReliable,
+            });
+        }
+
         private static void OnAcceptConnection(this NetworkComponent self, uint connectionId, IPEndPoint remoteEndPoint)
         {
             var session = self.AddChildWithId<Session>(connectionId);
@@ -245,7 +261,7 @@ namespace Bliss
                         self.NetDriver.RemoveConnection(netThreadOperation.ConnectionId, netThreadOperation.ErrorCode);
                         break;
                     case ENetThreadOpType.SendMessage: 
-                        self.NetDriver.Send(netThreadOperation.ConnectionId, netThreadOperation.BufferRef);
+                        self.NetDriver.Send(netThreadOperation.ConnectionId, netThreadOperation.BufferRef,  netThreadOperation.IsReliable);
                         break;
                     default:
                         throw new ArgumentOutOfRangeException();

@@ -76,7 +76,8 @@ namespace Bliss.Core.Network
         /// </summary>
         /// <param name="connectionId"></param>
         /// <param name="socketBufferRef"></param>
-        public abstract void Send(uint connectionId, SocketBufferRef socketBufferRef);
+        /// <param name="isReliable"></param>
+        public abstract void Send(uint connectionId, SocketBufferRef socketBufferRef, bool isReliable);
 
 
         internal virtual void Input(ANetConnection connection, SocketBufferRef socketBufferRef)
@@ -135,12 +136,13 @@ namespace Bliss.Core.Network
             }
             int size = GetSize(sizeHint);
 
-            if (!_bufferPool.TryGetValue(size, out ConcurrentQueue<SocketBuffer> bufferPool))
-            {
-                bufferPool = new ConcurrentQueue<SocketBuffer>();
-                _bufferPool.TryAdd(size, bufferPool);
-            }
+            ConcurrentQueue<SocketBuffer> bufferPool = _bufferPool.GetOrAdd(size, NewPool);
 
+            ConcurrentQueue<SocketBuffer> NewPool(int _)
+            {
+                return new ConcurrentQueue<SocketBuffer>();
+            }
+            
             if (!bufferPool.TryDequeue(out var buff))
             {
                 buff =  new SocketBuffer(size);

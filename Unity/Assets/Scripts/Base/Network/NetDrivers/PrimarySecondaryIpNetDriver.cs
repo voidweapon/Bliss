@@ -29,7 +29,7 @@ namespace Bliss.Core.Network
            throw new System.NotImplementedException();
        }
 
-       public override void Send(uint connectionId, SocketBufferRef socketBufferRef)
+       public override void Send(uint connectionId, SocketBufferRef socketBufferRef, bool isReliable)
        {
            throw new System.NotImplementedException();
        }

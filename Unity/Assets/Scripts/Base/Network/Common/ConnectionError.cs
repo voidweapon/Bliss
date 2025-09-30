@@ -26,5 +26,12 @@ namespace Bliss.Core
         public const int ERR_RECEIVEBUFF_TOOLARGE = 100212;
         
         public const int ERR_DEAD_LINK = 100213;
+        
+        /// <summary>
+        /// 握手超时
+        /// </summary>
+        public const int ERR_HANDSHAKE_TIMEOUT = 100214;
+        
+        
     }
 }

@@ -336,7 +336,7 @@ namespace Bliss.Core.Network
             _acceptedConnectionId = 0;
         }
         
-        public void InputConnectionless(ReadOnlySpan<byte> bufferSpan, IPEndPoint remoteEndPoint)
+        public bool InputConnectionless(ReadOnlySpan<byte> bufferSpan, IPEndPoint remoteEndPoint)
         {
             HandshakePacket packet = ParseHandshakePacket(bufferSpan);
 
@@ -344,7 +344,7 @@ namespace Bliss.Core.Network
             {
                 if (packet.Error != 0)
                 {
-                    return;
+                    return false;
                 }
                 
                 if (packet.HandsShakeType == EHandsShakeType.InitialPacket && packet.Cookie.IsEmpty)
@@ -377,6 +377,8 @@ namespace Bliss.Core.Network
                 //TODO: Restart HandsShake
                 SendRestartChallenge(packet.ClientId, remoteEndPoint);
             }
+            
+            return true;
         }
 
         private void SendConnectChallenge(uint clientId, IPEndPoint remoteEndPoint)

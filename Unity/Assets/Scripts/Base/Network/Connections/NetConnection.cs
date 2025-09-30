@@ -48,7 +48,7 @@ namespace Bliss.Core.Network
         /// <summary>
         /// 发送数据
         /// </summary>
-        public virtual void Send(SocketBufferRef socketBufferRef)
+        public virtual void Send(SocketBufferRef socketBufferRef, bool isReliable)
         {
             
         }
