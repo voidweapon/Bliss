@@ -86,9 +86,9 @@ namespace Bliss
             /// <summary>
             /// EntitySystem CategoryType -> EntitySystem Object
             /// </summary>
-            private MultiMapList<Type, ISystem> _entitySystems = new MultiMapList<Type, ISystem>();
+            private readonly MultiMapList<Type, ISystem> _entitySystems = new MultiMapList<Type, ISystem>();
 
-            private bool[] UpdateInGroup = new bool[(int)ESystemUpdateGroup.Max];
+            private readonly bool[] _updateInGroup = new bool[(int)ESystemUpdateGroup.Max];
             
             public List<ISystem> GetEntitySystems(Type systemCategoryType)
             {
@@ -99,13 +99,19 @@ namespace Bliss
             {
                 var categoryType = systemObject.GetSystemCategoryType();
                 _entitySystems.Add(categoryType, systemObject);
+                
+                ESystemUpdateGroup updateGroup = systemObject.GetUpdateGroup();
+                if (ESystemUpdateGroup.None < updateGroup && updateGroup < ESystemUpdateGroup.Max)
+                {
+                    _updateInGroup[(int)updateGroup] = true;
+                }
             }
 
             public bool IsEntityUpdateInGroup(ESystemUpdateGroup group)
             {
                 if(group == ESystemUpdateGroup.None) return false;
                 
-                return UpdateInGroup[(int)group];
+                return _updateInGroup[(int)group];
             }
         }
     }

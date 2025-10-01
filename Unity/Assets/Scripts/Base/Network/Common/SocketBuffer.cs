@@ -123,7 +123,7 @@ namespace Bliss.Core
             
             DataPosition -= count;
             Seek(DataPosition, SeekOrigin.Begin);
-            return GetSpan(count);
+            return GetBuffer().AsSpan(DataPosition, count);
         }
 
         public ReadOnlySpan<byte> Pull(int count)

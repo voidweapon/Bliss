@@ -176,5 +176,87 @@ namespace Bliss.Core.Network
 
         #endregion
         
+        
+        #region 网络统计数据
+        /// <summary>
+        /// 上次收集网络统计数据时间戳
+        /// </summary>
+        public long LastStatUpdateTime { get; internal set; }
+
+        /// <summary>
+        /// 收集网络统计数据时间间隔 MS
+        /// </summary>
+        public long StatPeriod { get; internal set; } = 1000L;
+        
+        /// <summary>
+        /// 本次采样间隔内接收到的字节数
+        /// </summary>
+        public uint InBytes { get; internal set; }
+        
+        /// <summary>
+        /// 接收到的总字节数
+        /// </summary>
+        public uint InTotalBytes { get; internal set; }
+        
+        /// <summary>
+        /// 本次采样间隔内发送的字节数
+        /// </summary>
+        public uint OutBytes { get; internal set; }
+        
+        /// <summary>
+        /// 发送的总字节数
+        /// </summary>
+        public uint OutTotalBytes { get; internal set; }
+        
+        /// <summary>
+        /// 本次采样间隔内收到的包数量
+        /// </summary>
+        public uint InPackets { get; internal set; }
+        
+        /// <summary>
+        /// 收到的总包数量
+        /// </summary>
+        public uint InTotalPackets { get; internal set; }
+        
+        /// <summary>
+        /// 本次采样间隔内收到的包数量
+        /// </summary>
+        public uint OutPackets { get; internal set; }
+        
+        /// <summary>
+        /// 收到的总包数量
+        /// </summary>
+        public uint OutTotalPackets { get; internal set; }
+        
+        /// <summary>
+        /// 每秒收到的字节数
+        /// </summary>
+        public uint InBytesPerSecond { get; internal set; }
+        
+        /// <summary>
+        /// 每秒发送的字节数
+        /// </summary>
+        public uint OutBytesPerSecond { get; internal set; }
+
+        private void UpdateNetworkStats()
+        {
+            long timeNow = TimeNow;
+            
+            if (timeNow > LastStatUpdateTime + StatPeriod)
+            {
+                float intervalS = (timeNow - LastStatUpdateTime) / 1000f;
+
+                InBytesPerSecond = (uint)System.Math.Floor(InBytes / intervalS);
+                OutBytesPerSecond = (uint)System.Math.Floor(OutBytes / intervalS);
+
+
+                InBytes = 0;
+                OutBytes = 0;
+                InPackets = 0;
+                OutPackets = 0;
+                LastStatUpdateTime =  timeNow;
+            }
+        }
+        #endregion
     }
 }

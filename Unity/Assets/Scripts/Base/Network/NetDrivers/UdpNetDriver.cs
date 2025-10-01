@@ -21,18 +21,17 @@ namespace Bliss.Core.Network
         private List<uint> _timeOutTime = new List<uint>();
         private uint _minUpdateTime = 0;
 
-        internal const int MessageHeaderLength = sizeof(byte) + sizeof(uint) + sizeof(uint);
-        
         protected override void OnDispose()
         {
-            _socket?.Close();
-            _socket = null;
             foreach (var connection in _dicId2Connection.Values.ToList())
             {
                 connection.Dispose();
             }
             _dicId2Connection.Clear();
             _connectionLookup.Clear();
+            
+            _socket?.Dispose();
+            _socket = null;
         }
 
         public override void InitClient(AddressFamily addressFamily = AddressFamily.InterNetwork)
@@ -85,6 +84,7 @@ namespace Bliss.Core.Network
             UdpNetConnection connection = new UdpNetConnection();
             connection.InitRemoteConnection(this, remoteEndPoint, connectionId, remoteId, connectionId);
             _dicId2Connection.Add(connectionId, connection);
+            ReportAcceptConnection(connectionId, remoteEndPoint);
             return connectionId;
         }
 
@@ -98,21 +98,23 @@ namespace Bliss.Core.Network
             }
         }
 
-        internal void SendDisconnect(uint local, uint remoteId,  IPEndPoint remoteEndPoint)
+        internal void SendDisconnect(uint local, uint remoteId,  IPEndPoint remoteEndPoint, int error)
         {
-            if (!CheckValid())
+            if (_socket == null)
             {
                 return;
             }
             
-            SocketBufferRef bufferRef = RentBuffer(MessageHeaderLength);
+            SocketBufferRef bufferRef = RentBuffer(ProtocolDefine.FinPacketHeaderSize);
             {
                 SocketBuffer buffer = bufferRef.Target;
-                buffer.Reserve(MessageHeaderLength);
-                buffer.Push(MessageHeaderLength)
+                buffer.Reserve(ProtocolDefine.FinPacketHeaderSize);
+                buffer.Push(ProtocolDefine.FinPacketHeaderSize)
                     .WriteByteTo((byte)EProtocolType.Fin)
+                    .WriteBoolTo(false)
                     .WriteUIntTo(local)
-                    .WriteUIntTo(remoteId);
+                    .WriteUIntTo(remoteId)
+                    .WriteIntTo(error);
                 Output(buffer.GetBuffer(), buffer.DataPosition, buffer.TrueLength, remoteEndPoint);
             }
             bufferRef.Dispose();
@@ -135,7 +137,7 @@ namespace Bliss.Core.Network
 
         internal void Output(byte[] buffer, int offset, int size, IPEndPoint remoteEndPoint)
         {
-            if (!CheckValid())
+            if (_socket == null)
             {
                 return;
             }
@@ -158,7 +160,7 @@ namespace Bliss.Core.Network
                 {
                     var packetSpan = new ReadOnlySpan<byte>(_receiveBuffer, 0, messageLength);
                 
-                    if (messageLength < MessageHeaderLength)
+                    if (messageLength < 9)
                     {
                         //不是合法的消息
                         continue;
@@ -219,19 +221,17 @@ namespace Bliss.Core.Network
 
         private void ProcessConnectedPacket(ReadOnlySpan<byte> bufferSpan, EProtocolType protocolType)
         {
-            bufferSpan.ReadByte(out var protoType)
+            var msgSpan = bufferSpan.ReadByte(out var protoType)
                 .ReadBool(out bool isReliable)
                 .ReadUInt(out uint clientId)
-                .ReadUInt(out uint remoteId)
-                .ReadUInt(out uint conversationId);
+                .ReadUInt(out uint remoteId);
 
             TryGetConnection(remoteId, out var connection);
 
             UdpNetConnection udpConnection = connection as UdpNetConnection;
             bool haveValidConnection = udpConnection != null 
                                        && udpConnection.ConnectionId == remoteId
-                                       && udpConnection.RemoteId == clientId
-                                       && udpConnection.ConversationId == conversationId;
+                                       && udpConnection.RemoteId == clientId ;
             
             switch (protocolType)
             {
@@ -243,13 +243,21 @@ namespace Bliss.Core.Network
                     else
                     {
                         //没有有效的Connection，通知对方断开
-                        SendDisconnect(remoteId, clientId, (IPEndPoint) _receiveEndPoint);
+                        SendDisconnect(remoteId, clientId, (IPEndPoint) _receiveEndPoint, ConnectionError.ERR_INVALID_PACKET);
                     }
                     break;
                 case EProtocolType.Fin:
                     if (haveValidConnection)
                     {
-                        SendDisconnect(remoteId, clientId, (IPEndPoint) _receiveEndPoint);
+                        //收到非法消息
+                        if (bufferSpan.Length != ProtocolDefine.FinPacketHeaderSize)
+                        {
+                            return;
+                        }
+                        
+                        msgSpan.ReadInt(out int error);
+                        Log.Info($"{nameof(UdpNetConnection)}[{remoteId}] FIN with error: {error}");
+                        udpConnection.OnError(ConnectionError.ERR_PEER_DISCONNECT);
                     }
                     break;
                 default:

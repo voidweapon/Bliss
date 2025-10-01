@@ -234,6 +234,15 @@ namespace Bliss.Core.Network
             
             _streamPacketParser.OutputCompleted(eventArgs.BytesTransferred);
             
+            OutBytes += (uint)eventArgs.BytesTransferred;
+            OutTotalBytes += (uint)eventArgs.BytesTransferred;
+
+            if (_tcpNetDriver != null)
+            {
+                _tcpNetDriver.OutBytes += (uint)eventArgs.BytesTransferred;
+                _tcpNetDriver.OutTotalBytes += (uint)eventArgs.BytesTransferred;
+            }
+            
             return (int) SocketError.Success;
         }
         
@@ -309,6 +318,14 @@ namespace Bliss.Core.Network
             
             _streamPacketParser.Input(eventArgs.BytesTransferred);
             
+            InBytes += (uint)eventArgs.BytesTransferred;
+            InTotalBytes += (uint)eventArgs.BytesTransferred;
+            if (_tcpNetDriver != null)
+            {
+                _tcpNetDriver.InBytes += (uint)eventArgs.BytesTransferred;
+                _tcpNetDriver.InTotalBytes += (uint)eventArgs.BytesTransferred;
+            }
+            
             //解析数据流，将整个消息从流里捞出来，提交个上层
             while (true)
             {
@@ -322,6 +339,14 @@ namespace Bliss.Core.Network
                 if (receiveBuffer == null)
                 {
                     break;
+                }
+
+                InPackets++;
+                InTotalPackets++;
+                if (_tcpNetDriver != null)
+                {
+                    _tcpNetDriver.InPackets++;
+                    _tcpNetDriver.InTotalPackets++;
                 }
                 
                 Input(receiveBuffer.Value);
@@ -345,6 +370,15 @@ namespace Bliss.Core.Network
                 OnError(ConnectionError.ERR_SENDBUFF_TOOLARGE);
                 return;
             }
+
+            OutPackets++;
+            OutTotalPackets++;
+            if (_tcpNetDriver != null)
+            {
+                _tcpNetDriver.OutPackets++;
+                _tcpNetDriver.OutTotalPackets++;
+            }
+            
             
             if (!_isSending)
             {

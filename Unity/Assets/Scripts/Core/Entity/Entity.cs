@@ -87,6 +87,8 @@ namespace Bliss
                     {
                         InstanceId = IdGenerator.Instance.GenerateInstanceId();
                     }
+
+                    RegisterToSystem();
                 }
 
                 if (_children != null)
@@ -485,6 +487,11 @@ namespace Bliss
         //     
         //     GetEntitySystem().Deserialize(this);
         // }
+        
+        protected virtual void RegisterToSystem()
+        {
+            this.LogicScene.Root.EntitySystem.RegisterSystem(this);
+        }
 
         public override void Dispose()
         {

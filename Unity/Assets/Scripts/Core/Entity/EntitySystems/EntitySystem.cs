@@ -143,11 +143,11 @@ namespace Bliss
             where TEntity : IEntitySystemConstraint 
             where TSystem : IUpdateGroupSystem
         {
-            Queue<EntityWeakRef<Entity>> lateUpdateQueue = _updateQueue[(int)ESystemUpdateGroup.LateUpdate];
-            int thisFrameCount = lateUpdateQueue.Count;
+            Queue<EntityWeakRef<Entity>> updateQueue = _updateQueue[(int)updateGroup];
+            int thisFrameCount = updateQueue.Count;
             while (thisFrameCount > 0)
             {
-                var entity = (Entity)lateUpdateQueue.Dequeue();
+                var entity = (Entity)updateQueue.Dequeue();
                 thisFrameCount--;
                 
                 if (entity == null || entity.IsDisposed)
@@ -167,7 +167,7 @@ namespace Bliss
                     {
                         continue;
                     }
-                    lateUpdateQueue.Enqueue(entity);
+                    updateQueue.Enqueue(entity);
 
                     foreach (var system in lateUpdateSystems)
                     {

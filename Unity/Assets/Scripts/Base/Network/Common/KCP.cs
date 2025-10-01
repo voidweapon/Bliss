@@ -90,5 +90,15 @@ namespace Bliss.Core
         {
             return (int)_kcp->state;
         }
+
+        /// <summary>
+        /// 平滑往返时间 MS
+        /// </summary>
+        public int SmoothRTT => _kcp->rx_srtt;
+
+        /// <summary>
+        /// 平滑网络抖动时间 MS
+        /// </summary>
+        public int SmoothJitter => _kcp->rx_rttval;
     }
 }

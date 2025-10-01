@@ -63,6 +63,8 @@ namespace Bliss
 
         internal void EarlyUpdate()
         {
+            EntitySystem.EarlyUpdate();
+            
             UpdateTiming(TimingEarly);
 
             void TimingEarly(Root root)
@@ -73,6 +75,8 @@ namespace Bliss
         
         internal void Update()
         {
+            EntitySystem.Update();
+            
             UpdateTiming(TimingUpdate);
 
             void TimingUpdate(Root root)
@@ -83,6 +87,8 @@ namespace Bliss
 
         internal void LateUpdate()
         {
+            EntitySystem.LateUpdate();
+            
             UpdateTiming(TimingLate);
 
             void TimingLate(Root root)
@@ -93,8 +99,6 @@ namespace Bliss
         
         private void UpdateTiming(Action<Root> updateAction)
         {
-            EntitySystem.LateUpdate();
-            
             int count = _updateQueue.Count;
             for (int i = 0; i < count; i++)
             {

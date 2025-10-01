@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using System.Net.Sockets;
 using System.Runtime.InteropServices;
 
 namespace Bliss.Core.Network
@@ -95,13 +94,13 @@ namespace Bliss.Core.Network
             RemoteId = 0;
             ConversationId = 0;
                   
-            _kcp.Dispose();
+            _kcp?.Dispose();
             _kcp = null;
             
             _state = ENetConnectionState.Close;
             
             _udpDriver.RemoveConnection(localId);
-            _udpDriver.SendDisconnect(localId, remoteId, _remoteEndPoint);
+            _udpDriver.SendDisconnect(localId, remoteId, _remoteEndPoint, Error);
         }
 
 
@@ -250,7 +249,7 @@ namespace Bliss.Core.Network
             
 
             skBuffer.Push(messageBuf.TrueLength)
-                .WriteSpanTo(skBuffer.Push(messageBuf.TrueLength));
+                .WriteReadOnlySpanTo(messageBuf.Pull(messageBuf.TrueLength));
             
             bool isReliable = false;
             skBuffer.Push(ProtocolDefine.MsgPacketHeaderSize)
@@ -265,6 +264,16 @@ namespace Bliss.Core.Network
         internal void OutputRaw(byte[] buffer, int offset, int size)
         {
             _udpDriver.Output(buffer, offset, size, _remoteEndPoint);
+            
+            OutBytes += (uint)size;
+            OutTotalBytes += (uint)size;
+            OutPackets++;
+            OutTotalPackets++;
+            
+            _udpDriver.OutBytes += (uint)size;
+            _udpDriver.OutTotalBytes += (uint)size;
+            _udpDriver.OutPackets++;
+            _udpDriver.OutTotalPackets++;
         }
 
         #endregion
@@ -282,17 +291,30 @@ namespace Bliss.Core.Network
             if (_state == ENetConnectionState.Pending)
             {
                 _connectHandler.Input(bufferSpan);
-                return;
             }
         }
 
         internal void InputRaw(ReadOnlySpan<byte> bufferSpan)
         {
-            if (IsDisposed || _state == ENetConnectionState.Invalid)
+            if (IsDisposed || _state != ENetConnectionState.Open)
             {
                 return;
             }
+            
+            InBytes += (uint)bufferSpan.Length;
+            InTotalBytes += (uint)bufferSpan.Length;
+            InPackets++;
+            InTotalPackets++;
 
+            if (_udpDriver != null)
+            {
+                _udpDriver.InBytes += (uint)bufferSpan.Length;
+                _udpDriver.InTotalBytes += (uint)bufferSpan.Length;
+                _udpDriver.InPackets++;
+                _udpDriver.InTotalPackets++;
+            }
+
+            
             bufferSpan.ReadByte(out _)
                 .ReadBool(out bool isReliable);
 
@@ -309,7 +331,12 @@ namespace Bliss.Core.Network
         private void InputReliableRaw(ReadOnlySpan<byte> bufferSpan)
         {
             bufferSpan = bufferSpan.Slice(ProtocolDefine.MsgPacketHeaderSize);
-            _kcp.ikcp_input(bufferSpan);
+            int error = _kcp.ikcp_input(bufferSpan);
+            if (error != 0)
+            {
+                return;
+            }
+            
             _udpDriver.ScheduleUpdate(ConnectionId, 0);
             
             while (ReceiveNextReliable(out var bufferRef))
@@ -360,11 +387,20 @@ namespace Bliss.Core.Network
             return true;
         }
         #endregion
-        
-        private void OnError(int error)
+
+        protected override void UpdateNetworkLagStats()
+        {
+            if (_kcp != null)
+            {
+                AvgLag = _kcp.SmoothRTT;
+                AverageJitterInMS =  _kcp.SmoothJitter;
+            }
+        }
+
+        internal void OnError(int error)
         {
             uint connectionId = ConnectionId;
-            Log.Error($"{nameof(TcpNetConnection)}[{connectionId}] error: {error}");
+            Log.Error($"{nameof(UdpNetConnection)}[{connectionId}] error: {error}");
             _udpDriver.RemoveConnection(connectionId, error);
             _udpDriver.ReportConnectionError(connectionId, error);
         }

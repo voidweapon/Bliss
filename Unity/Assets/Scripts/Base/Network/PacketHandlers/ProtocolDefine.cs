@@ -9,6 +9,14 @@ namespace Bliss.Core.Network
 
     public static class ProtocolDefine
     {
+        /// <summary>
+        /// 普通消息头长度
+        /// </summary>
         public const int MsgPacketHeaderSize = sizeof(byte) + sizeof(bool) + sizeof(uint) + sizeof(uint);
+        
+        /// <summary>
+        /// 关闭连接消息头长度
+        /// </summary>
+        public const int FinPacketHeaderSize = MsgPacketHeaderSize +  sizeof(int);
     }
 }

@@ -178,7 +178,9 @@ namespace Bliss
             {
                 return;
             }
-            
+            SocketBuffer buffer = bufferRef.Target;
+            var rawMsg = buffer.Pull(buffer.TrueLength);
+            Log.Debug($"OnReceive: ConnectionId = {connectionId}, BufferRef = {bufferRef} , RawMsg={rawMsg.ToString()}");
             //解析消息
             
             bufferRef.Dispose();

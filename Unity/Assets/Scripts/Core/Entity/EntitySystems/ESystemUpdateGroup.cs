@@ -4,8 +4,8 @@ namespace Bliss
     {
         None = -1,
         EarlyUpdate = 0,
-        Update = 0,
-        LateUpdate = 1,
+        Update = 1,
+        LateUpdate = 2,
         
         Max,
     }
