@@ -10,7 +10,7 @@ using System.Collections.Generic;
     {{~if proto_class.response_class_name~}}
     [MessageResponse({{proto_class.response_class_name}})]
     {{~end~}}
-    public partial class {{proto_class.class_name}} {{base_class __parents__}} 
+    public partial class {{proto_class.class_name}} : MessageObject{{base_class proto_class.parents}} 
     {
         {{~ for proto_property in proto_class.properties ~}}
         {{gen_comment proto_property.comment}}
@@ -22,6 +22,8 @@ using System.Collections.Generic;
         {
             return ObjectPool.Instance.Fetch(typeof({{proto_class.class_name}}), isFromPool) as {{proto_class.class_name}};
         }
+        
+        partial void CustomDispose();
         
         public override void Dispose()
         {
@@ -38,8 +40,17 @@ using System.Collections.Generic;
         {{end}}
             ObjectPool.Instance.Recycle(this);
         }
+       
+        private const int _sizeHint = {{gen_size_hint proto_class}};
         
-        partial void CustomDispose();
+        partial void CustomSizeHint(ref int sizeHint);
+        
+        public override int SizeHint()
+        {
+            int sizeHint = _sizeHint;
+            CustomSizeHint(ref sizeHint);
+            return sizeHint;
+        }
     }
     
     {{~end~}}

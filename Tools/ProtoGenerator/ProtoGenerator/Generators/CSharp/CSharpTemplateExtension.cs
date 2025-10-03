@@ -45,14 +45,9 @@ public class CSharpTemplateExtension : ScriptObject
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.Append(" : ");
         for (int i = 0; i < parents.Count; i++)
         {
-            sb.Append(parents[i]);
-            if (i != parents.Count - 1)
-            {
-                sb.Append(", ");
-            }
+            sb.Append($", {parents[i]}");
         }
         return sb.ToString();
     }
@@ -72,6 +67,28 @@ public class CSharpTemplateExtension : ScriptObject
         }
     }
 
+
+    public static string gen_size_hint(ProtoClassInfo protoClassInfo)
+    {
+        StringBuilder sb = new StringBuilder();
+        if (protoClassInfo.properties.Count == 0)
+        {
+            sb.Append("0");
+        }
+        else
+        {
+            for (int i = 0; i < protoClassInfo.properties.Count; i++)
+            {
+                var propertyInfo = protoClassInfo.properties[i];
+                sb.Append($"sizeof({propertyInfo.property_type})");
+                if (i != protoClassInfo.properties.Count - 1)
+                {
+                    sb.Append(" + ");
+                }
+            }
+        }
+        return sb.ToString();
+    }
 
     
 }

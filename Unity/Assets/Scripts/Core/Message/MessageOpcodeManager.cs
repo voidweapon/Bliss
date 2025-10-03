@@ -82,5 +82,11 @@ namespace Bliss
         {
             _request2Response.Add(request, responseType);
         }
+
+        public Type GetRequestTypeBy(Type request)
+        {
+            return _request2Response[request];
+        }
+        
     }
 }

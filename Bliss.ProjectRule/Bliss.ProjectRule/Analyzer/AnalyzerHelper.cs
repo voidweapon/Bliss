@@ -307,5 +307,63 @@ namespace Bliss.ProjectRule.Analyzer
             return $"{attributeName}Attribute";
         }
         
+        /// <summary>
+        ///     INamedTypeSymbol 是否有指定的Attribute
+        /// </summary>
+        public static bool HasAttribute(this ITypeSymbol typeSymbol, string attributeName)
+        {
+            foreach (AttributeData? attributeData in typeSymbol.GetAttributes())
+            {
+                if (attributeData.AttributeClass?.ToString() == attributeName)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        
+        public static bool HasAttributeInTypeAndBaseTypes(this ITypeSymbol typeSymbol, string attributeName)
+        {
+            if (typeSymbol.HasAttribute(attributeName))
+            {
+                return true;
+            }
+
+            foreach (var baseType in typeSymbol.BaseTypes())
+            {
+                if (baseType.HasAttribute(attributeName))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        /// <summary>
+        ///     INamedTypeSymbol 获取指定类型的第一个Attribute
+        /// </summary>
+        public static AttributeData? GetFirstAttribute(this INamedTypeSymbol namedTypeSymbol, string attributeName)
+        {
+            foreach (AttributeData? attributeData in namedTypeSymbol.GetAttributes())
+            {
+                if (attributeData.AttributeClass?.ToString() == attributeName)
+                {
+                    return attributeData;
+                }
+            }
+
+            return null;
+        }
+        
+        public static IEnumerable<ITypeSymbol> BaseTypes(this ITypeSymbol typeSymbol)
+        {
+            ITypeSymbol? baseType = typeSymbol.BaseType;
+            while (baseType!=null)
+            {
+                yield return baseType;
+                baseType = baseType.BaseType;
+            }
+        }
     }
 }

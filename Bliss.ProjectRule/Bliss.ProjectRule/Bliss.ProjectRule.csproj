@@ -37,6 +37,10 @@
     </ItemGroup>
     
     <ItemGroup>
+        <Compile Include="../../Unity/Assets/Scripts/Base/Analyzer/**/*.cs">
+            <PrivateAssets>all</PrivateAssets>
+            <Link>AnalyzerAttribute/%(RecursiveDir)%(FileName)%(Extension)</Link>
+        </Compile>
         <Compile Include="../../Unity/Assets/Scripts/Core/AnalyzerAttribute/**/*.cs">
             <PrivateAssets>all</PrivateAssets>
             <Link>AnalyzerAttribute/%(RecursiveDir)%(FileName)%(Extension)</Link>

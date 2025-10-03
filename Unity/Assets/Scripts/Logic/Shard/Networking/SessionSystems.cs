@@ -17,11 +17,12 @@ namespace Bliss
             var networkComponent = self.Parent as NetworkComponent;
             networkComponent.RemoveConnection((uint)self.Id, self.ErrorCode);
         }
-
-
-        public static void Send(this Session self, object message)
+        
+        public static void Send(this Session self, MessageObject message)
         {
-            
+            var networkComponent = self.Parent as NetworkComponent;
+            SocketBufferRef netStreamRef = MessageSerializer.MessageToNetStream(networkComponent.NetDriver,  message);
+            self.SendRaw(netStreamRef);
         }
         
         public static void SendRaw(this Session self, SocketBufferRef buffer)
@@ -30,8 +31,9 @@ namespace Bliss
             networkComponent.Send((uint)self.Id, buffer);
         }
 
-        public static async ETTask<object> Call(this Session self, object request, ETCancellationToken cancellation)
+        public static async ETTask<IResponse> Call(this Session self, MessageObject request, ETCancellationToken cancellation)
         {
+            var requestType = MessageOpcodeManager.Instance.GetRequestTypeBy(request.GetType());
             int rpcId = self.GenRpcId();
             var rpcInfo = new RpcInfo(rpcId);
             self.RpcInfos.Add(rpcId, rpcInfo);
@@ -54,7 +56,7 @@ namespace Bliss
             try
             {
                 cancellation.Add(CancelAction);
-                object response = await rpcInfo.Wait();
+                IResponse response = await rpcInfo.Wait();
                 return response;
             }
             finally
@@ -63,13 +65,13 @@ namespace Bliss
             }
         }
         
-        public static async ETTask<object> Call(this Session self, object request, long timeMS, ETCancellationToken cancellation)
+        public static async ETTask<IResponse> Call(this Session self, IRequest request, long timeMS, ETCancellationToken cancellation)
         {
+            var requestType = MessageOpcodeManager.Instance.GetRequestTypeBy(request.GetType());
             int rpcId = self.GenRpcId();
-            var requestType = request.GetType();
             var rpcInfo = new RpcInfo(rpcId);
             self.RpcInfos.Add(rpcId, rpcInfo);
-            self.Send(request);
+            self.Send((MessageObject)request);
             
             long instanceId = self.InstanceId;
             void CancelAction()
@@ -108,7 +110,7 @@ namespace Bliss
             try
             {
                 cancellation.Add(CancelAction);
-                object response = await rpcInfo.Wait();
+                IResponse response = await rpcInfo.Wait();
                 return response;
             }
             finally
@@ -116,12 +118,22 @@ namespace Bliss
                 cancellation.Remove(CancelAction);   
             }
         }
+        
+        internal static void OnResponse(this Session self, IResponse response)
+        {
+            if (!self.RpcInfos.Remove(response.RpcId, out RpcInfo action))
+            {
+                return;
+            }
+            action.SetResult(response);
+        }
 
         private static int GenRpcId(this Session self)
         {
             int rpcId = RandomGenerator.RandInt32();
             int tryLimit = 100;
             int tryCount = 0;
+            
             while (self.RpcInfos.ContainsKey(rpcId))
             {
                 rpcId = RandomGenerator.RandInt32();

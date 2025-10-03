@@ -19,15 +19,15 @@ namespace Bliss
     public readonly struct RpcInfo
     {
         public readonly int RpcId;
-        private readonly ETTask<object> tcs;
+        private readonly ETTask<IResponse> tcs;
 
         public RpcInfo(int rpcId)
         {
             RpcId = rpcId;
-            tcs = ETTask<object>.Create(true);
+            tcs = ETTask<IResponse>.Create(true);
         }
         
-        public void SetResult(object response)
+        public void SetResult(IResponse response)
         {
             tcs.SetResult(response);
         }
@@ -37,7 +37,7 @@ namespace Bliss
             tcs.SetException(exception);
         }
 
-        public async ETTask<object> Wait()
+        public async ETTask<IResponse> Wait()
         {
             return await tcs;
         }
