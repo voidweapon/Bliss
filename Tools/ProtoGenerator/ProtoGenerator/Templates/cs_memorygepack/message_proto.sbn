@@ -1,0 +1,53 @@
+/* This file is Generated, DON'T MODIFY THIS FILE. */
+using MemoryPack;
+using System.Collections.Generic;
+
+{{namespace_with_grace_begin __namespace__}}
+    {{~for proto_class in __proto_messages__ ~}}
+    {{gen_comment proto_class.comment}}
+    [MemoryPackable]
+    [MessageOpcode({{__file_name__}}Opcode.{{proto_class.class_name}})]
+    {{~if proto_class.response_class_name~}}
+    [MessageResponse({{proto_class.response_class_name}})]
+    {{~end~}}
+    public partial class {{proto_class.class_name}} {{base_class __parents__}} 
+    {
+        {{~ for proto_property in proto_class.properties ~}}
+        {{gen_comment proto_property.comment}}
+        [MemoryPackOrder({{proto_property.order}})]
+        public {{proto_property.property_type}} {{proto_property.name}};
+        {{~end~}}
+        
+        public static {{proto_class.class_name}} Create(bool isFromPool = false)
+        {
+            return ObjectPool.Instance.Fetch(typeof({{proto_class.class_name}}), isFromPool) as {{proto_class.class_name}};
+        }
+        
+        public override void Dispose()
+        {
+            if (!this.IsFromPool)
+            {
+                return;
+            }
+        {{if proto_class.use_custom_dispose}}
+            CustomDispose();
+        {{else}}
+            {{~ for p_property in proto_class.properties ~}}
+            {{clear_property p_property.property_type p_property.name}}
+            {{~end~}}
+        {{end}}
+            ObjectPool.Instance.Recycle(this);
+        }
+        
+        partial void CustomDispose();
+    }
+    
+    {{~end~}}
+    
+    public partial static class {{__file_name__}}Opcode
+    {
+        {{~for proto_class in __proto_messages__ ~}}
+        public const ushort {{proto_class.class_name}} = {{proto_class.opcode}};
+        {{~end~}}
+    }
+{{namespace_with_grace_end __namespace__}}
