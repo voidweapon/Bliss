@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace Bliss.Pool
 {
-    public class ObjectPool
+    public class ObjectPool : IDisposable
     {
         private static ObjectPool instance;
 
@@ -23,6 +23,12 @@ namespace Bliss.Pool
         private ConcurrentDictionary<Type, Pool> _pools = new ConcurrentDictionary<Type, Pool>();
         private Func<Type, Pool> funcAddPool = type => new Pool(type, 1024);
 
+        
+        public void Dispose()
+        {
+            instance = null;
+        }
+        
         public T Fetch<T>(bool isFromPool = true)
         {
             return (T)Fetch(typeof(T), isFromPool);

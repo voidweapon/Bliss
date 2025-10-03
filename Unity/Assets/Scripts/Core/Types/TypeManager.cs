@@ -48,7 +48,7 @@ namespace Bliss.Core
         
         public Type GetType(string typeName)
         {
-            return this._types[typeName];
+            return _types[typeName];
         }
 
         /// <summary>

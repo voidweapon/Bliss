@@ -78,6 +78,29 @@ namespace Bliss.Base.Collections
 			}
 			return default(TKey);
 		}
+		
+		public bool TryGetValueByKey(TKey key, out TValue value)
+		{
+			if (key != null && kv.ContainsKey(key))
+			{
+				value = kv[key];
+				return true;
+			}
+
+			value = default(TValue);
+			return false;
+		}
+
+		public bool TryGetKeyByValue(TValue value, out TKey key)
+		{
+			if (value != null && vk.ContainsKey(value))
+			{
+				key = vk[value];
+				return true;
+			}
+			key = default(TKey);
+			return false;
+		}
 
 		public void RemoveByKey(TKey key)
 		{

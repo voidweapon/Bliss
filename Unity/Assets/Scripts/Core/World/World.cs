@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Bliss.Id;
 using Bliss;
+using Bliss.Pool;
 
 namespace Bliss
 {
@@ -28,6 +29,16 @@ namespace Bliss
                 kv.Value.Dispose();
             }
             _singletons.Clear();
+            
+            ObjectPool.Instance.Dispose();
+            MessageOpcodeManager.Instance.Dispose();
+        }
+        
+        public T AddSingletonNoInit<T>() where T : ASingleton, new()
+        {
+            var singleton = new T();
+            AddSingleton(singleton);
+            return singleton;
         }
         
         public T AddSingleton<T>() where T : ASingleton, ISingletonInit, new()

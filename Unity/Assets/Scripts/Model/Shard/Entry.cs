@@ -13,7 +13,7 @@ namespace Bliss
         private static async ETTask StartAsync()
         {
             
-            //RootManager.Instance.Create()
+            World.Instance.AddSingleton<MessageOpcodeManager>();
             
             //创建支持reload的 singleton
             TypeManager.Instance.CreateAutoSingletonManager();

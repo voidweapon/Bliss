@@ -11,8 +11,8 @@ namespace Bliss
         }
 
         /// <summary>
-        /// 在序列话之前调用
-        /// 可以在里面做序列话的准备工作
+        /// 在序列化之前调用
+        /// 可以在里面做序列化的准备工作
         /// </summary>
         public virtual void BeforeSerialize()
         {
