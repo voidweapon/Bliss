@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+      <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+      <DefineConstants>TRACE;UNITY_DOTSPLAYER</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+      <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+      <DefineConstants>TRACE;UNITY_DOTSPLAYER</DefineConstants>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="coverlet.collector" Version="6.0.0"/>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0"/>
+        <PackageReference Include="NUnit" Version="3.14.0"/>
+        <PackageReference Include="NUnit.Analyzers" Version="3.9.0"/>
+        <PackageReference Include="NUnit3TestAdapter" Version="4.5.0"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="NUnit.Framework"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="..\..\Unity\Assets\Scripts\Base\**\*.cs">
+            <Link>Scripts\Base\%(RecursiveDir)%(FileName)%(Extension)</Link>
+        </Compile>
+
+        <Compile Include="..\..\Unity\Assets\Scripts\Core\Network\Common\SocketBuffer.cs">
+            <Link>Scripts\Core\Network\Common\SocketBuffer.cs</Link>
+        </Compile>
+
+        <Compile Include="..\..\Unity\Library\PackageCache\com.unity.mathematics*\Unity.Mathematics\**\*.cs">
+            <Link>Unity.Mathematics/$([System.String]::new(%(RecursiveDir)).Substring($([System.String]::new(%(RecursiveDir)).Indexof("Unity.Mathematics"))).Replace("Unity.Mathematics", ""))/%(FileName)%(Extension)</Link>
+        </Compile>
+
+        <Compile Update="..\..\Unity\Library\PackageCache\com.unity.mathematics@1.2.6\Unity.Mathematics\PropertyAttribute.cs">
+          <Link>Unity.Mathematics\PropertyAttribute.cs</Link>
+        </Compile>
+
+        <Compile Update="Unity.Mathematics\PropertyAttribute.cs">
+          <Link>Unity.Mathematics\PropertyAttribute.cs</Link>
+        </Compile>
+    </ItemGroup>
+
+</Project>
