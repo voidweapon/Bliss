@@ -38,6 +38,12 @@ public class ProtoSourceGenerator
         using FileStream txt = new(outputPath, FileMode.Create, FileAccess.ReadWrite);
         using StreamWriter sw = new(txt);
         sw.Write(sourceText);
+        
+        Console.WriteLine($"===================================================");
+        Console.WriteLine($"Generate Message {protoName} Success");
+        Console.WriteLine($"Output Path: {outputPath}");
+        Console.WriteLine($"===================================================");
+        
     }
     
     

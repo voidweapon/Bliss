@@ -29,7 +29,9 @@ public abstract class BaseProtoGenerator
         {
             throw new ArgumentException($"Unknown target: {target}");
         }
-        string templatePath = Path.Combine(Path.Combine("./Templates", name), "message_proto.sbn");
+
+        var curDir = Path.GetDirectoryName(AppContext.BaseDirectory);
+        string templatePath = Path.Combine(Path.Combine($"{curDir}/Templates", name), "message_proto.sbn");
         var sourceText = File.ReadAllText(templatePath);
         return Template.Parse(sourceText);
     }

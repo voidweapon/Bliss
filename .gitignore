@@ -105,3 +105,4 @@ Unity/Assets/StreamingAssets.meta
 #其他
 /Bin
 bin/
+/Tools/ProtoGenerator/Generate
