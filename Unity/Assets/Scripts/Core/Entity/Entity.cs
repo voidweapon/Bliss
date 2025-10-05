@@ -10,11 +10,6 @@ namespace Bliss
     using SerializeIgnore = MemoryPackIgnoreAttribute;
     using SerializeInclude = MemoryPackIncludeAttribute;
     
-    public enum EEntityStatus
-    {
-        //是否是池化对象
-    }
-    
     /*
      * 序列化消息顺序: BeforeSerialize -> AfterSerialize -- Invoke--> SerializeSystem
      * 反序列化消息函数顺: BeginInit (possible not call) -> EndInit -> （first mount to scene） Deserialize System -- Then --> MountToSceneSystem
@@ -296,7 +291,6 @@ namespace Bliss
                 return;
             }
 
-
             if (!_children.TryGetValue(id, out Entity child))
             {
                 return;
@@ -354,9 +348,6 @@ namespace Bliss
                 }
             }
         }
-        
-        
-
         #endregion
 
         #region Entity Component
@@ -450,13 +441,18 @@ namespace Bliss
         
         public Entity AddComponent(Entity component)
         {
+            EarlyCheckDuplicateComponents(component.GetType());
+            
             component.SetComponentParent(this);
             return component;
         }
 
         public TComponent AddComponent<TComponent>(bool isFromPool = false) where TComponent : Entity
         {
-            Entity component = Create(typeof(TComponent), isFromPool);
+            Type componentType = typeof(TComponent);
+            EarlyCheckDuplicateComponents(componentType);
+            
+            Entity component = Create(componentType, isFromPool);
             component.Id = Id;
             component.SetComponentParent(this);
             GetEntitySystem().Awake(component);
@@ -465,7 +461,10 @@ namespace Bliss
         
         public TComponent AddComponent<TComponent, TParam>(TParam param, bool isFromPool = false) where TComponent : Entity
         {
-            Entity component = Create(typeof(TComponent), isFromPool);
+            Type componentType = typeof(TComponent);
+            EarlyCheckDuplicateComponents(componentType);
+            
+            Entity component = Create(componentType, isFromPool);
             component.Id = Id;
             component.SetComponentParent(this);
             GetEntitySystem().Awake(component, param);
@@ -474,7 +473,10 @@ namespace Bliss
 
         public TComponent AddComponentWithId<TComponent>(int id, bool isFromPool = false) where TComponent : Entity
         {
-            Entity component = Create(typeof(TComponent), isFromPool);
+            Type componentType = typeof(TComponent);
+            EarlyCheckDuplicateComponents(componentType);
+            
+            Entity component = Create(componentType, isFromPool);
             component.Id = id;
             component.SetComponentParent(this);
             GetEntitySystem().Awake(component);
@@ -523,6 +525,15 @@ namespace Bliss
             RemoveFromComponents(component);
             component.Dispose();
         }
+
+        private void EarlyCheckDuplicateComponents(Type componentType)
+        {
+            if (_components != null && _components.ContainsKey(GetLongHashCode(componentType)))
+            {
+                throw new Exception($"entity already has component: {componentType.FullName}");
+            }
+        }
+        
         
         #endregion
 
