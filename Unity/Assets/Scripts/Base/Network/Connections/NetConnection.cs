@@ -150,7 +150,7 @@ namespace Bliss.Core.Network
         /// </summary>
         public float AverageJitterInMS  { get; protected set; }
         
-        private void UpdateNetworkStats()
+        internal void UpdateNetworkStats()
         {
             long timeNow = NetDriver.TimeNow;
             

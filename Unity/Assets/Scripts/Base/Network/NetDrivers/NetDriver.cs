@@ -254,7 +254,13 @@ namespace Bliss.Core.Network
                 OutBytes = 0;
                 InPackets = 0;
                 OutPackets = 0;
-                LastStatUpdateTime =  timeNow;
+                LastStatUpdateTime = timeNow;
+            }
+
+            foreach (var kv in _dicId2Connection)
+            {
+                var connection = kv.Value;
+                connection.UpdateNetworkStats();
             }
         }
         #endregion

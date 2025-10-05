@@ -51,6 +51,11 @@ namespace Bliss.Core
             return _types[typeName];
         }
 
+        public Dictionary<string, Type> GetAllTypes()
+        {
+            return _types;
+        }
+
         /// <summary>
         /// 重新创建被标记为<see cref="SingletonMangerAttribute"/>到Singleton
         /// </summary>

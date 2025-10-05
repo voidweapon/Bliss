@@ -87,14 +87,15 @@ public class EntitySystemGenerator : ISourceGenerator
         
         string? namespaceName = classTypeSymbol.GetNameSpace();
 
-        var generationContext = new GenerationContext()
+        var generationContext = new EntitySystemsGenerationContext()
         {
             NameSpace = namespaceName ?? string.Empty,
             ClassName = entityClassName,
+            defEntitySystems = defEntitySystems,
         };
         
-        var generator = new CSharpTemplateCodeTarget();
-        string code = generator.GenerateCode(generationContext, defEntitySystems, Definition.TemplateMap.GetTemplateName(EntitySystemOfAttributeName), ref context);
+        var generator = new CSharpEntitySystemTemplateCodeTarget();
+        string code = generator.GenerateCode(generationContext, Definition.TemplateMap.GetTemplateName(EntitySystemOfAttributeName), ref context);
         string fileName = $"{className}.Generated.cs";
         context.AddSource(fileName, code);
 

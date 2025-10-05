@@ -14,12 +14,12 @@ namespace Bliss
         public abstract int SizeHint();
 
 #if DOTNET
-    [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
 #endif
         public bool IsFromPool { get; set; }
     
 #if DOTNET
-    [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
 #endif
         public bool IsInPool { get; set; }
     }

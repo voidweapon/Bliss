@@ -68,7 +68,7 @@ internal abstract class TemplateCodeTargetBase
     //     return template.Render(tplCtx);
     // }
     
-    public string GenerateCode(GenerationContext context, List<DefEntitySystem> defEntitySystems, string templateName, ref GeneratorExecutionContext executionContext)
+    public string GenerateCode(GenerationContext context, string templateName, ref GeneratorExecutionContext executionContext)
     {
         var template = GetTemplate(templateName, ref executionContext);
         var tplCtx = CreateTemplateContext(template);
@@ -76,11 +76,17 @@ internal abstract class TemplateCodeTargetBase
         {
             {KeywordDefine.Namespace, context.NameSpace},
             {KeywordDefine.ClassName, context.ClassName},
-            {KeywordDefine.EntitySystems, defEntitySystems},
+            {KeywordDefine.IsDotNet, context.IsDotNet},
         };
         tplCtx.PushGlobal(extraEnvs);
+        OnGenerateCode(tplCtx, context);
 
         return template.Render(tplCtx);
+    }
+
+    protected virtual void OnGenerateCode(TemplateContext tplCtx, GenerationContext context)
+    {
+        
     }
     
     protected abstract void OnCreateTemplateContext(TemplateContext ctx);

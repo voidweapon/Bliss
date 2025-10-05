@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using Bliss.ProjectRule.SourceGenerator.Generators;
 using Bliss.ProjectRule.SourceGenerator.Templates;
 using Scriban;
 
@@ -17,12 +18,23 @@ internal class TemplateManager
     private readonly List<string> _templateSearchPaths = new();
     
     private readonly ConcurrentDictionary<string, string> _templateStrings = new();
+    
+    /// <summary>
+    /// key: templateName --> value: Template
+    /// </summary>
     private readonly ConcurrentDictionary<string, Template> _templates = new();
 
     public TemplateManager()
     {
-        var entitySystem = new EntitySystemTemplate().Get();
-        _templates.TryAdd(entitySystem.Item1, entitySystem.Item2);
+        AddTemplateLocal(new EntitySystemTemplate());
+        AddTemplateLocal(new MemoryPackPolymorphismTemplate());
+        AddTemplateLocal(new MemoryPackPolymorphismRegisterTemplate());
+        
+        void AddTemplateLocal(ACodeTemplate codeTemplate)
+        {
+            var info = codeTemplate.Get();
+            _templates.TryAdd(info.Item1, info.Item2);
+        }
     }
     
     private void EnsureInit()

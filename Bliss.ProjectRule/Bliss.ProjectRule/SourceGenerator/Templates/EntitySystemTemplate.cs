@@ -24,7 +24,7 @@ internal class EntitySystemTemplate : ACodeTemplate
     
     public override (string, Template) Get()
     {
-        var template =Template.Parse(this.TemplateString);
+        var template = Template.Parse(this.TemplateString);
         return (Templatename, template);
     }
 }

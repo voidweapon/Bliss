@@ -12,7 +12,10 @@ namespace Bliss
 
         private static async ETTask StartAsync()
         {
-            
+#if DOTNET
+            Bliss.Server.MongoRegister.Init();
+#endif
+            MemoryPackSerializerRegister.Init();
             World.Instance.AddSingleton<MessageOpcodeManager>();
             
             //创建支持reload的 singleton

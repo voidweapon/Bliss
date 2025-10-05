@@ -3,32 +3,81 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Bliss.Id;
 using Bliss.Pool;
+using MemoryPack;
 
 namespace Bliss
 {
-
+    using SerializeIgnore = MemoryPackIgnoreAttribute;
+    using SerializeInclude = MemoryPackIncludeAttribute;
+    
     public enum EEntityStatus
     {
         //是否是池化对象
     }
     
-    public class Entity : DisposableObject, IPoolableObject
+    /*
+     * 序列化消息顺序: BeforeSerialize -> AfterSerialize -- Invoke--> SerializeSystem
+     * 反序列化消息函数顺: BeginInit (possible not call) -> EndInit -> （first mount to scene） Deserialize System -- Then --> MountToSceneSystem
+     */
+    [MemoryPackable(GenerateType.NoGenerate)]
+    public partial class Entity : DisposableObject, IPoolableObject
     {
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
+        [SerializeIgnore]
         public bool IsFromPool { get; set; }
+        
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
+        [SerializeIgnore]
         public bool IsInPool { get; set; }
-        public bool IsComponent { get; private set; }
+        
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
+        [SerializeIgnore]
+        protected bool IsComponent { get; private set; }
 
         /// <summary>
-        /// 对象是否是序列化出来的
+        /// 对象是否是反序列化出来的
         /// </summary>
-        public bool IsSerialized { get; private set; }
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
+        [SerializeIgnore]
+        protected bool IsSerialized { get; private set; }
+        
+        /// <summary>
+        /// 对象是否挂载在场景上
+        /// </summary>
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
+        [SerializeIgnore]
+        protected bool IsMountedOnScene { get; private set; }
 
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
+        [SerializeIgnore]
         public bool IsDisposed => InstanceId == 0;
-
+        
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnoreIfDefault]
+        [MongoDB.Bson.Serialization.Attributes.BsonDefaultValue(0L)]
+        [MongoDB.Bson.Serialization.Attributes.BsonElement]
+        [MongoDB.Bson.Serialization.Attributes.BsonId]
+#endif
         public long Id { get; set; }
+        
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
+        [SerializeIgnore]
         public long InstanceId { get; protected set; }
         
-            
         protected  Entity()
         {
            
@@ -58,8 +107,15 @@ namespace Bliss
         /// <summary>
         /// 挂载在哪个场景上
         /// </summary>
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
         protected ILogicScene _logicScene;
 
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
+        [SerializeIgnore]
         public ILogicScene LogicScene
         {
             get
@@ -106,7 +162,16 @@ namespace Bliss
                         component.LogicScene = _logicScene;
                     }
                 }
+
+                bool isMountedOnScene = IsMountedOnScene;
+                IsMountedOnScene = true;
+
+                if (IsSerialized && !isMountedOnScene)
+                {
+                    GetEntitySystem().OnAfterDeserialize(this);
+                }
                 
+                GetEntitySystem().OnMountToScene(this);
             }
         }
 
@@ -114,11 +179,17 @@ namespace Bliss
         #endregion
 
         #region Entity Tree
-        
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
         protected SortedDictionary<long, Entity> _children;
         /// <summary>
         /// 孩子节点
         /// </summary>
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
+        [SerializeIgnore]
         public SortedDictionary<long, Entity> Children
         {
             get
@@ -132,6 +203,10 @@ namespace Bliss
         /// <summary>
         /// 孩子节点数量
         /// </summary>
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
+        [SerializeIgnore]
         public int ChildCount
         {
             get
@@ -234,8 +309,15 @@ namespace Bliss
         /// <summary>
         /// 父亲节点
         /// </summary>
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
         protected Entity _parent;
 
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
+        [SerializeIgnore]
         public Entity Parent
         {
             get
@@ -249,18 +331,18 @@ namespace Bliss
                 if (_parent != null)
                 {
                     // parent相同，不设置
-                    if (this._parent == value)
+                    if (_parent == value)
                     {
-                        Log.Error($"重复设置了Parent: {this.GetType().FullName} parent: {this._parent.GetType().FullName}");
+                        Log.Error($"重复设置了Parent: {GetType().FullName} parent: {_parent.GetType().FullName}");
                         return;
                     }
                     
-                    this._parent.RemoveFromChildren(this);
+                    _parent.RemoveFromChildren(this);
                 }
                 
-                this._parent = value;
-                this.IsComponent = false;
-                this._parent.AddToChildren(this);
+                _parent = value;
+                IsComponent = false;
+                _parent.AddToChildren(this);
                 
                 if (this is ILogicScene logicScene)
                 {
@@ -278,10 +360,17 @@ namespace Bliss
         #endregion
 
         #region Entity Component
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
         protected SortedDictionary<long, Entity> _components;
         /// <summary>
         /// Entity的组件
         /// </summary>
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
+        [SerializeIgnore]
         public SortedDictionary<long, Entity> Components
         {
             get
@@ -295,6 +384,10 @@ namespace Bliss
         /// <summary>
         /// 组件数量
         /// </summary>
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
+#endif
+        [SerializeIgnore]
         public int ComponentCount
         {
             get
@@ -422,7 +515,7 @@ namespace Bliss
 
             Type type = typeof (TComponent);
             
-            if (!_components.TryGetValue(this.GetLongHashCode(type), out var component))
+            if (!_components.TryGetValue(GetLongHashCode(type), out var component))
             {
                 return;
             }
@@ -433,64 +526,146 @@ namespace Bliss
         
         #endregion
 
+        
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonElement("Children")]
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnoreIfNull]
+#endif
+        [SerializeInclude]
+        private List<Entity> _childrenSerializer = null;
+        
+#if DOTNET
+        [MongoDB.Bson.Serialization.Attributes.BsonElement("Cmps")]
+        [MongoDB.Bson.Serialization.Attributes.BsonIgnoreIfNull]
+#endif
+        [SerializeInclude]
+        private List<Entity> _componentSerializer = null;
+        
         public override void BeforeSerialize()
         {
             base.BeforeSerialize();
-            GetEntitySystem().Serialize(this);
-
+            GetEntitySystem().OnBeforeSerialize(this);
+            
+            _componentSerializer?.Clear();
             if (_components != null && _components.Count > 0)
             {
+                if (_componentSerializer == null)
+                {
+                    _componentSerializer = ObjectPool.Instance.Fetch<List<Entity>>();
+                }
                 foreach (Entity component in _components.Values)
                 {
                     if (component is not ISerializableEntity)
                     {
                         continue;
                     }
-                    
                     component.BeforeSerialize();
+                    _componentSerializer.Add(component);
                 }
             }
             
+            _childrenSerializer?.Clear();
             if (_children != null && _children.Count > 0)
             {
+                if (_childrenSerializer == null)
+                {
+                    _childrenSerializer = ObjectPool.Instance.Fetch<List<Entity>>();
+                }
+                
                 foreach (Entity child in _children.Values)
                 {
                     if (child is not ISerializableEntity)
                     {
                         continue;
                     }
-                    
                     child.BeforeSerialize();
+                    
+                    _childrenSerializer.Add(child);
                 }
             }
         }
 
-        // public override void AfterDeserialize()
-        // {
-        //     base.AfterDeserialize();
-        //     
-        //     if (_components != null && _components.Count > 0)
-        //     {
-        //         foreach (Entity component in _components.Values)
-        //         {
-        //             component.AfterDeserialize();
-        //         }
-        //     }
-        //     
-        //     if (_children != null && _children.Count > 0)
-        //     {
-        //         foreach (Entity child in _children.Values)
-        //         {
-        //             child.AfterDeserialize();
-        //         }
-        //     }
-        //     
-        //     GetEntitySystem().Deserialize(this);
-        // }
+        /// <summary>
+        /// 清理序列化状态
+        /// </summary>
+        public override void AfterSerialize()
+        {
+            base.AfterSerialize();
+            
+            _componentSerializer?.Clear();
+            if (_componentSerializer != null)
+            {
+                ObjectPool.Instance.Recycle(_componentSerializer);
+            }
+            _componentSerializer = null;
+            if (_components != null && _components.Count > 0)
+            {
+                foreach (Entity component in _components.Values)
+                {
+                    component.AfterSerialize();   
+                }
+            }
+            
+            _childrenSerializer?.Clear();
+            if (_childrenSerializer != null)
+            {
+                ObjectPool.Instance.Recycle(_childrenSerializer);
+            }
+            _childrenSerializer = null;
+            if (_children != null && _children.Count > 0)
+            {
+                foreach (Entity child in _children.Values)
+                {
+                    child.AfterSerialize();   
+                }
+            }
+            
+        }
+        
+        /// <summary>
+        /// AfterDeserialize
+        /// 从Serializer集合中还原component和child集合，以及他们的父子关系
+        /// 完成后清除Serializer集合
+        /// </summary>
+        public override void EndInit()
+        {
+            base.EndInit();
+            IsSerialized = true;
+            
+            if (_componentSerializer != null && _componentSerializer.Count > 0)
+            {
+                foreach (Entity component in _componentSerializer)
+                {
+                    component.IsComponent = true;
+                    component.IsSerialized = true;
+                    AddToComponents(component);
+                    component._parent = this;
+                    component.EndInit();
+                }
+            }
+            
+            if (_childrenSerializer != null && _childrenSerializer.Count > 0)
+            {
+                foreach (Entity child in _childrenSerializer)
+                {
+                    child.IsComponent = false;
+                    child.IsSerialized = true;
+                    AddToChildren(child);
+                    child._parent =  this;
+                    child.EndInit();
+                }
+            }
+            
+            _componentSerializer?.Clear();
+            _componentSerializer = null;
+            
+            _childrenSerializer?.Clear();
+            _childrenSerializer = null;
+        }
         
         protected virtual void RegisterToSystem()
         {
-            this.LogicScene.Root.EntitySystem.RegisterSystem(this);
+            LogicScene.Root.EntitySystem.RegisterSystem(this);
         }
 
         public override void Dispose()
@@ -546,6 +721,7 @@ namespace Bliss
 
             //重置运行时状态
             IsSerialized = false;
+            IsMountedOnScene = false;
             
             ObjectPool.Instance.Recycle(this);
         }

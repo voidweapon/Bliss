@@ -120,4 +120,14 @@ internal class CsharpTemplateExtension : ScriptObject
         
         return "return";
     }
+
+    public static string gen_str_hashcode(string className)
+    {
+        return className.GetLongHashCode().ToString();
+    }
+    
+    public static string gen_class_name(string className)
+    {
+        return className.Replace('.', '_');
+    }
 }

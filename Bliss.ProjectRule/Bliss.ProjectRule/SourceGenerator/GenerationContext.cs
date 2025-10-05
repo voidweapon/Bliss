@@ -12,4 +12,6 @@ public class GenerationContext
     public List<string> GenericTypes { get; set; }
     
     public string ReturnType { get; set; }
+    
+    public bool IsDotNet { get; set; }
 }

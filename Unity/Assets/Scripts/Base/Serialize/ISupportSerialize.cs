@@ -1,8 +1,17 @@
+using System.ComponentModel;
+
 namespace Bliss
 {
-    public interface ISupportSerialize
+    public interface ISupportSerialize : ISupportInitialize
     {
+        /// <summary>
+        /// 序列化之前调用
+        /// </summary>
         void BeforeSerialize();
-        void AfterDeserialize();
+        
+        /// <summary>
+        /// 序列化之后调用
+        /// </summary>
+        void AfterSerialize();
     }
 }

@@ -55,7 +55,8 @@ ExportedObj/
 *.mdb.meta
 
 # Unity3D generated file on crash reports
-/Unitysysinfo.txt
+/Unity/sysinfo.txt
+/Unity/mono_crash*.blob
 
 # Builds
 *.apk

@@ -27,7 +27,7 @@ namespace Bliss
         {
             object obj = _serializer.Deserialize(type, bytes, offset, count);
             
-            TryCallAfterSerialize(obj);
+            TryCallAfterDeserialize(obj);
             
             return obj;
         }
@@ -36,7 +36,7 @@ namespace Bliss
         {
             object obj = _serializer.Deserialize(type, buffer);
             
-            TryCallAfterSerialize(obj);
+            TryCallAfterDeserialize(obj);
             
             return obj;
         }
@@ -45,7 +45,7 @@ namespace Bliss
         {
             object obj = _serializer.Deserialize(type, buffer);
             
-            TryCallAfterSerialize(obj);
+            TryCallAfterDeserialize(obj);
             
             return obj;
         }
@@ -61,9 +61,11 @@ namespace Bliss
         /// <returns></returns>
         public static void Deserialize(Type type, byte[] bytes, int offset, int count, ref object mergeObject)
         {
+            TryCallBeforeDeserialize(mergeObject);
+            
             _serializer.Deserialize(type, bytes,  offset, count, ref mergeObject);
             
-            TryCallAfterSerialize(mergeObject);
+            TryCallAfterDeserialize(mergeObject);
         }
 
         /// <summary>
@@ -75,9 +77,11 @@ namespace Bliss
         /// <returns></returns>
         public static void Deserialize(Type type, ReadOnlySpan<byte> buffer,  ref object mergeObject)
         {
+            TryCallBeforeDeserialize(mergeObject);
+            
              _serializer.Deserialize(type, buffer,  ref mergeObject);
             
-            TryCallAfterSerialize(mergeObject);
+            TryCallAfterDeserialize(mergeObject);
         }
         
         /// <summary>
@@ -89,9 +93,11 @@ namespace Bliss
         /// <returns></returns>
         public static void Deserialize(Type type, ReadOnlySequence<byte> buffer, ref object mergeObject)
         {
+            TryCallBeforeDeserialize(mergeObject);
+            
            _serializer.Deserialize(type, buffer,  ref mergeObject);
             
-            TryCallAfterSerialize(mergeObject);
+            TryCallAfterDeserialize(mergeObject);
         }
         
         private static void TryCallBeforeSerialize(object obj)
@@ -102,11 +108,19 @@ namespace Bliss
             }
         }
         
-        private static void TryCallAfterSerialize(object obj)
+        private static void TryCallBeforeDeserialize(object obj)
         {
             if (obj is ISupportSerialize supportSerialize)
             {
-                supportSerialize.AfterDeserialize();
+                supportSerialize.BeginInit();
+            }
+        }
+        
+        private static void TryCallAfterDeserialize(object obj)
+        {
+            if (obj is ISupportSerialize supportSerialize)
+            {
+                supportSerialize.EndInit();
             }
         }
         

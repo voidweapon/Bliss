@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -86,7 +87,7 @@ namespace Bliss.ProjectRule.Analyzer
             return false;
         }
 
-        public static string? GetNameSpace(this INamedTypeSymbol namedTypeSymbol)
+        public static string? GetNameSpace(this ITypeSymbol namedTypeSymbol)
         {
             INamespaceSymbol? namespaceSymbol = namedTypeSymbol.ContainingNamespace;
             string? namespaceName = namespaceSymbol?.Name;
@@ -197,11 +198,21 @@ namespace Bliss.ProjectRule.Analyzer
             return methodName;
         }
         
+        /// <summary>
+        /// 包含命名空间的名字
+        /// </summary>
+        /// <param name="namedTypeSymbols"></param>
+        /// <returns></returns>
         public static string GetFullName(this INamedTypeSymbol namedTypeSymbols)
         {
             return namedTypeSymbols.ToDisplayString();
         }
         
+        /// <summary>
+        /// 不包含命名空间的名字
+        /// </summary>
+        /// <param name="namedTypeSymbols"></param>
+        /// <returns></returns>
         public static string GetName(this INamedTypeSymbol namedTypeSymbols)
         {
             return namedTypeSymbols.Name;
@@ -309,11 +320,15 @@ namespace Bliss.ProjectRule.Analyzer
         
         /// <summary>
         ///     INamedTypeSymbol 是否有指定的Attribute
+        /// <param name="attributeName">full name</param>
         /// </summary>
         public static bool HasAttribute(this ITypeSymbol typeSymbol, string attributeName)
         {
             foreach (AttributeData? attributeData in typeSymbol.GetAttributes())
             {
+                string attName = attributeData.AttributeClass?.ToString();
+                string attShortName = attributeData.AttributeClass?.Name;
+                string attDispolayName = attributeData.AttributeClass?.ToDisplayString();
                 if (attributeData.AttributeClass?.ToString() == attributeName)
                 {
                     return true;
@@ -338,6 +353,32 @@ namespace Bliss.ProjectRule.Analyzer
                 }
             }
             return false;
+        }
+
+        public static bool TryGetAttributeInDeepestBassType(this ITypeSymbol typeSymbol,
+            string attributeName,
+            out ITypeSymbol deepestBassType)
+        {
+            deepestBassType = null;
+            if (typeSymbol.HasAttribute(attributeName))
+            {
+                deepestBassType = typeSymbol;
+            }
+            
+            INamedTypeSymbol? symbolNode = typeSymbol.BaseType;
+            while (symbolNode != null)
+            {
+                if (symbolNode is ITypeSymbol)
+                {
+                    if (symbolNode.HasAttribute(attributeName))
+                    {
+                        deepestBassType = symbolNode;
+                    }
+                }
+                symbolNode =  symbolNode.BaseType;   
+            }
+            
+            return deepestBassType != null;
         }
         
         /// <summary>
@@ -364,6 +405,88 @@ namespace Bliss.ProjectRule.Analyzer
                 yield return baseType;
                 baseType = baseType.BaseType;
             }
+        }
+
+        public static bool HasAttributeDeclaredOnly(this MemberDeclarationSyntax syntaxNode, string attributeName)
+        {
+            //Syntax Node上只能获取字面值，无法解析出Full Name，所以统一用Short Name
+            int dotIndex = attributeName.LastIndexOf('.');
+            if (dotIndex != -1)
+            {
+                attributeName = attributeName.Substring(dotIndex + 1);
+            }
+            
+            foreach (AttributeListSyntax attributeListSyntax in syntaxNode.AttributeLists)
+            {
+                AttributeSyntax? attribute = attributeListSyntax.Attributes.FirstOrDefault();
+                if (attribute == null)
+                {
+                    continue;
+                }
+                
+                string attributeClassName = attribute.GetAttributeClassName();
+                if (attributeClassName == attributeName)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public static bool HasAttributeInInheritance(this ClassDeclarationSyntax syntaxNode, string attributeName)
+        {
+            ClassDeclarationSyntax? node = syntaxNode;
+            while (node != null)
+            {
+                if (node.HasAttributeDeclaredOnly(attributeName))
+                {
+                    return true;
+                }
+                node = node.Parent as ClassDeclarationSyntax;
+            }
+
+            return false;
+        }
+
+        public static bool TryGetBaseClassHasAttributeInInheritance(this ClassDeclarationSyntax syntaxNode, 
+            string attributeName, 
+            out ClassDeclarationSyntax baseClassSyntaxNode)
+        {
+            baseClassSyntaxNode = null;
+            ClassDeclarationSyntax? node = syntaxNode;
+            while (node != null)
+            {
+                if (node.HasAttributeDeclaredOnly(attributeName))
+                {
+                    baseClassSyntaxNode = node;
+                    return true;
+                }
+
+                if (node.BaseList != null && node.BaseList.Types.Count > 0)
+                {
+                    var baseType = node.BaseList.Types[0];
+                }
+                
+                node = node.Parent as ClassDeclarationSyntax;
+            }
+
+            return false;
+        }
+        
+        public static string GetFullName(this ClassDeclarationSyntax classDeclaration)
+        {
+           StringBuilder sb = new StringBuilder();
+           sb.Append(classDeclaration.Identifier.Text);
+           SyntaxNode node = classDeclaration.Parent;
+           while (node != null)
+           {
+               if (node is NamespaceDeclarationSyntax namespaceDeclaration)
+               {
+                   sb.Insert(0, $"{namespaceDeclaration.Name.ToFullString()}.");
+               }
+                node = node.Parent;
+           }
+           return sb.ToString();
         }
     }
 }

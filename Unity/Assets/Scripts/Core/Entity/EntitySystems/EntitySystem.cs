@@ -111,16 +111,99 @@ namespace Bliss
         #endregion
 
         #region Serialize Call
-        public void Serialize(Entity entity)
+        public void OnBeforeSerialize(Entity entity)
         {
-           
+            if (entity is not ISerialize)
+            {
+                return;
+            }
+            
+            List<ISystem> serializeSystems = EntitySystemManager.Instance.GetEntitySystems(entity.GetType(), typeof(ISerializeSystem));
+            if (serializeSystems == null)
+            {
+                return;
+            }
+            
+            foreach (ISerializeSystem serializeSystem in serializeSystems)
+            {
+                if (serializeSystem == null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    serializeSystem.Run(entity);
+                }
+                catch (Exception e)
+                {
+                    Log.Error(e);
+                }
+            }
         }
 
-        public void Deserialize(Entity entity)
+        public void OnAfterDeserialize(Entity entity)
         {
+            if (entity is not IDeserialize)
+            {
+                return;
+            }
             
+            List<ISystem> deserializeSystems = EntitySystemManager.Instance.GetEntitySystems(entity.GetType(), typeof(IDeserializeSystem));
+            if (deserializeSystems == null)
+            {
+                return;
+            }
+            
+            foreach (IDeserializeSystem deserializeSystem in deserializeSystems)
+            {
+                if (deserializeSystem == null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    deserializeSystem.Run(entity);
+                }
+                catch (Exception e)
+                {
+                    Log.Error(e);
+                }
+            }
         }
         #endregion
+
+        public void OnMountToScene(Entity entity)
+        {
+            if (entity is not IMountToScene)
+            {
+                return;
+            }
+            
+            List<ISystem> serializeSystems = EntitySystemManager.Instance.GetEntitySystems(entity.GetType(), typeof(IMountToSceneSystem));
+            if (serializeSystems == null)
+            {
+                return;
+            }
+            
+            foreach (IMountToSceneSystem mountToSceneSystem in serializeSystems)
+            {
+                if (mountToSceneSystem == null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    mountToSceneSystem.Run(entity);
+                }
+                catch (Exception e)
+                {
+                    Log.Error(e);
+                }
+            }
+        }
 
         #region Update Call
 

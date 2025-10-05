@@ -58,6 +58,11 @@ namespace Bliss.Pool
             
             if (obj is IPoolableObject poolableObject)
             {
+                if (!poolableObject.IsFromPool)
+                {
+                    return;
+                }
+                
                 if (poolableObject.IsInPool)
                 {
                     throw new InvalidOperationException($"{obj} The object has been recycled");
