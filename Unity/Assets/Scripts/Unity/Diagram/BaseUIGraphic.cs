@@ -15,14 +15,17 @@ public class BaseUIGraphic : MonoBehaviour
     static readonly int ID_CategoryMask = Shader.PropertyToID("_CategoryMask");
     static readonly int ID_CategoryColors = Shader.PropertyToID("_CategoryColors");
 
+    private const int SampleCountPerSecondLimit = 60;
     private const int CategoryCountLimit = 8;
     private const int CapacityLimit = 64;
     
     public Material DiagramMaterial;
     public Graphic Renderer;
+    
+    public EDiagram DiagramType;
 
-    [Range(1, 60)]
-    public int SamoleCountPerSecond;
+    [Range(1, SampleCountPerSecondLimit)]
+    public int SampleCountPerSecond;
     
     [Range(1, CapacityLimit)]
     public int Capacity;
@@ -37,8 +40,9 @@ public class BaseUIGraphic : MonoBehaviour
     private Material _runtimeMaterial;
     //ring buffer
     protected float[] _diagramData { get; private set; }
-    protected int _head { get; private set; }
-    protected int _tail { get; private set; }
+    protected int _seek { get; private set; }
+
+    private float[] _dataBuffer;
 
     private bool _isDiagramDataDirty;
     private float _sampleIntervalS;
@@ -49,13 +53,15 @@ public class BaseUIGraphic : MonoBehaviour
     {
         Capacity = Mathf.Clamp(Capacity, 1, CapacityLimit);
         CategoryCount = Mathf.Clamp(CategoryCount, 1, CategoryCountLimit);
+        SampleCountPerSecond =  Mathf.Clamp(SampleCountPerSecond, 1, SampleCountPerSecondLimit);
         
         _diagramData = new float[Capacity * CategoryCount];
+        _dataBuffer = new float[CategoryCount];
         _isDiagramDataDirty = true;
         _maxValue = float.MinValue;
         _runtimeMaterial = new Material(DiagramMaterial);
         Renderer.material = _runtimeMaterial;
-        _sampleIntervalS = 1.0f / SamoleCountPerSecond;
+        _sampleIntervalS = 1.0f / SampleCountPerSecond;
     }
     
 
@@ -68,7 +74,11 @@ public class BaseUIGraphic : MonoBehaviour
             _sampleTimer -= _sampleIntervalS;
             Sample();
         }
-        //_head = (_head + CategoryCount) % Capacity;
+    }
+
+    private void OnDrawGizmos()
+    {
+        throw new NotImplementedException();
     }
 
     void LateUpdate()
@@ -77,7 +87,7 @@ public class BaseUIGraphic : MonoBehaviour
         {
             _isDiagramDataDirty = false;
             _runtimeMaterial.SetInt(ID_DataCount, Capacity);
-            _runtimeMaterial.SetInt(ID_DataOffset, _head);
+            _runtimeMaterial.SetInt(ID_DataOffset, _seek);
             _runtimeMaterial.SetFloatArray(ID_DiagramData,  _diagramData);
             _runtimeMaterial.SetFloat(ID_MaxValue, _maxValue);
             _runtimeMaterial.SetFloat(ID_CategoryCount, CategoryCount);
@@ -88,18 +98,31 @@ public class BaseUIGraphic : MonoBehaviour
 
     private void Sample()
     {
-        int indexBase = (_head - 1 + Capacity) % Capacity;
+        int indexBase = (_seek - 1 + Capacity) % Capacity;
         for (int categoryIndex = 0; categoryIndex < CategoryCount; categoryIndex++)
         {
             float value = CollectData(categoryIndex);
+            _dataBuffer[categoryIndex] = value;
 
             _diagramData[indexBase * CategoryCount + categoryIndex] = value;
         }
 
-        float newMaxValue = GetMax();
-        _maxValue = newMaxValue;
+        float sampleMaxValue = 0f;
+        switch (DiagramType)
+        {
+            case EDiagram.Line:
+                sampleMaxValue = GetMax(_dataBuffer);
+                break;
+            case EDiagram.Stacked:
+                sampleMaxValue = GetSum(_dataBuffer);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
+
+        _maxValue = Mathf.Max(_maxValue, sampleMaxValue);
         
-        _head = (_head + 1) % Capacity;
+        _seek = (_seek + 1) % Capacity;
         _isDiagramDataDirty = true;
     }
 
@@ -108,17 +131,27 @@ public class BaseUIGraphic : MonoBehaviour
         return Random.Range(categoryIndex * 25, categoryIndex * 25 + 50f);
     }
 
-    protected virtual float GetMax()
+    protected virtual float GetMax(float[] buffer)
     {
         float max = float.MinValue;
-        for (int i = 0; i < _diagramData.Length; i++)
+        for (int i = 0; i < buffer.Length; i++)
         {
-            if (max < _diagramData[i])
+            if (max < buffer[i])
             {
-                max = _diagramData[i];
+                max = buffer[i];
             }
         }
         return max;
+    }
+    
+    private float GetSum(float[] buffer)
+    {
+        float sum = 0;
+        for (int i = 0; i < buffer.Length; i++)
+        {
+            sum += buffer[i];
+        }
+        return sum;
     }
 
 
@@ -149,5 +182,18 @@ public class BaseUIGraphic : MonoBehaviour
         Category8 = 1 << 7,
         
         ALL = Category1 |  Category2 | Category3 | Category4 | Category5 | Category6 | Category7 | Category8
+    }
+    
+    public enum EDiagram
+    {
+        /// <summary>
+        /// 折线图
+        /// </summary>
+        Line,
+        
+        /// <summary>
+        /// 堆叠图
+        /// </summary>
+        Stacked,
     }
 }

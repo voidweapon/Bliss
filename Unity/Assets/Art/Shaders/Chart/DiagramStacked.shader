@@ -4,6 +4,9 @@ Shader "Bliss/DiagramStacked"
     {
         [PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
         _Color ("Tint", Color) = (1,1,1,1)
+        _BgColor ("Bg Color", Color) = (1,1,1,1)
+        _MiddleLineColor ("Middle Line Color", Color) = (1,1,1,1)
+        _MiddleLineWidth ("Middle Line Width", Float) = 0.005
         _LineWidth ("Line Width", Float) = 0.005
         [HideInInspector] _DataOffset ("DataOffset", Int) = 0
         [HideInInspector] _DataCount ("DataCount", Int) = 0
@@ -82,10 +85,13 @@ Shader "Bliss/DiagramStacked"
 
             sampler2D _MainTex; // we dont use this, but unitys ui library expects the shader to have a texture
             fixed4 _Color;
+            fixed4 _BgColor;
+            fixed4 _MiddleLineColor;
             fixed4 _TextureSampleAdd;
             float4 _ClipRect;
             float4 _MainTex_ST;
-            
+
+            half _MiddleLineWidth;
             half _LineWidth;
             uint _DataOffset;
             uint _DataCount;
@@ -134,8 +140,9 @@ Shader "Bliss/DiagramStacked"
 
             fixed4 frag (v2f i) : SV_Target
             {
-                float totalValue = 0;
-                half4 color = half4(0, 0, 0, 0);
+                float upper = 0;
+                float lower = 0;
+                half4 color = _BgColor;
 
                 uint cur = uint(round(i.texcoord.x * float(_DataCount)));
                 uint seek = (cur + _DataOffset) % _DataCount;
@@ -144,10 +151,24 @@ Shader "Bliss/DiagramStacked"
                 {
                     float y = _DiagramData[seek * _CategoryCount + categoryIndex] / _MaxValue;
                     uint categoryEnable = (_CategoryMask >> categoryIndex) & 1;
-                    totalValue += lerp(0, y, categoryEnable);
                     half4 categoryColor = lerp(color, _CategoryColors[categoryIndex], categoryEnable);
-                    lerp(categoryColor, color, step(0.0, i.texcoord.y - totalValue));
+                    upper += lerp(0, y, categoryEnable);
+
+                    //Subtraction operate
+                    float d1 = i.texcoord.y - lower;
+                    float d2 = i.texcoord.y - upper;
+                    float res = max(-d1, d2);
+
+                    
+                    color= lerp(categoryColor, color, step(0.0,  res));
+                    lower = upper;
                 }
+
+                // this scaling only works if the object is flat and not rotated - but thats fine
+                float2 pixelScale = float2(1 / ddx(i.texcoord.x), 1 / ddy(i.texcoord.y));
+                float2 screenSpaceUV = i.texcoord * pixelScale;
+                float midLineDistance = sdSegment(screenSpaceUV, float2(0., 0.5) * pixelScale, float2(1., 0.5) * pixelScale);
+                color = lerp(_MiddleLineColor, color,step(0., midLineDistance - _MiddleLineWidth));
 
                 color *= i.color;
                 

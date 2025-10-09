@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: GraphicLines
+  m_Name: DiagramLines
   m_Shader: {fileID: 4800000, guid: f226d174b76404f0cba321154e7efd9a, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -87,6 +87,7 @@ Material:
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
     - _CategoryCount: 0
+    - _CategoryMask: 1
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
     - _ColorMask: 15
@@ -105,6 +106,7 @@ Material:
     - _LineWidth: 1
     - _MaxValue: 1
     - _Metallic: 0
+    - _MiddleLineWidth: 1
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueOffset: 0
@@ -125,8 +127,10 @@ Material:
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BgColor: {r: 0, g: 0, b: 0, a: 0.54509807}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _MiddleLineColor: {r: 1, g: 0, b: 0, a: 0.54509807}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
 --- !u!114 &1610633501855440238

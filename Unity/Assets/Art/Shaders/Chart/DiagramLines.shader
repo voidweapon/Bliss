@@ -4,6 +4,9 @@ Shader "Bliss/DiagramLines"
     {
         [PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
         _Color ("Tint", Color) = (1,1,1,1)
+        _BgColor ("Bg Color", Color) = (1,1,1,1)
+        _MiddleLineColor ("Middle Line Color", Color) = (1,1,1,1)
+        _MiddleLineWidth ("Middle Line Width", Float) = 0.005
         _LineWidth ("Line Width", Float) = 0.005
         [HideInInspector] _DataOffset ("DataOffset", Int) = 0
         [HideInInspector] _DataCount ("DataCount", Int) = 0
@@ -82,10 +85,13 @@ Shader "Bliss/DiagramLines"
 
             sampler2D _MainTex; // we dont use this, but unitys ui library expects the shader to have a texture
             fixed4 _Color;
+            fixed4 _BgColor;
+            fixed4 _MiddleLineColor;
             fixed4 _TextureSampleAdd;
             float4 _ClipRect;
             float4 _MainTex_ST;
             
+            half _MiddleLineWidth;
             half _LineWidth;
             uint _DataOffset;
             uint _DataCount;
@@ -137,7 +143,7 @@ Shader "Bliss/DiagramLines"
                 // this scaling only works if the object is flat and not rotated - but thats fine
                 float2 pixelScale = float2(1 / ddx(i.texcoord.x), 1 / ddy(i.texcoord.y));
                 float2 screenSpaceUV = i.texcoord * pixelScale;
-                half4 color = half4(0, 0, 0, 0);
+                half4 color = _BgColor;
                 
                 uint cur = uint(round(i.texcoord.x * float(_DataCount)));
                 uint prev = cur == 0 ? 0 : cur - 1;
@@ -149,8 +155,13 @@ Shader "Bliss/DiagramLines"
                 color = samplePoint(cur, pixelScale, screenSpaceUV, color);
                 color = samplePoint(next, pixelScale, screenSpaceUV, color);
 
-                color *= i.color;
+                float midLineDistance = sdSegment(screenSpaceUV, float2(0., 0.5) * pixelScale, float2(1., 0.5) * pixelScale);
+                color = lerp(_MiddleLineColor, color,step(0., midLineDistance - _MiddleLineWidth));
                 
+                
+                color *= i.color;
+
+
 #ifdef UNITY_UI_CLIP_RECT
                 color.a *= UnityGet2DClipping(IN.worldPosition.xy, _ClipRect);
 #endif
