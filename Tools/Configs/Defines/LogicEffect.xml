@@ -1,0 +1,30 @@
+
+<module name="Gameplay">
+
+<bean name="NumericProperty">
+  <var name="Numeric_Type" type="ENumeric"/>
+  <var name="Numeric_Value" type="int"/>
+</bean>
+
+<bean name="LogicEffect">
+  <var name="name" type="string"/>
+</bean>
+
+<bean name="DamageEffect" parent="LogicEffect">
+  <var name="DMG_Type" type="EDamage"/>
+  <var name="DMG_Multiplier" type="int"/>
+</bean>
+
+<bean name="NumericEffect" parent="LogicEffect">
+  <var name="numerics" type="list,NumericProperty"/>
+</bean>
+
+<bean name="GameTagEffect" parent="LogicEffect">
+  <var name="tag" type="string"/>
+</bean>
+
+<bean name="SetEffect" parent="LogicEffect">
+  <var name="effects" type="(list#sep=,),int"/>
+</bean>
+
+</module>

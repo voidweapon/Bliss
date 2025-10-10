@@ -770,9 +770,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d9c57334cf5dc4f7a8fd1b1ee6e51322, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  DiagramMaterial: {fileID: 2100000, guid: f1db120213cd845178c6ce0fea91360e, type: 2}
+  DiagramMaterial: {fileID: 2100000, guid: 8d558d80d7c71479ebf097f9dc2c6c1b, type: 2}
   Renderer: {fileID: 1817868667}
-  SamoleCountPerSecond: 30
+  DiagramType: 1
+  SampleCountPerSecond: 30
   Capacity: 60
   CategoryCount: 5
   CategoryMask: 255
