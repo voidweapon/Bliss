@@ -1,0 +1,7 @@
+{
+  "name": "cn.bliss.scenephysical.export.physx5",
+  "displayName": "Bliss.ScenePhysicalExport.Physx5",
+  "version": "1.0.0",
+  "unity": "2022.3",
+  "description": "导出场景物理信息到Physx5"
+}
