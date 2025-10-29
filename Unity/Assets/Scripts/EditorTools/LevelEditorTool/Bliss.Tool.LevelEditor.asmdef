@@ -1,0 +1,21 @@
+{
+    "name": "Bliss.Tool.LevelEditor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:e0cd26848372d4e5c891c569017e11f1",
+        "GUID:b29d92c5f98f74ee09d1e1ebd807d906",
+        "GUID:3c36f0eb464784f4d9bca767f5a44d73",
+        "GUID:128900e407c7c49c4b8da68d9421e56b"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "UNITY_EDITOR"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
