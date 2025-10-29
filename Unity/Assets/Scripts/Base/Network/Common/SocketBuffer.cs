@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.IO;
 
 namespace Bliss.Core
@@ -14,10 +15,11 @@ namespace Bliss.Core
         
         public int TrueLength => TailPosition - DataPosition;
         
-        
         public ReadOnlyMemory<byte> WrittenMemory => GetBuffer().AsMemory(HeadPosition, (int)Position);
 
         public ReadOnlySpan<byte> WrittenSpan => GetBuffer().AsSpan(HeadPosition, (int)Position);
+
+        public ConcurrentDictionary<Guid,object> Owner = new ConcurrentDictionary<Guid, object>();
 
         
         public SocketBuffer()
@@ -143,6 +145,7 @@ namespace Bliss.Core
         public void Clear()
         {
             Seek(0, SeekOrigin.Begin);
+            SetLength(0);
             DataPosition = 0;
             TailPosition = 0;
         }
@@ -156,6 +159,14 @@ namespace Bliss.Core
                 SetLength(newLength);
             }
             Position = newLength;
+        }
+
+        public void Clone(SocketBuffer buffer)
+        {
+            SetLength(buffer.Length);
+            DataPosition = buffer.DataPosition;
+            TailPosition = buffer.TailPosition;
+            Buffer.BlockCopy(buffer.GetBuffer(), 0, GetBuffer(), 0, (int)buffer.Length);
         }
 
         public Memory<byte> GetMemory(int sizeHint = 0)

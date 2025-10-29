@@ -7,6 +7,7 @@ public class ProtoPropertyInfo
     public string property_type { get; set; }
     public string name { get; set; }
     public int order { get; set; }
+    public ESupportedCollection CollectionMode { get; set; }
 }
 
 

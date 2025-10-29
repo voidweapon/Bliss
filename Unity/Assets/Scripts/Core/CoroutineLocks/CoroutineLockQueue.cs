@@ -29,7 +29,7 @@ namespace Bliss.CoroutineLocks
             self.CoroutineLockType = 0;;
         }
 
-        internal static async ETTask<CoroutineLock> WaitAsync(this CoroutineLockQueue self, int timeoutMS = 60000)
+        internal static async ETTask<CoroutineLock> WaitAsync(this CoroutineLockQueue self, long timeoutMS = 60000)
         {
             CoroutineLock coroutineLock = null;
             if (!self.IsStart)

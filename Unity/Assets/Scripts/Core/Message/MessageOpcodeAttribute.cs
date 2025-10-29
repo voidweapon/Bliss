@@ -1,8 +1,9 @@
 using System;
+using Bliss.Core;
 
 namespace Bliss
 {
-    public class MessageOpcodeAttribute : Attribute
+    public class MessageOpcodeAttribute : BaseAttribute
     {
         public ushort Opcode { get; private set; }
 

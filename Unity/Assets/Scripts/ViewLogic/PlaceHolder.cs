@@ -1,4 +1,4 @@
-namespace ViewLogic
+namespace Bliss.ViewLogic
 {
     public class PlaceHolder
     {

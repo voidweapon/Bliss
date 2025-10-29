@@ -17,27 +17,43 @@ namespace Bliss
             var networkComponent = self.Parent as NetworkComponent;
             networkComponent.RemoveConnection((uint)self.Id, self.ErrorCode);
         }
-        
-        public static void Send(this Session self, MessageObject message)
+
+        public static SocketBufferRef MessageToNetStream(this Session self, MessageObject message)
         {
             var networkComponent = self.Parent as NetworkComponent;
             SocketBufferRef netStreamRef = MessageSerializer.MessageToNetStream(networkComponent.NetDriver,  message);
-            self.SendRaw(netStreamRef);
+            return netStreamRef;
         }
         
-        public static void SendRaw(this Session self, SocketBufferRef buffer)
+        public static void Send(this Session self, MessageObject message, bool isReliable = true)
         {
             var networkComponent = self.Parent as NetworkComponent;
-            networkComponent.Send((uint)self.Id, buffer);
+            SocketBufferRef netStreamRef = MessageSerializer.MessageToNetStream(networkComponent.NetDriver,  message);
+            self.SendRaw(netStreamRef, isReliable);
+        }
+        
+        public static void SendRawCopy(this Session self, SocketBufferRef buffer, bool isReliable = true)
+        {
+            var networkComponent = self.Parent as NetworkComponent;
+            var newBuffer = networkComponent.NetDriver.RentBuffer(buffer.Target.TrueLength);
+            newBuffer.Target.Clone(buffer.Target);
+            networkComponent.Send((uint)self.Id, newBuffer, isReliable);
+        }
+        
+        public static void SendRaw(this Session self, SocketBufferRef buffer, bool isReliable = true)
+        {
+            var networkComponent = self.Parent as NetworkComponent;
+            networkComponent.Send((uint)self.Id, buffer, isReliable);
         }
 
-        public static async ETTask<IResponse> Call(this Session self, MessageObject request, ETCancellationToken cancellation)
+        public static async ETTask<IResponse> Call(this Session self, IRequest request, ETCancellationToken cancellation)
         {
             var requestType = MessageOpcodeManager.Instance.GetRequestTypeBy(request.GetType());
             int rpcId = self.GenRpcId();
             var rpcInfo = new RpcInfo(rpcId);
             self.RpcInfos.Add(rpcId, rpcInfo);
-            self.Send(request);
+            request.RpcId = rpcId;
+            self.Send((MessageObject)request);
 
             long instanceId = self.InstanceId;
             void CancelAction()
@@ -71,6 +87,7 @@ namespace Bliss
             int rpcId = self.GenRpcId();
             var rpcInfo = new RpcInfo(rpcId);
             self.RpcInfos.Add(rpcId, rpcInfo);
+            request.RpcId = rpcId;
             self.Send((MessageObject)request);
             
             long instanceId = self.InstanceId;
@@ -119,7 +136,7 @@ namespace Bliss
             }
         }
         
-        internal static void OnResponse(this Session self, IResponse response)
+        public static void OnResponse(this Session self, IResponse response)
         {
             if (!self.RpcInfos.Remove(response.RpcId, out RpcInfo action))
             {

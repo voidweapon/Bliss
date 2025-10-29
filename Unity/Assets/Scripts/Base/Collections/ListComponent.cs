@@ -4,9 +4,11 @@ using Bliss.Pool;
 
 namespace Bliss.Base.Collections
 {
+    
+    [DisableNew]
     public class ListComponent<T>: List<T>, IDisposable
     {
-        private ListComponent()
+        public ListComponent()
         {
             
         }

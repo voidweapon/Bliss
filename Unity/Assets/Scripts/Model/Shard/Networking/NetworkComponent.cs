@@ -56,6 +56,7 @@ namespace Bliss
         AcceptConnection,
         OnConnectionError,
         OnReceiveMessage,
+        ConnectionStatSample,
     }
 
     public struct NetThreadOperation
@@ -75,5 +76,16 @@ namespace Bliss
         public int ErrorCode;
         public IPEndPoint RemoteEndPoint;
         public SocketBufferRef BufferRef;
+    }
+
+    public struct Invoke_OnReceiveMessage
+    {
+        public Session Session;
+        public object Message;
+    }
+    
+    public struct Event_OnAcceiptConnection
+    {
+        public Session Session;
     }
 }

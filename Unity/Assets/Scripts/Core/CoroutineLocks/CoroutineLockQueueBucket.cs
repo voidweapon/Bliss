@@ -5,7 +5,7 @@ namespace Bliss.CoroutineLocks
 {
     public class CoroutineLockQueueBucket : Entity, IAwake
     {
-        
+
     }
 
 
@@ -33,8 +33,8 @@ namespace Bliss.CoroutineLocks
             self.RemoveChild(key);
         }
 
-        internal static async ETTask<CoroutineLock> WaitAsync(this CoroutineLockQueueBucket self, int coroutineLockIdentifier,
-            int timeoutMS = 60000)
+        internal static async ETTask<CoroutineLock> WaitAsync(this CoroutineLockQueueBucket self, long coroutineLockIdentifier,
+            long timeoutMS = 60000)
         {
             CoroutineLockQueue coroutineLockQueue = self.GetQueue(coroutineLockIdentifier) ?? self.CreateQueue(coroutineLockIdentifier);
             return await coroutineLockQueue.WaitAsync(timeoutMS);

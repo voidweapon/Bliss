@@ -21,5 +21,15 @@ namespace Bliss
         {
             return GetRandom().RandInt32();
         }
+
+        public static int RandomNumber(int lower, int upper)
+        {
+            return GetRandom().RandomNumber(lower, upper);
+        }
+        
+        public static float RandFloat()
+        {
+            return (float)GetRandom().NextDouble();
+        }
     }
 }

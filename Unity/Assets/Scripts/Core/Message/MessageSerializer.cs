@@ -16,11 +16,23 @@ namespace Bliss
         public static void Serialize(MessageObject message, SocketBufferRef bufferRef)
         {
             SocketBuffer buffer = bufferRef.Target;
+            long prevLength = buffer.Length;
+            if (prevLength > 2)
+            {
+                throw new Exception("Serialize error!!!");
+            }
             
             Serializer.Serialize(message, buffer);
             
-            buffer.Reserve((int)buffer.Length);
-            buffer.Push((int)buffer.Length);
+            long afterLength = buffer.Length;
+            int messageLength = (int)(afterLength - prevLength);
+            if (messageLength == 0)
+            {
+                throw new Exception("Serialize error");
+            }
+            
+            buffer.Reserve(messageLength);
+            buffer.Push(messageLength);
         }
 
         public static MessageObject Deserialize(Type type, byte[] bytes, int offset, int count)
@@ -54,9 +66,11 @@ namespace Bliss
             {
                 throw new Exception($"{message.GetType()} not found Opcode");
             }
+            
             int opcodeSize = sizeof(ushort);
             SocketBufferRef bufferRef = netDriver.RentBuffer(message.SizeHint() + opcodeSize);
             SocketBuffer buffer = bufferRef.Target;
+
             
             buffer.Reserve(opcodeSize);
             buffer.Advance(opcodeSize);
@@ -71,24 +85,27 @@ namespace Bliss
 
         public static (ushort, MessageObject) NetStreamToMessage(SocketBufferRef bufferRef)
         {
+            int msgLength = bufferRef.Target.TrueLength;
+            int dataPosition = bufferRef.Target.DataPosition;
+            int tailPosition = bufferRef.Target.TailPosition;
+
+            SocketBuffer buffer = bufferRef.Target;
+            var msgSpan = buffer.Pull(buffer.TrueLength)
+                .ReadUShort(out ushort opcodeType);
+            
+            if (!MessageOpcodeManager.Instance.GetMessageTypeBy(opcodeType, out Type messageType))
+            {
+                throw new Exception($"opcode {opcodeType} not found messageType");
+            }
+
             try
             {
-                SocketBuffer buffer = bufferRef.Target;
-                var msgSpan = buffer.Pull(buffer.TrueLength)
-                    .ReadUShort(out ushort opcodeType);
-            
-                if (!MessageOpcodeManager.Instance.GetMessageTypeBy(opcodeType, out Type messageType))
-                {
-                    throw new Exception($"opcode {opcodeType} not found messageType");
-                }
-                
                 MessageObject  messageObject = Deserialize(messageType, msgSpan);
-            
                 return (opcodeType, messageObject);
             }
-            finally
+            catch (Exception e)
             {
-                bufferRef.Dispose();        
+                throw new Exception($"message type {messageType} opcode[{opcodeType}] 解析失败 [{dataPosition},{tailPosition}] ", e);
             }
         }
     }

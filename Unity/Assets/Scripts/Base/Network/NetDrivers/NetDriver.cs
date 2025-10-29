@@ -82,6 +82,11 @@ namespace Bliss.Core.Network
 
         internal virtual void Input(ANetConnection connection, SocketBufferRef socketBufferRef)
         {
+            if (socketBufferRef.Target == null)
+            {
+                Log.Error("socketBufferRef.Target is null");
+                return;
+            }
             OnConnectionReceive?.Invoke(connection.ConnectionId, socketBufferRef);
         }
 
@@ -145,7 +150,12 @@ namespace Bliss.Core.Network
             
             if (!bufferPool.TryDequeue(out var buff))
             {
-                buff =  new SocketBuffer(size);
+                buff = new SocketBuffer(size);
+            }
+
+            if (buff.Owner.Count != 0)
+            {
+                throw new Exception($"multi thread error on get buffer from pool");
             }
             
             return new SocketBufferRef(size, buff, this);
@@ -153,6 +163,11 @@ namespace Bliss.Core.Network
         
         internal void ReturnBuffer(int size, SocketBuffer buffer)
         {
+            if (buffer == null)
+            {
+                return;
+            }
+            
             if (_bufferPool.TryGetValue(size, out ConcurrentQueue<SocketBuffer> bufferPool))
             {
                 if (bufferPool.Count >= 16)
@@ -264,5 +279,41 @@ namespace Bliss.Core.Network
             }
         }
         #endregion
+
+        #region 网络状况模拟
+
+        private long _packetLossBurstEndTime = -1;
+        public NetworkSimulationSettings SimulationSettings
+        {
+            get;
+            private set;
+        }
+        public void SetNetSimulationSettings(NetworkSimulationSettings networkSimulationSettings)
+        {
+            SimulationSettings = networkSimulationSettings;
+            OnNetSimulationSettingsChange();
+        }
+
+        public void HandlePacketLossBurstCommand(long durationMS)
+        {
+            _packetLossBurstEndTime = TimeNow + durationMS;   
+        }
+
+        public bool IsSimulatingPacketLossBurst()
+        {
+            return _packetLossBurstEndTime > TimeNow;
+        }
+
+        protected virtual void OnNetSimulationSettingsChange()
+        {
+            foreach (var kv in _dicId2Connection)
+            {
+                var connection = kv.Value;
+                connection.UpdateNetworkSimulationSettings();
+            }
+        }
+
+        #endregion
+        
     }
 }

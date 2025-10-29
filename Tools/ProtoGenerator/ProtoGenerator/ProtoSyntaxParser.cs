@@ -276,7 +276,7 @@ public class ProtoSyntaxParser
     }
 
     private const string Symbol_Option = "option";
-    private Regex _propertyRegex =  new Regex("\\b\\w+\\b|=");
+    private Regex _propertyRegex =  new Regex("\\b[\\w.]+\\b|=");
     private ProtoPropertyInfo _protoPropertyBuilder;
 
     private Dictionary<string, ESupportedCollection> _supportCollection = new ()
@@ -394,6 +394,7 @@ public class ProtoSyntaxParser
 
         if (collectionMode != ESupportedCollection.None)
         {
+            _protoPropertyBuilder.CollectionMode = collectionMode;
             _protoPropertyBuilder.property_type = ConvertCollectionType(collectionMode, _protoPropertyBuilder.property_type);
         }
         

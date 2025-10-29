@@ -179,6 +179,13 @@ namespace Bliss.Core.Network
             
         }
         #endregion
+        
+        public NetworkSimulationSettings  SimulationSettings { get; private set; }
+
+        public void UpdateNetworkSimulationSettings()
+        {
+            SimulationSettings = NetDriver.SimulationSettings;
+        }
     }
 
     public enum ENetConnectionState

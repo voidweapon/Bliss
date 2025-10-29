@@ -1,0 +1,102 @@
+using System.Collections.Generic;
+using Bliss.Core;
+using Bliss.CoroutineLocks;
+using Bliss.ViewModel;
+using ET;
+using UnityEngine.SceneManagement;
+using YooAsset;
+
+namespace Bliss.ViewLogic
+{
+    [EntitySystemOf(typeof(ResourcesLoaderComponent))]
+    public static partial class ResourcesLoaderComponentSystems
+    {
+        public static void Awake(this ResourcesLoaderComponent self)
+        {
+            self.package = YooAssets.GetPackage("DefaultPackage");
+        }
+
+        public static void Awake(this ResourcesLoaderComponent self, string packageName)
+        {
+            self.package = YooAssets.GetPackage(packageName);
+        }
+
+        public static void Destroy(this ResourcesLoaderComponent self)
+        {
+            foreach (var kv in self.handlers)
+            {
+                switch (kv.Value)
+                {
+                    case AssetHandle handle:
+                        handle.Release();
+                        break;
+                    case AllAssetsHandle handle:
+                        handle.Release();
+                        break;
+                    case SubAssetsHandle handle:
+                        handle.Release();
+                        break;
+                    case RawFileHandle handle:
+                        handle.Release();
+                        break;
+                    case SceneHandle handle:
+                        handle.UnloadAsync();
+                        break;
+                }
+            }
+        }
+        
+        public static async ETTask<T> LoadAssetAsync<T>(this ResourcesLoaderComponent self, string location) where T : UnityEngine.Object
+        {
+            using CoroutineLock coroutineLock = await self.Root().GetComponent<CoroutineLockComponent>().WaitAsync(ECoroutineLockType.ResourcesLoader, location.GetHashCode());
+            HandleBase handler;
+            if (!self.handlers.TryGetValue(location, out handler))
+            {
+                handler = self.package.LoadAssetAsync<T>(location);
+
+                await handler.Task;
+
+                self.handlers.Add(location, handler);
+            }
+            return (T)((AssetHandle)handler).AssetObject;
+        }
+        
+        public static async ETTask<Dictionary<string, T>> LoadAllAssetsAsync<T>(this ResourcesLoaderComponent self, string location) where T : UnityEngine.Object
+        {
+            using CoroutineLock coroutineLock = await self.Root().GetComponent<CoroutineLockComponent>().WaitAsync(ECoroutineLockType.ResourcesLoader, location.GetHashCode());
+
+            HandleBase handler;
+            if (!self.handlers.TryGetValue(location, out handler))
+            {
+                handler = self.package.LoadAllAssetsAsync<T>(location);
+                await handler.Task;
+                self.handlers.Add(location, handler);
+            }
+
+            Dictionary<string, T> dictionary = new Dictionary<string, T>();
+            foreach (UnityEngine.Object assetObj in ((AllAssetsHandle)handler).AllAssetObjects)
+            {
+                T t = assetObj as T;
+                dictionary.Add(t.name, t);
+            }
+
+            return dictionary;
+        }
+
+        public static async ETTask LoadSceneAsync(this ResourcesLoaderComponent self, string location, LoadSceneMode loadSceneMode)
+        {
+            using CoroutineLock coroutineLock = await self.Root().GetComponent<CoroutineLockComponent>().WaitAsync(ECoroutineLockType.ResourcesLoader, location.GetHashCode());
+
+            HandleBase handler;
+            if (self.handlers.TryGetValue(location, out handler))
+            {
+                return;
+            }
+
+            handler = self.package.LoadSceneAsync(location, loadSceneMode);
+
+            await handler.Task;
+            self.handlers.Add(location, handler);
+        }
+    }
+}

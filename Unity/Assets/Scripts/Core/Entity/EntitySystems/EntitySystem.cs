@@ -260,7 +260,6 @@ namespace Bliss
                             continue;
                         }
                         updateSystem.Run(entity);
-                        updateSystem.Run(entity);
                     }
                 }
                 catch (Exception e)

@@ -37,3 +37,42 @@ MonoBehaviour:
         FilterRuleName: CollectAll
         AssetTags: 
         UserData: 
+    - GroupName: Scenes
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Res/Scenes
+        CollectorGUID: 09bdee4e0dc2a4c10811fd08f1a675c1
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackSeparately
+        FilterRuleName: CollectScene
+        AssetTags: 
+        UserData: 
+    - GroupName: SceneActor
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Res/Prefabs
+        CollectorGUID: 080ecf8e25f4c4d80b825cc51e3288d6
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: Tools
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Res/Tools
+        CollectorGUID: e7ecb316fc8bc49138bb3826e8a44d13
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 

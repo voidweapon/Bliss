@@ -1,8 +1,8 @@
 using Unity.Mathematics;
 
-namespace Bliss.Math
+namespace Bliss.Mathematics
 {
-    public static class quaternionExtension
+    public static partial class mathEx
     {
         public static float3 RotateVector(this quaternion self, float3 vector)
         {
@@ -28,5 +28,12 @@ namespace Bliss.Math
 
             return Result;
         }
+
+        public static bool Equals(this quaternion self, quaternion other,float tolerance)
+        {
+            return (math.abs(self.value.x - other.value.x) <= tolerance && math.abs(self.value.y - other.value.y) <= tolerance && math.abs(self.value.z - other.value.z) <= tolerance && math.abs(self.value.w - other.value.w) <= tolerance)
+                   || (math.abs(self.value.x + other.value.x) <= tolerance && math.abs(self.value.y + other.value.y) <= tolerance && math.abs(self.value.z + other.value.z) <= tolerance && math.abs(self.value.w + other.value.w) <= tolerance);
+        }
+        
     }
 }

@@ -15,9 +15,9 @@ public class BaseUIGraphic : MonoBehaviour
     static readonly int ID_CategoryMask = Shader.PropertyToID("_CategoryMask");
     static readonly int ID_CategoryColors = Shader.PropertyToID("_CategoryColors");
 
-    private const int SampleCountPerSecondLimit = 60;
-    private const int CategoryCountLimit = 8;
-    private const int CapacityLimit = 64;
+    protected const int SampleCountPerSecondLimit = 60;
+    protected const int CategoryCountLimit = 8;
+    protected const int CapacityLimit = 64;
     
     public Material DiagramMaterial;
     public Graphic Renderer;
@@ -43,6 +43,7 @@ public class BaseUIGraphic : MonoBehaviour
     protected int _seek { get; private set; }
 
     private float[] _dataBuffer;
+    private Queue<float> _maxQueue = new Queue<float>();
 
     private bool _isDiagramDataDirty;
     private float _sampleIntervalS;
@@ -58,12 +59,19 @@ public class BaseUIGraphic : MonoBehaviour
         _diagramData = new float[Capacity * CategoryCount];
         _dataBuffer = new float[CategoryCount];
         _isDiagramDataDirty = true;
-        _maxValue = float.MinValue;
+        _maxValue = 1f;
         _runtimeMaterial = new Material(DiagramMaterial);
         Renderer.material = _runtimeMaterial;
         _sampleIntervalS = 1.0f / SampleCountPerSecond;
+
+        OnInit();
     }
-    
+
+    protected virtual void OnInit()
+    {
+        
+    }
+
 
     // Update is called once per frame
     void Update()
@@ -74,11 +82,6 @@ public class BaseUIGraphic : MonoBehaviour
             _sampleTimer -= _sampleIntervalS;
             Sample();
         }
-    }
-
-    private void OnDrawGizmos()
-    {
-        throw new NotImplementedException();
     }
 
     void LateUpdate()
@@ -120,7 +123,26 @@ public class BaseUIGraphic : MonoBehaviour
                 throw new ArgumentOutOfRangeException();
         }
 
-        _maxValue = Mathf.Max(_maxValue, sampleMaxValue);
+        _maxQueue.Enqueue(sampleMaxValue);
+        if (_maxQueue.Count > 2 * Capacity)
+        {
+            _maxQueue.Dequeue();
+        }
+        float newMax = float.Epsilon;
+        int itemCount = _maxQueue.Count;
+        for (int i = 0; i < itemCount; i++)
+        {
+            var max = _maxQueue.Dequeue();
+            _maxQueue.Enqueue(max);
+            if (max > newMax)
+            {
+                newMax = max;
+            }
+        }
+        _maxValue = newMax;
+        
+        //_maxValue = Mathf.Max(_maxValue, sampleMaxValue);
+        _maxValue = Mathf.Max(_maxValue, 1f);
         
         _seek = (_seek + 1) % Capacity;
         _isDiagramDataDirty = true;
@@ -144,7 +166,7 @@ public class BaseUIGraphic : MonoBehaviour
         return max;
     }
     
-    private float GetSum(float[] buffer)
+    protected virtual float GetSum(float[] buffer)
     {
         float sum = 0;
         for (int i = 0; i < buffer.Length; i++)

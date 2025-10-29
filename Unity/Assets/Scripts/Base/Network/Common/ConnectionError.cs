@@ -32,6 +32,7 @@ namespace Bliss.Core
         /// </summary>
         public const int ERR_HANDSHAKE_TIMEOUT = 100214;
         
+        public const int ERR_RpcFail = 100215;
         
     }
 }

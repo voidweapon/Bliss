@@ -24,4 +24,9 @@ namespace Bliss
             await RootManager.Instance.Create(0, ELogicSceneType.Main, nameof(ELogicSceneType.Main));
         }
     }
+
+    public struct Event_InitProcessEntry
+    {
+        
+    }
 }

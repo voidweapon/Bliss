@@ -157,6 +157,11 @@ namespace Bliss
         {
             var session = self.AddChildWithId<Session>(connectionId);
             session.RemoteEndPoint = remoteEndPoint;
+            
+            EventSystem.Instance.Push(self.LogicScene, new Event_OnAcceiptConnection()
+            {
+                Session = session,
+            });
         }
         
         private static void OnConnectionError(this NetworkComponent self, uint connectionId, int errorCode)
@@ -176,16 +181,33 @@ namespace Bliss
             Session session = self.GetChild<Session>(connectionId);
             if (session == null)
             {
+                bufferRef.Dispose();
                 return;
             }
-            SocketBuffer buffer = bufferRef.Target;
-            var rawMsg = buffer.Pull(buffer.TrueLength);
-            Log.Debug($"OnReceive: ConnectionId = {connectionId}, BufferRef = {bufferRef} , RawMsg={rawMsg.ToString()}");
-            //解析消息
             
-            bufferRef.Dispose();
+            //解析消息
+            MessageObject message = null;
+            try
+            {
+                (ushort _, MessageObject msg) = MessageSerializer.NetStreamToMessage(bufferRef);
+                message = msg;
+            }
+            catch (Exception e)
+            {
+                Log.Error($"解析消息失败:{e}");
+                return;
+            }
+            finally
+            {
+                bufferRef.Dispose();
+            }
             
             //分发消息
+            EventSystem.Instance.Invoke((long)self.LogicScene.SceneType, new Invoke_OnReceiveMessage()
+            {
+                Session = session,
+                Message = message
+            });
         }
         
         private static void ProcessMainThreadOperation(this NetworkComponent self)

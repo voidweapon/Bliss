@@ -210,7 +210,7 @@ namespace Bliss.Core.Network
         public void SendInitHandsShake()
         {
             SocketBufferRef bufferRef = _udpDriver.RentBuffer(INIT_PACKET_HEADER_LENGTH);
-            {
+            { 
                 SocketBuffer buffer = bufferRef.Target;
                 buffer.Reserve(INIT_PACKET_HEADER_LENGTH);
 

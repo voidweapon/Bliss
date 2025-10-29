@@ -11,8 +11,8 @@ dotnet ${PROTO_GEN_DLL} 	\
     -c cs_memorygepack 		\
     -g Sequence 		\
     -m Specific 		\
-    --offset_min 100000 	\
-    --offset_max 200000 	\
+    --offset_min 1000 		\
+    --offset_max 2000 		\
 
   
-#cp -r -f ${OUTPUT_CODE}/csharp/ ${WORKSPACE}/Unity/Assets/Scripts/Model/Generate/Message
+cp -r -f ${OUTPUT_CODE}/csharp/ ${WORKSPACE}/Unity/Assets/Scripts/Model/Shard/Generated/Message

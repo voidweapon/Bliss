@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Runtime.InteropServices;
+using Bliss.Base.Collections;
 
 namespace Bliss.Core.Network
 {
@@ -17,7 +18,7 @@ namespace Bliss.Core.Network
         private ConnectHandler _connectHandler;
         private Queue<(bool, SocketBufferRef)> _waitSendQueue = new Queue<(bool, SocketBufferRef)>();
         private KCP _kcp;
-        private int MaxWaitSendSize = 1024 * 1024;
+        private int MaxWaitSendSize = 10240;
         
         /// <summary>
         /// 握手超时时间  毫秒
@@ -259,9 +260,50 @@ namespace Bliss.Core.Network
                 .WriteUIntTo(RemoteId);
             
             OutputRaw(skBuffer.GetBuffer(), 0, messageSize);
+            
+            socketBufferRef.Dispose();
+            bufferRef.Dispose();
         }
         
         internal void OutputRaw(byte[] buffer, int offset, int size)
+        {
+            int outPacketId = _outPacketIdGenerator++;
+            var outPacketInfo = new OutPacketInfo()
+            {
+                OutPacketId = outPacketId,
+                SendTime = NetDriver.TimeNow,
+            };
+            
+            bool inSimulation = CheckOutgoingPacketSimulation(ref outPacketInfo, size);
+
+            if (!inSimulation)
+            {
+                OutputRawImmediately(buffer, offset, size);
+            }
+            else
+            {
+                if (outPacketInfo.Droped)
+                {
+                    return;
+                }
+                
+                SocketBufferRef bufferRef = NetDriver.RentBuffer(size);
+                SocketBuffer skBuffer = bufferRef.Target;
+                skBuffer.Reserve(size);
+                skBuffer.Push(size)
+                    .WriteReadOnlySpanTo(new ReadOnlySpan<byte>(buffer, offset, size));
+                outPacketInfo.BufferRef =  bufferRef;
+                
+                _sendBucket.Add(outPacketInfo.SendTime, outPacketInfo.OutPacketId);
+                _dicPacket.Add(outPacketInfo.OutPacketId, outPacketInfo);
+                if (outPacketInfo.SendTime < _minTimeout)
+                {
+                    _minTimeout = outPacketInfo.SendTime;
+                }
+            }
+        }
+
+        private void OutputRawImmediately(byte[] buffer, int offset, int size)
         {
             _udpDriver.Output(buffer, offset, size, _remoteEndPoint);
             
@@ -378,7 +420,7 @@ namespace Bliss.Core.Network
             if (receiveDataLength < 0)
             {
                 bufferRef.Dispose();
-                result = new SocketBufferRef();
+                result = null;
                 OnError(ConnectionError.ERR_SOCKET_CANT_RECEIVE);
                 return false;
             }
@@ -397,12 +439,139 @@ namespace Bliss.Core.Network
             }
         }
 
-        internal void OnError(int error)
+        internal void OnError(int error, bool logError = true)
         {
             uint connectionId = ConnectionId;
-            Log.Error($"{nameof(UdpNetConnection)}[{connectionId}] error: {error}");
+            if (logError)
+            {
+                Log.Error($"{nameof(UdpNetConnection)}[{connectionId}] error: {error}");
+            }
             _udpDriver.RemoveConnection(connectionId, error);
             _udpDriver.ReportConnectionError(connectionId, error);
         }
+
+
+        #region Simulate
+        private int _outPacketIdGenerator;
+        private readonly Random _random = new Random(Guid.NewGuid().GetHashCode() ^ Environment.TickCount);
+        private SortedMultiMapList<long, int> _sendBucket = new SortedMultiMapList<long, int>();
+        private Dictionary<int, OutPacketInfo> _dicPacket = new Dictionary<int, OutPacketInfo>();
+        private long _minTimeout;
+        private Queue<long> _queueOutTimestamp = new Queue<long>();
+        private Queue<int> _queueOutTimePacketId = new Queue<int>();
+        internal void UpdateSimulate(long now)
+        {
+            if (_sendBucket.Count == 0)
+            {
+                return;
+            }
+            
+            if (now < _minTimeout)
+            {
+                return;
+            }
+
+            _queueOutTimestamp.Clear();
+            _queueOutTimePacketId.Clear();
+            
+            foreach (var kv in _sendBucket)
+            {
+                long timeStamp = kv.Key;
+                if (_minTimeout < timeStamp)
+                {
+                    _minTimeout = timeStamp;
+                    break;
+                }
+                _queueOutTimestamp.Enqueue(timeStamp);
+            }
+
+            while (_queueOutTimestamp.Count > 0)
+            {
+                var timeStamp = _queueOutTimestamp.Dequeue();
+                
+                foreach (var packetIdList in _sendBucket[timeStamp])
+                {
+                    _queueOutTimePacketId.Enqueue(packetIdList);
+                }
+                _sendBucket.Remove(timeStamp);
+            }
+            
+            while (_queueOutTimePacketId.Count > 0)
+            {
+                int packetId = _queueOutTimePacketId.Dequeue();
+                if (!_dicPacket.Remove(packetId, out var outPacketInfo))
+                {
+                    continue;
+                }
+                SocketBufferRef bufferRef = outPacketInfo.BufferRef;
+                SocketBuffer skBuffer = bufferRef.Target;
+                OutputRawImmediately(skBuffer.GetBuffer(), skBuffer.DataPosition, skBuffer.TrueLength);
+                bufferRef.Dispose();
+            }
+        }
+        private bool CheckOutgoingPacketSimulation(ref OutPacketInfo  outPacketInfo, int numBytes)
+        {
+            bool inSimulation = false;
+            long now = NetDriver.TimeNow;
+
+            if (ShouldDropOutgoingPacketForLossSimulation(numBytes))
+            {
+                outPacketInfo.Droped = true;
+                inSimulation = true;
+            }
+            else if (SimulationSettings.Jitter != 0)
+            {
+                bool isLowLatency = outPacketInfo.OutPacketId % 2 == 0;
+                
+                if (isLowLatency)
+                {
+                    double latencyVariance = 2.0 * (_random.NextDouble() - 0.5) * SimulationSettings.LatencyVariance;
+                    long latency = (long)(SimulationSettings.LatencyMin + latencyVariance);
+                    outPacketInfo.SendTime = now + latency;
+                }
+                else
+                {
+                    double latencyVariance = 2.0 * (_random.NextDouble() - 0.5) * SimulationSettings.LatencyVariance;
+                    long latency = (long)(SimulationSettings.LatencyMin + SimulationSettings.Jitter + latencyVariance);
+                    outPacketInfo.SendTime = now + latency;
+                }
+                inSimulation =  true;
+            }
+            else if (SimulationSettings.Latency > 0)
+            {
+                double latencyVariance = 2.0 * (_random.NextDouble() - 0.5) * SimulationSettings.LatencyVariance;
+                long latency = (long)(SimulationSettings.Latency + latencyVariance);
+                outPacketInfo.SendTime = now + latency;
+                inSimulation =  true;
+
+            }
+            else if (SimulationSettings.LatencyMin > 0 || SimulationSettings.LatencyMax > 0)
+            {
+                double latencyVariance = _random.NextDouble() * (SimulationSettings.LatencyMax - SimulationSettings.LatencyMin);
+                long latency = (long)(SimulationSettings.LatencyMin + latencyVariance);
+                outPacketInfo.SendTime = now + latency;
+                inSimulation =  true;
+            }
+            
+            return inSimulation;
+        }
+
+        private bool ShouldDropOutgoingPacketForLossSimulation(int numBytes)
+        {
+            return NetDriver.IsSimulatingPacketLossBurst() ||
+                   (SimulationSettings.Loss > 0 &&
+                    SimulationSettings.ShouldDropPacketOfSize(numBytes) &&
+                    (_random.NextDouble() * 100f < SimulationSettings.Loss));
+        }
+        
+        private struct OutPacketInfo
+        {
+            public int OutPacketId;
+            public SocketBufferRef  BufferRef;
+            public long SendTime;
+            public bool Droped;
+        }
+
+        #endregion
     }
 }

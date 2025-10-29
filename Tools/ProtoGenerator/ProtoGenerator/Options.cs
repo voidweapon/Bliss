@@ -17,10 +17,10 @@ public class Options
     public EOpcodeGenMode  OpcodeGenMode { get; set; }
     
     [Option("offset_min", Required = false, HelpText = "Gen opcode Sequence Mode code start offset min", Default = 0)]
-    public int OpcodeMin { get; set; }
+    public ushort OpcodeMin { get; set; }
     
     [Option("offset_max", Required = false, HelpText = "Gen opcode Sequence Mode code start offset max", Default = 0)]
-    public int OpcodeMax { get; set; }
+    public ushort OpcodeMax { get; set; }
     
     [Option('m', "offset_mode", Required = false, HelpText = "Gen opcode Sequence Mode code start offset", Default = EOpcodeOffsetMode.Specific)]
     public EOpcodeOffsetMode OpcodeOffsetMode { get; set; }

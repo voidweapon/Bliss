@@ -21,7 +21,7 @@ namespace Bliss.Timer
         /// <summary>
         /// TimeStamp -> Timer Id List
         /// </summary>
-        internal MultiMapList<long, long> TimeBucket =  new MultiMapList<long, long>(1000);
+        internal SortedMultiMapList<long, long> TimeBucket =  new SortedMultiMapList<long, long>(1000);
 
         /// <summary>
         /// Timer Id -> Timer 

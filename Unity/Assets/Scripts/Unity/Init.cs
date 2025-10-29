@@ -40,6 +40,8 @@ namespace Bliss
 
         private async ETTask InitFramework()
         {
+            Application.targetFrameRate = 60;
+            
             DontDestroyOnLoad(gameObject);
             
             Log.Logger = new UnityLogger();

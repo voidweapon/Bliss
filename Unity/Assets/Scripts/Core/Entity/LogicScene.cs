@@ -20,7 +20,7 @@ namespace Bliss
             
         }
 
-        internal LogicScene(Root root, int id,  int instanceId, ELogicSceneType sceneType, string name)
+        internal LogicScene(Root root, long id,  long instanceId, ELogicSceneType sceneType, string name)
         {
             Root = root;
             Id = id;

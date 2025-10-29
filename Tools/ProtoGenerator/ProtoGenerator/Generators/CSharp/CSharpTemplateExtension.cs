@@ -80,15 +80,48 @@ public class CSharpTemplateExtension : ScriptObject
             for (int i = 0; i < protoClassInfo.properties.Count; i++)
             {
                 var propertyInfo = protoClassInfo.properties[i];
-                sb.Append($"sizeof({propertyInfo.property_type})");
-                if (i != protoClassInfo.properties.Count - 1)
+
+                if (propertyInfo.CollectionMode != ESupportedCollection.None
+                    || propertyInfo.property_type == "string")
+                {
+                    continue;
+                }
+                
+                if (!_propertySizeof.TryGetValue(propertyInfo.property_type, out var sizeofStr))
+                {
+                    sizeofStr = $"sizeof({propertyInfo.property_type})";
+                }
+
+                if (i != 0)
                 {
                     sb.Append(" + ");
                 }
+                sb.Append(sizeofStr);
             }
         }
         return sb.ToString();
     }
 
-    
+    private static Dictionary<string, string> _propertySizeof = new Dictionary<string, string>()
+    {
+        {"Unity.Mathematics.float2", "2 * sizeof(float)"},
+        {"Unity.Mathematics.float3", "3 * sizeof(float)"},
+        {"Unity.Mathematics.float4", "4 * sizeof(float)"},
+        {"Unity.Mathematics.quaternion", "4 * sizeof(float)"},
+        {"Unity.Mathematics.half",  "sizeof(ushort)"},
+        {"Unity.Mathematics.half2", "2 * sizeof(ushort)"},
+        {"Unity.Mathematics.half3", "3 * sizeof(ushort)"},
+        {"Unity.Mathematics.half4", "4 * sizeof(ushort)"},
+        {"Unity.Mathematics.double2", "2 * sizeof(double)"},
+        {"Unity.Mathematics.double3", "3 * sizeof(double)"},
+        {"Unity.Mathematics.double4", "4 * sizeof(double)"},
+        {"Unity.Mathematics.int2", "2 * sizeof(int)"},
+        {"Unity.Mathematics.int3", "3 * sizeof(int)"},
+        {"Unity.Mathematics.int4", "4 * sizeof(int)"},
+        {"Unity.Mathematics.bool2", "2 * sizeof(bool)"},
+        {"Unity.Mathematics.bool3", "3 * sizeof(bool)"},
+        {"Unity.Mathematics.bool4", "4 * sizeof(bool)"},
+    };
+
+
 }

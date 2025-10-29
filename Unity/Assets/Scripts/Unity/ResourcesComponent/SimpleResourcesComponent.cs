@@ -128,7 +128,51 @@ namespace Bliss
             {
                 Debug.LogError($"资源包初始化失败：{initOperation.Error}");
             }
+
+            var requestOperation =  package.RequestPackageVersionAsync();
+            await requestOperation.Task;
+            if (requestOperation.Status == EOperationStatus.Succeed)
+            {
+                Debug.Log($"Request package version : {requestOperation.PackageVersion}");
+            }
+            else
+            {
+                Debug.LogError($"Request package version fail : {requestOperation.Error}");
+            }
+
+            var updatePackageManifestOperation = package.UpdatePackageManifestAsync(requestOperation.PackageVersion);
+            await updatePackageManifestOperation.Task;
+            if (updatePackageManifestOperation.Status == EOperationStatus.Succeed)
+            {
+                Debug.Log($"update package manifest : success");
+            }
+            else
+            {
+                Debug.LogError($"update package manifest fail : {requestOperation.Error}");
+            }
+
+            var downloader = package.CreateResourceDownloader(10, 3);
+            if (downloader.TotalDownloadCount == 0)
+            {
+                //不需要更新
+                return;
+            }
+
+            // 发现新更新文件后走更新流程
+            downloader.BeginDownload();
+            await downloader.Task;
+
+            if (downloader.Status != EOperationStatus.Succeed)
+            {
+                Debug.LogError($"update package  fail : {downloader.Error}");
+            }
+
+            //清理未使用的Bundle
+            var clearOp = package.ClearCacheFilesAsync(EFileClearMode.ClearUnusedBundleFiles);
+            await clearOp.Task;
         }
+        
+        
 
         public void DestroyPackage(string packageName)
         {
@@ -136,6 +180,15 @@ namespace Bliss
             var operation = package.UnloadUnusedAssetsAsync();
             operation.WaitForAsyncComplete();
         }
+        
+        public T LoadAsset<T>(string location) where T : UnityEngine.Object
+        {
+            AssetHandle handle = YooAssets.LoadAssetSync<T>(location);
+            T t = (T)handle.AssetObject;
+            handle.Release();
+            return t;
+        }
+        
 
         /// <summary>
         /// 加载制定路径的资源

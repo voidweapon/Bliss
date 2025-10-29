@@ -33,8 +33,8 @@ namespace Bliss
         /// <param name="timeoutMS">超时时间 MS</param>
         /// <returns></returns>
         public static async ETTask<CoroutineLock> WaitAsync(this CoroutineLockComponent self,
-            int coroutineLockType, int coroutineLockIdentifier,
-            int timeoutMS = 60000)
+            int coroutineLockType, long coroutineLockIdentifier,
+            long timeoutMS = 60000)
         {
             CoroutineLockQueueBucket coroutineLockQueueBucket = self.GetChild<CoroutineLockQueueBucket>(coroutineLockType) ?? self.AddChildWithId<CoroutineLockQueueBucket>(coroutineLockType);
             return await coroutineLockQueueBucket.WaitAsync(coroutineLockIdentifier, timeoutMS);

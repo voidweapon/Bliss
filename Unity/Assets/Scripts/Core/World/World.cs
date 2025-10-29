@@ -31,7 +31,6 @@ namespace Bliss
             _singletons.Clear();
             
             ObjectPool.Instance.Dispose();
-            MessageOpcodeManager.Instance.Dispose();
         }
         
         public T AddSingletonNoInit<T>() where T : ASingleton, new()

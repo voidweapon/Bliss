@@ -31,7 +31,7 @@ namespace Bliss
             }
         }
 
-        protected abstract ETTask Run(TScene scene, TEvent eventInfo);
+        protected abstract ETTask Run(TScene mainScene, TEvent eventInfo);
 
     }
 }

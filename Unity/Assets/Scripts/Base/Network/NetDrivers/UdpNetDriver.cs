@@ -69,6 +69,8 @@ namespace Bliss.Core.Network
             //Connection Update
             TimerUpdate(timeNow);
             UpdateConnections(timeNow);
+
+            UpdateSimulateConnections(TimeNow);
         }
 
 
@@ -77,6 +79,7 @@ namespace Bliss.Core.Network
             var connection = new UdpNetConnection();
             _dicId2Connection.Add(connectionId, connection);
             connection.InitLocalConnection(this, remoteEndPoint, connectionId);
+            connection.UpdateNetworkSimulationSettings();
         }
 
         private uint CreateAcceptedConnection(uint connectionId, uint remoteId, IPEndPoint remoteEndPoint)
@@ -84,6 +87,7 @@ namespace Bliss.Core.Network
             UdpNetConnection connection = new UdpNetConnection();
             connection.InitRemoteConnection(this, remoteEndPoint, connectionId, remoteId, connectionId);
             _dicId2Connection.Add(connectionId, connection);
+            connection.UpdateNetworkSimulationSettings();
             ReportAcceptConnection(connectionId, remoteEndPoint);
             return connectionId;
         }
@@ -257,7 +261,7 @@ namespace Bliss.Core.Network
                         
                         msgSpan.ReadInt(out int error);
                         Log.Info($"{nameof(UdpNetConnection)}[{remoteId}] FIN with error: {error}");
-                        udpConnection.OnError(ConnectionError.ERR_PEER_DISCONNECT);
+                        udpConnection.OnError(ConnectionError.ERR_PEER_DISCONNECT, false);
                     }
                     break;
                 default:
@@ -314,6 +318,18 @@ namespace Bliss.Core.Network
                 }
             }
             _updateConnectionId.Clear();
+        }
+
+        private void UpdateSimulateConnections(long timeNow)
+        {
+            foreach (var kv in _dicId2Connection)
+            {
+                var connection = kv.Value;
+                if (connection is UdpNetConnection udpConnection)
+                {
+                    udpConnection.UpdateSimulate(timeNow);
+                }
+            }
         }
 
         #endregion

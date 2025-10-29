@@ -252,7 +252,7 @@ namespace Bliss
             T entity = (T)Entity.Create(typeof(T), isFromPool);
             entity.Id = Bliss.Id.IdGenerator.Instance.GenerateId();
             entity.Parent = this;
-            GetEntitySystem().Awake(entity, arg);
+            GetEntitySystem().Awake<TArg>(entity, arg);
             return entity;
         }
         
@@ -270,7 +270,7 @@ namespace Bliss
             T entity = (T)Entity.Create(typeof(T), isFromPool);
             entity.Id = id;
             entity.Parent = this;
-            GetEntitySystem().Awake(entity);
+            GetEntitySystem().Awake<TArg>(entity, arg);
             return entity;
         }
 
@@ -467,7 +467,7 @@ namespace Bliss
             Entity component = Create(componentType, isFromPool);
             component.Id = Id;
             component.SetComponentParent(this);
-            GetEntitySystem().Awake(component, param);
+            GetEntitySystem().Awake<TParam>(component, param);
             return (TComponent)component;
         }
 
