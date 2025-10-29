@@ -15,6 +15,7 @@ namespace Bliss.ProjectRule.SourceGenerator.Generators;
 [Generator]
 public class EntitySystemGenerator : ISourceGenerator
 {
+    private static readonly string EntitySystemOfAttributeFullName = typeof(EntitySystemOfAttribute).FullName;
     private static readonly string EntitySystemOfAttributeName = nameof(EntitySystemOfAttribute);
 
     public void Initialize(GeneratorInitializationContext context)
@@ -51,7 +52,7 @@ public class EntitySystemGenerator : ISourceGenerator
             return;
         }
         
-        var entitySystemOfAttributeData =  classTypeSymbol.GetFirstAttribute(EntitySystemOfAttributeName);
+        var entitySystemOfAttributeData =  classTypeSymbol.GetFirstAttribute(EntitySystemOfAttributeFullName);
         if (entitySystemOfAttributeData == null)
         {
             return;
@@ -138,7 +139,7 @@ public class EntitySystemGenerator : ISourceGenerator
                     continue;
                 }
                 
-                string attributeClassName = attribute.GetAttributeClassName();
+                string attributeClassName = attribute.GetAttributeClassNameWithoutNamespace();
                 if (attributeClassName == EntitySystemOfAttributeName)
                 {
                     found = true;

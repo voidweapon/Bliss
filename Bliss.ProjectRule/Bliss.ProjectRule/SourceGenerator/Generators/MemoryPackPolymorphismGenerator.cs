@@ -35,12 +35,18 @@ public class MemoryPackPolymorphismGenerator : ISourceGenerator
         foreach (var candicateClasseclaration in receiver.CandicateClassDeclaration)
         {
             SemanticModel semanticModel = context.Compilation.GetSemanticModel(candicateClasseclaration.SyntaxTree);
+
+            if (!AnalyzerHelper.IsAssemblyNeedAnalyze(semanticModel.Compilation.AssemblyName, AnalyzeAssembly.AllModel))
+            {
+                continue;   
+            }
+            
             INamedTypeSymbol? classTypeSymbol = ModelExtensions.GetDeclaredSymbol(semanticModel, candicateClasseclaration) as INamedTypeSymbol;
             if (classTypeSymbol == null)
             {
                 continue;
             }
-
+            
             if (classTypeSymbol.TryGetAttributeInDeepestBassType(MemoryPackableAttributeName, out var deepestBassType))
             {
                 if (!inheritanceGroup.TryGetValue(deepestBassType, out var group))
@@ -83,7 +89,7 @@ public class MemoryPackPolymorphismGenerator : ISourceGenerator
         bool isDotNet = false;
         if (context.Compilation.AssemblyName != null)
         {
-            isDotNet = !context.Compilation.AssemblyName.StartsWith("Unity");
+            isDotNet = !context.Compilation.AssemblyName.StartsWith("Bliss");
         }
 
         var generationContext = new SerializePolymorphismGenerationContext()

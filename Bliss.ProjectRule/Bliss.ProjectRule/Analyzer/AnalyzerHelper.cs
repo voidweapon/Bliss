@@ -114,18 +114,18 @@ namespace Bliss.ProjectRule.Analyzer
         /// <summary>
         ///     INamedTypeSymbol 获取指定类型的第一个Attribute
         /// </summary>
-        public static AttributeData? GetFirstAttribute(this INamedTypeSymbol namedTypeSymbol, string attributeName, bool fullName = false)
+        public static AttributeData? GetFirstAttribute(this INamedTypeSymbol namedTypeSymbol, string attributeFullName, bool fullName = false)
         {
             foreach (AttributeData? attributeData in namedTypeSymbol.GetAttributes())
             {
                 if (fullName)
                 {
-                    if (attributeData.AttributeClass?.ToString() == attributeName)
+                    if (attributeData.AttributeClass?.ToString() == attributeFullName)
                     {
                         return attributeData;
                     }
                 }
-                if (attributeData.AttributeClass?.Name == attributeName)
+                if (attributeData.AttributeClass?.Name == attributeFullName)
                 {
                     return attributeData;
                 }
@@ -307,10 +307,11 @@ namespace Bliss.ProjectRule.Analyzer
             return false;
         }
 
-        public static string GetAttributeClassName(this AttributeSyntax attributeSyntax)
+        
+        public static string GetAttributeClassNameWithoutNamespace(this AttributeSyntax attributeSyntax)
         {
             string attributeName = attributeSyntax.Name.ToString();
-            if (attributeName.EndsWith("AttributeS"))
+            if (attributeName.EndsWith("Attribute"))
             {
                 return attributeName;
             }
@@ -320,16 +321,13 @@ namespace Bliss.ProjectRule.Analyzer
         
         /// <summary>
         ///     INamedTypeSymbol 是否有指定的Attribute
-        /// <param name="attributeName">full name</param>
+        /// <param name="attributeFullName">full name</param>
         /// </summary>
-        public static bool HasAttribute(this ITypeSymbol typeSymbol, string attributeName)
+        public static bool HasAttribute(this ITypeSymbol typeSymbol, string attributeFullName)
         {
             foreach (AttributeData? attributeData in typeSymbol.GetAttributes())
             {
-                string attName = attributeData.AttributeClass?.ToString();
-                string attShortName = attributeData.AttributeClass?.Name;
-                string attDispolayName = attributeData.AttributeClass?.ToDisplayString();
-                if (attributeData.AttributeClass?.ToString() == attributeName)
+                if (attributeData.AttributeClass?.ToString() == attributeFullName)
                 {
                     return true;
                 }
@@ -356,11 +354,11 @@ namespace Bliss.ProjectRule.Analyzer
         }
 
         public static bool TryGetAttributeInDeepestBassType(this ITypeSymbol typeSymbol,
-            string attributeName,
+            string attributeFullName,
             out ITypeSymbol deepestBassType)
         {
             deepestBassType = null;
-            if (typeSymbol.HasAttribute(attributeName))
+            if (typeSymbol.HasAttribute(attributeFullName))
             {
                 deepestBassType = typeSymbol;
             }
@@ -370,7 +368,7 @@ namespace Bliss.ProjectRule.Analyzer
             {
                 if (symbolNode is ITypeSymbol)
                 {
-                    if (symbolNode.HasAttribute(attributeName))
+                    if (symbolNode.HasAttribute(attributeFullName))
                     {
                         deepestBassType = symbolNode;
                     }
@@ -384,11 +382,11 @@ namespace Bliss.ProjectRule.Analyzer
         /// <summary>
         ///     INamedTypeSymbol 获取指定类型的第一个Attribute
         /// </summary>
-        public static AttributeData? GetFirstAttribute(this INamedTypeSymbol namedTypeSymbol, string attributeName)
+        public static AttributeData? GetFirstAttribute(this INamedTypeSymbol namedTypeSymbol, string attributeFullName)
         {
             foreach (AttributeData? attributeData in namedTypeSymbol.GetAttributes())
             {
-                if (attributeData.AttributeClass?.ToString() == attributeName)
+                if (attributeData.AttributeClass?.ToString() == attributeFullName)
                 {
                     return attributeData;
                 }
@@ -424,7 +422,7 @@ namespace Bliss.ProjectRule.Analyzer
                     continue;
                 }
                 
-                string attributeClassName = attribute.GetAttributeClassName();
+                string attributeClassName = attribute.GetAttributeClassNameWithoutNamespace();
                 if (attributeClassName == attributeName)
                 {
                     return true;

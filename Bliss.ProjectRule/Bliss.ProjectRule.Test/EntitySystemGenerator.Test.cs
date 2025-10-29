@@ -18,54 +18,62 @@ public class EntitySystemGeneratorTests
     public void Test2()
     {
         Compilation inputCompilation = CreateCompilation(@"
-namespace TestES;
-[AttributeUsage(AttributeTargets.Class)]
-public class EntitySystemOfAttribute : System.Attribute
-{
-    public System.Type EntityType { get; private set; }
+using System;
 
-    public EntitySystemOfAttribute(System.Type entityType)
+namespace Bliss.Core
+{
+    [AttributeUsage(AttributeTargets.Class)]
+    public class EntitySystemOfAttribute : System.Attribute
     {
-    EntityType = entityType;
+        public System.Type EntityType { get; private set; }
+
+        public EntitySystemOfAttribute(System.Type entityType)
+        {
+        EntityType = entityType;
+        }
     }
 }
 
-[EntitySystemOf(typeof(Entity))]
-public static partial class GenTest
+
+namespace TestES
 {
+    [EntitySystemOf(typeof(Entity))]
+    public static partial class GenTest
+    {
 
-}
-
-
-public interface IEntitySystemConstraint
-{
-}
-
-public interface IAwake<T> : IEntitySystemConstraint
-{
-
-}
-
-public interface IAwake<T, TParam0> : IEntitySystemConstraint
-{
-
-}
-
-public interface IUpdate : IEntitySystemConstraint
-{
-
-}
+    }
 
 
+    public interface IEntitySystemConstraint
+    {
+    }
 
-public class Entity : IAwake<int, EntityInitData>,  IUpdate
-{
+    public interface IAwake<T> : IEntitySystemConstraint
+    {
 
-}
+    }
 
-public struct EntityInitData 
-{
+    public interface IAwake<T, TParam0> : IEntitySystemConstraint
+    {
 
+    }
+
+    public interface IUpdate : IEntitySystemConstraint
+    {
+
+    }
+
+
+
+    public class Entity : IAwake<int, EntityInitData>,  IUpdate
+    {
+
+    }
+
+    public struct EntityInitData 
+    {
+
+    }
 }
 ");        
         

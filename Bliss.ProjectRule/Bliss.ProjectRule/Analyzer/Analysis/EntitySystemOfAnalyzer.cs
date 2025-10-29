@@ -12,6 +12,7 @@ namespace Bliss.ProjectRule.Analyzer;
 public class EntitySystemOfAnalyzer : DiagnosticAnalyzer
 {
     private const string AttributeName =nameof(EntitySystemOfAttribute);
+    private readonly string AttributeFullName = typeof(EntitySystemOfAttribute).FullName;
     
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(EntitySystemOfAnalyzerRule.Rule, EntitySystemMethodAnalyzerRule.Rule);
 
@@ -99,10 +100,7 @@ public class EntitySystemOfAnalyzer : DiagnosticAnalyzer
             return;
         }
         
-        
-
-
-        var entitySystemOfAttributeData = classTypeSymbol.GetFirstAttribute(AttributeName);
+        var entitySystemOfAttributeData = classTypeSymbol.GetFirstAttribute(AttributeFullName);
         if (entitySystemOfAttributeData == null)
         {
             return;
