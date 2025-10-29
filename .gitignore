@@ -91,6 +91,7 @@ crashlytics-build.properties
 /Unity/*.csproj
 /Unity/*.unityproj
 /Unity/*.sln
+/Unity/mono_crash.*.json
 
 #Unity/Assets
 /Unity/Assets/Res/Code
