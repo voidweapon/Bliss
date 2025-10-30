@@ -32,9 +32,11 @@ message G2C_EnterLevel : ISessionResponse
 message TransformSimpleSyncMessage : IActorMessage
 {
    int64 ActorId = 1;
+
    Unity.Mathematics.float3 Position = 2;
    Unity.Mathematics.float4 Rotation = 3;
    Unity.Mathematics.float3 Velocity = 4;
+   Unity.Mathematics.float3 AngularVelocity = 5;
 }
 
 message PropertySync_Long : IActorMessage

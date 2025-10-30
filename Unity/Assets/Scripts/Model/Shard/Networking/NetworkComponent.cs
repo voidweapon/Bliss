@@ -76,6 +76,7 @@ namespace Bliss
         public int ErrorCode;
         public IPEndPoint RemoteEndPoint;
         public SocketBufferRef BufferRef;
+        public bool IsReliable; 
     }
 
     public struct Invoke_OnReceiveMessage

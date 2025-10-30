@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Text;
 using Bliss.Core;
 using Bliss.ViewModel;
 using Bliss.ViewModel.Debugger;
@@ -42,6 +43,17 @@ namespace Bliss.ViewLogic.Debugger
             netDriver.HandlePacketLossBurstCommand(durationMS);
         }
 
+        [Command("debug_net_simulate")]
+        public static void NetSimulateDebug()
+        {
+            if (!TryGetTestScene("LocalClient", out var resultScene)) return;
+            var netDriver = resultScene.GetComponent<NetworkComponent>()?.NetDriver;
+            if(netDriver == null) return;
+            StringBuilder stringBuilder = new StringBuilder();
+            netDriver.DebugSimulate(stringBuilder);
+            Log.Info(stringBuilder.ToString());
+        }
+        
         [Command("tranform_stat")]
         public static void ToggleTransformStat()
         {

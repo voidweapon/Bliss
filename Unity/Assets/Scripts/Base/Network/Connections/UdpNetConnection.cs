@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Runtime.InteropServices;
+using System.Text;
 using Bliss.Base.Collections;
 
 namespace Bliss.Core.Network
@@ -294,11 +295,16 @@ namespace Bliss.Core.Network
                     .WriteReadOnlySpanTo(new ReadOnlySpan<byte>(buffer, offset, size));
                 outPacketInfo.BufferRef =  bufferRef;
                 
-                _sendBucket.Add(outPacketInfo.SendTime, outPacketInfo.OutPacketId);
+                _sendBucket.Add(outPacketInfo.SimulateSendTime, outPacketInfo.OutPacketId);
                 _dicPacket.Add(outPacketInfo.OutPacketId, outPacketInfo);
-                if (outPacketInfo.SendTime < _minTimeout)
+                if (outPacketInfo.SimulateSendTime < _minTimeout)
                 {
-                    _minTimeout = outPacketInfo.SendTime;
+                    _minTimeout = outPacketInfo.SimulateSendTime;
+                }
+
+                if (_dicPacket.Count > 100)
+                {
+                    System.Diagnostics.Debugger.Break();
                 }
             }
         }
@@ -434,7 +440,7 @@ namespace Bliss.Core.Network
         {
             if (_kcp != null)
             {
-                AvgLag = _kcp.SmoothRTT;
+                AvgLagMS = _kcp.SmoothRTT;
                 AverageJitterInMS =  _kcp.SmoothJitter;
             }
         }
@@ -527,13 +533,13 @@ namespace Bliss.Core.Network
                 {
                     double latencyVariance = 2.0 * (_random.NextDouble() - 0.5) * SimulationSettings.LatencyVariance;
                     long latency = (long)(SimulationSettings.LatencyMin + latencyVariance);
-                    outPacketInfo.SendTime = now + latency;
+                    outPacketInfo.SimulateSendTime = now + latency;
                 }
                 else
                 {
                     double latencyVariance = 2.0 * (_random.NextDouble() - 0.5) * SimulationSettings.LatencyVariance;
                     long latency = (long)(SimulationSettings.LatencyMin + SimulationSettings.Jitter + latencyVariance);
-                    outPacketInfo.SendTime = now + latency;
+                    outPacketInfo.SimulateSendTime = now + latency;
                 }
                 inSimulation =  true;
             }
@@ -541,7 +547,7 @@ namespace Bliss.Core.Network
             {
                 double latencyVariance = 2.0 * (_random.NextDouble() - 0.5) * SimulationSettings.LatencyVariance;
                 long latency = (long)(SimulationSettings.Latency + latencyVariance);
-                outPacketInfo.SendTime = now + latency;
+                outPacketInfo.SimulateSendTime = now + latency;
                 inSimulation =  true;
 
             }
@@ -549,7 +555,7 @@ namespace Bliss.Core.Network
             {
                 double latencyVariance = _random.NextDouble() * (SimulationSettings.LatencyMax - SimulationSettings.LatencyMin);
                 long latency = (long)(SimulationSettings.LatencyMin + latencyVariance);
-                outPacketInfo.SendTime = now + latency;
+                outPacketInfo.SimulateSendTime = now + latency;
                 inSimulation =  true;
             }
             
@@ -563,12 +569,29 @@ namespace Bliss.Core.Network
                     SimulationSettings.ShouldDropPacketOfSize(numBytes) &&
                     (_random.NextDouble() * 100f < SimulationSettings.Loss));
         }
+
+        public override void DebugSimulate(System.Text.StringBuilder stringBuilder)
+        {
+            foreach (var kv in _sendBucket)
+            {
+                var simulateSendTime = kv.Key;
+                stringBuilder.AppendLine($"--------------------------");
+                stringBuilder.AppendLine($"[{simulateSendTime}]");
+                foreach (var outPacketId in kv.Value)
+                {
+                    var outPacketInfo = _dicPacket[outPacketId];
+                    stringBuilder.AppendLine($"Pkt[{outPacketId}] SendTime={outPacketInfo.SendTime}, SimulateSendTime={outPacketInfo.SimulateSendTime}, Diff={outPacketInfo.SimulateSendTime - outPacketInfo.SendTime}");
+                }
+                stringBuilder.AppendLine($"--------------------------");
+            }
+        }
         
         private struct OutPacketInfo
         {
             public int OutPacketId;
             public SocketBufferRef  BufferRef;
             public long SendTime;
+            public long SimulateSendTime;
             public bool Droped;
         }
 

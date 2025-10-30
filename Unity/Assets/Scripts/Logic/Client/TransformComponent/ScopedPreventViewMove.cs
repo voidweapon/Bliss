@@ -9,14 +9,13 @@ namespace Bliss
 
         public static ScopedPreventViewMove Create(TransformComponent target)
         {
-            if (target == null)
-            {
-                throw new ArgumentNullException(nameof(target));
-            }
-
             var obj = ObjectPool.Instance.Fetch<ScopedPreventViewMove>();
-            obj._weakReference.SetTarget(target);
-            target.AddViewSyncBarrier(obj);
+            
+            if (target != null)
+            {
+                obj._weakReference.SetTarget(target);
+                target.AddViewSyncBarrier(obj);
+            }
             
             return obj;
         }

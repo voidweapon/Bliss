@@ -6,6 +6,7 @@ using System.Net;
 using System.Numerics;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
 
 namespace Bliss.Core.Network
@@ -102,7 +103,7 @@ namespace Bliss.Core.Network
         
         public virtual void Update()
         {
-            
+            UpdateNetworkStats();
         }
 
         #region NetworkGuid
@@ -234,12 +235,12 @@ namespace Bliss.Core.Network
         public uint InTotalPackets { get; internal set; }
         
         /// <summary>
-        /// 本次采样间隔内收到的包数量
+        /// 本次采样间隔内发送的包数量
         /// </summary>
         public uint OutPackets { get; internal set; }
         
         /// <summary>
-        /// 收到的总包数量
+        /// 发送的总包数量
         /// </summary>
         public uint OutTotalPackets { get; internal set; }
         
@@ -263,7 +264,7 @@ namespace Bliss.Core.Network
 
                 InBytesPerSecond = (uint)System.Math.Floor(InBytes / intervalS);
                 OutBytesPerSecond = (uint)System.Math.Floor(OutBytes / intervalS);
-
+                NetworkProfiler.Instance?.Sample(this);
 
                 InBytes = 0;
                 OutBytes = 0;
@@ -313,6 +314,19 @@ namespace Bliss.Core.Network
             }
         }
 
+        public void DebugSimulate(StringBuilder stringBuilder)
+        {
+            stringBuilder.Clear();
+            foreach (var kv in _dicId2Connection)
+            {
+                var connection = kv.Value;
+                
+                stringBuilder.AppendLine($"**************************************************");
+                stringBuilder.AppendLine($"Connection[{connection.ConnectionId}]");
+                connection.DebugSimulate(stringBuilder);
+                stringBuilder.AppendLine($"**************************************************");
+            }
+        }
         #endregion
         
     }

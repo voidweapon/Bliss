@@ -69,7 +69,7 @@ namespace Bliss.ViewLogic
             };
             clientScene.GetComponent<NetworkComponent>().NetDriver.SetNetSimulationSettings(networkSimulateSetting);
             remoteClientScene.GetComponent<NetworkComponent>().NetDriver.SetNetSimulationSettings(networkSimulateSetting);
-            serverScene.GetComponent<NetworkComponent>().NetDriver.SetNetSimulationSettings(networkSimulateSetting);
+            // serverScene.GetComponent<NetworkComponent>().NetDriver.SetNetSimulationSettings(networkSimulateSetting);
             
             await mainScene.GetComponent<TimerComponent>().WaitDurationAsync(1000);
 

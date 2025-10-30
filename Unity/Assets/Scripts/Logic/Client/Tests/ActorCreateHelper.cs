@@ -33,7 +33,7 @@ namespace Bliss
             
             if (isReplicate)
             {
-                actor.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.OrderedMessage);
+                actor.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.UnOrderedMessage);
                 scene.GetComponent<LevelNetworkObjectCollectionComponent>().AddNetworkObject(actor);
             }
             

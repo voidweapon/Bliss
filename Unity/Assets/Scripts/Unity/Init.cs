@@ -41,6 +41,7 @@ namespace Bliss
         private async ETTask InitFramework()
         {
             Application.targetFrameRate = 60;
+            Application.runInBackground = true;
             
             DontDestroyOnLoad(gameObject);
             

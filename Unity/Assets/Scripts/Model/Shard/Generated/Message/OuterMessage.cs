@@ -200,6 +200,9 @@ namespace Bliss
         [MemoryPackOrder(4)]
         public Unity.Mathematics.float3 Velocity { get; set; }
         
+        [MemoryPackOrder(5)]
+        public Unity.Mathematics.float3 AngularVelocity { get; set; }
+        
         public static TransformSimpleSyncMessage Create(bool isFromPool = false)
         {
             return ObjectPool.Instance.Fetch(typeof(TransformSimpleSyncMessage), isFromPool) as TransformSimpleSyncMessage;
@@ -218,11 +221,12 @@ namespace Bliss
             this.Position = default;
             this.Rotation = default;
             this.Velocity = default;
+            this.AngularVelocity = default;
                 
             ObjectPool.Instance.Recycle(this);
         }
        
-        private const int _sizeHint = sizeof(long) + 3 * sizeof(float) + 4 * sizeof(float) + 3 * sizeof(float);
+        private const int _sizeHint = sizeof(long) + 3 * sizeof(float) + 4 * sizeof(float) + 3 * sizeof(float) + 3 * sizeof(float);
         
         partial void CustomSizeHint(ref int sizeHint);
         

@@ -2,6 +2,7 @@ using Bliss.Core;
 using Bliss.ViewModel;
 using Bliss.ViewModel.Debugger;
 using TMPro;
+using Unity.Mathematics;
 
 namespace Bliss.ViewLogic.Debugger
 {

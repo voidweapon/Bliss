@@ -62,6 +62,9 @@ namespace Bliss
             long rttMS = currentTime - sendTimeMS;
             long serverSendTime = pongMessage.LocalTime;
 
+            self.OutLagPacketId[outLagPacketIndex] = -1;
+            self.OutLagPacketSendTime[outLagPacketIndex] = 0;
+
             double jitterMS = 0;
             if (self.RTT_EMA.Value == 0)
             {
@@ -73,6 +76,7 @@ namespace Bliss
             }
             self.Jitter_EMA.Add(Math.Abs(jitterMS));
             self.RTT_EMA.Add(rttMS);
+            self.RTT = rttMS;
 
             if (self.IsUpdateServerTime)
             {

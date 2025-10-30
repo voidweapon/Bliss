@@ -15,5 +15,6 @@ namespace Bliss
         public const int RTT_MA_Window = 50;
         public ExponentialMovingAverage RTT_EMA;
         public ExponentialMovingAverage Jitter_EMA;
+        public long RTT;
     }
 }

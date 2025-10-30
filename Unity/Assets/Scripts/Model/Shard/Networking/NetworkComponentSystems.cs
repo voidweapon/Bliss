@@ -15,6 +15,7 @@ namespace Bliss
 
         public static void Awake(this NetworkComponent self, NetworkClientParam param1)
         {
+            NetworkProfiler.Create();
             self.IsStop = false;
             self.NetDriver = self.CreateNetDriver(param1.DriverType);
             self.NetDriver.InitClient(param1.AddressFamily);
@@ -29,6 +30,7 @@ namespace Bliss
         
         public static void Awake(this NetworkComponent self, NetworkServerParam param1)
         {
+            NetworkProfiler.Create();
             self.IsStop = false;
             self.NetDriver = self.CreateNetDriver(param1.DriverType);
             self.NetDriver.InitServer(param1.BindEndPoint);
@@ -51,6 +53,7 @@ namespace Bliss
                 self.NetDriver.OnConnectionError -= self.OnNetThreadConnectionError;
             }
             self.NetDriver = null;
+            NetworkProfiler.Instance?.Dispose();
         }
         
         public static void Update(this NetworkComponent self)

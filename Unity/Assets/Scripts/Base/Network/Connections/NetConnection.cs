@@ -130,7 +130,7 @@ namespace Bliss.Core.Network
         /// <summary>
         /// 平均Lag
         /// </summary>
-        public float AvgLag { get; protected set; }
+        public long AvgLagMS { get; protected set; }
         
         /// <summary>
         /// Total accumulated lag values during the current StatPeriod
@@ -148,7 +148,7 @@ namespace Bliss.Core.Network
         /// If the time between the sending and the reception of packets is always 100ms; the jitter will be 0.
         /// If the time difference is either 150ms or 100ms, the jitter will tend towards 50ms.
         /// </summary>
-        public float AverageJitterInMS  { get; protected set; }
+        public long AverageJitterInMS  { get; protected set; }
         
         internal void UpdateNetworkStats()
         {
@@ -165,6 +165,7 @@ namespace Bliss.Core.Network
                 OutPacketsPerSecond = (uint)System.Math.Floor(OutPackets / intervalS);
 
                 UpdateNetworkLagStats();
+                NetworkProfiler.Instance?.Sample(this);
                 
                 InBytes = 0;
                 OutBytes = 0;
@@ -185,6 +186,11 @@ namespace Bliss.Core.Network
         public void UpdateNetworkSimulationSettings()
         {
             SimulationSettings = NetDriver.SimulationSettings;
+        }
+
+        public virtual void DebugSimulate(System.Text.StringBuilder stringBuilder)
+        {
+           
         }
     }
 

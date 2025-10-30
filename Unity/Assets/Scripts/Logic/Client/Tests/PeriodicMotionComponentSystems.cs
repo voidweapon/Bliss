@@ -245,6 +245,7 @@ namespace Bliss
             transformSyncMsg.Position = transformCmp.Transform.Location;
             transformSyncMsg.Rotation = transformCmp.Transform.Rotation.value;
             transformSyncMsg.Velocity = self.CurrentVelocity;
+            transformSyncMsg.AngularVelocity = self.CurrentAngularVelocity;
             
             self.Scene<LogicScene>().GetComponent<LevelPlayerMgrComponent>().Broadcast(transformSyncMsg);
         }
@@ -289,6 +290,7 @@ namespace Bliss
             transformSyncMsg.Position = sendingMoveData.EndPosition;
             transformSyncMsg.Rotation = sendingMoveData.EndRotation.value;
             transformSyncMsg.Velocity = sendingMoveData.EndVelocity;
+            transformSyncMsg.AngularVelocity = self.CurrentAngularVelocity;
             
             self.Scene<LogicScene>().GetComponent<LevelPlayerMgrComponent>().Broadcast(transformSyncMsg);
 
@@ -370,6 +372,7 @@ namespace Bliss
             transformSyncMsg.Position = sendingMoveData.EndPosition;
             transformSyncMsg.Rotation = sendingMoveData.EndRotation.value;
             transformSyncMsg.Velocity = sendingMoveData.EndVelocity;
+            transformSyncMsg.AngularVelocity = self.CurrentAngularVelocity;
             
             self.Scene<LogicScene>().GetComponent<LevelPlayerMgrComponent>().Broadcast(transformSyncMsg);
 
@@ -378,6 +381,9 @@ namespace Bliss
         
         private static void OnReceiveTransformMessage_UE(this PeriodicMotionComponent self, TransformSimpleSyncMessage message)
         {
+            self.CurrentVelocity = message.Velocity;
+            self.CurrentAngularVelocity = message.AngularVelocity;
+            
             var transformCmp = self.Parent.GetComponent<TransformComponent>();
             float3 oldPosition = transformCmp.Transform.Location;
             quaternion oldRotation = transformCmp.Transform.Rotation;
@@ -391,11 +397,48 @@ namespace Bliss
         private static void OnSimulateUpdate_UE(this PeriodicMotionComponent self, long now)
         {
             long dtMS = now - self.OnewayTimer;
+            float dt = dtMS / 1000f;
+            
+            var transformCmp = self.Parent.GetComponent<TransformComponent>();
+            float3 saveViewRelativeLocation = transformCmp.ViewRelativeTransform.Location;
+            quaternion savedRotation = transformCmp.Transform.Rotation;
+            bool preventViewMove = !self.IsNetworkSmoothingComplete;
+            using (var _ = ScopedPreventViewMove.Create(preventViewMove ? transformCmp : null))
+            {
+                self.SimulateMovement_UE(dt);
+            }
+
+            // With Linear smoothing we need to know if the rotation changes, since the mesh should follow along with that (if it was prevented above).
+            // This should be rare that rotation changes during simulation, but it can happen when ShouldRemainVertical() changes, or standing on a moving base.
+            bool validateRotation = preventViewMove && (self.NetworkSmoothingMode == ENetworkSmoothingMode.Linear);
+            if (validateRotation)
+            {
+                // Same mesh with different rotation?
+                quaternion newRotation = transformCmp.Transform.Rotation;
+                if (!newRotation.Equals(savedRotation, 1e-6f) && self.ClientData != null)
+                {
+                    // Smoothing should lerp toward this new rotation target, otherwise it will just try to go back toward the old rotation.
+                    self.ClientData.MeshRotationTarget = newRotation;
+                    transformCmp.SynViewRelativeTranslationAndRotation(saveViewRelativeLocation, transformCmp.ViewRelativeTransform.Rotation);
+                }
+            }
             
             if (!self.IsNetworkSmoothingComplete)
             {
                 self.SmoothClientPosition(dtMS);
             }
+        }
+
+        private static void SimulateMovement_UE(this PeriodicMotionComponent self, float dt)
+        {
+            var transformCmp = self.Parent.GetComponent<TransformComponent>();
+            var newPosition = transformCmp.Transform.Location + self.CurrentVelocity * dt;
+            
+            //var deltaRotation = quaternion.EulerZXY(self.CurrentAngularVelocity * dt);
+            //var newRotation = math.mul(transformCmp.Transform.Rotation, deltaRotation);
+            var newRotation = transformCmp.Transform.Rotation;
+            
+            transformCmp.SetPositionAndRotation(newPosition, newRotation);
         }
         
         private static void SmoothCorrection(this PeriodicMotionComponent self,
@@ -462,7 +505,7 @@ namespace Bliss
             {
                 var oldClientTimeStamp = self.ClientData.SmoothingClientTimeStamp;
                 self.ClientData.SmoothingClientTimeStamp = (self.ClientData.SmoothingServerTimeStamp + oldClientTimeStamp) / 2;
-                Log.Info($"SmoothCorrection: Pull back client from ClientTimeStamp {oldClientTimeStamp} to {self.ClientData.SmoothingServerTimeStamp}, ServerTimeStamp {self.ClientData.SmoothingServerTimeStamp}");
+                //Log.Info($"SmoothCorrection: Pull back client from ClientTimeStamp {oldClientTimeStamp} to {self.ClientData.SmoothingServerTimeStamp}, ServerTimeStamp {self.ClientData.SmoothingServerTimeStamp}");
             }
             
             var oldServerTimeStamp = self.ClientData.SmoothingServerTimeStamp;
