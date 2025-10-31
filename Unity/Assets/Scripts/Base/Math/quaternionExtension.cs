@@ -29,6 +29,24 @@ namespace Bliss.Mathematics
             return Result;
         }
 
+        public static quaternion FastLerp(quaternion a, quaternion b, float t)
+        {
+            float dotResult = math.dot(a, b);
+            float bias = math.select(-1f, 1f, dotResult > 0);
+            return math.normalizesafe(Add(Scale(b, t), Scale(a, bias * (1f - t))));
+        }
+
+        public static quaternion Scale(quaternion a, float scale)
+        {
+            return new quaternion(a.value * scale);
+        }
+        
+        public static quaternion Add(quaternion a, quaternion b)
+        {
+            return new quaternion(a.value + b.value);
+        }
+        
+        
         public static bool Equals(this quaternion self, quaternion other,float tolerance)
         {
             return (math.abs(self.value.x - other.value.x) <= tolerance && math.abs(self.value.y - other.value.y) <= tolerance && math.abs(self.value.z - other.value.z) <= tolerance && math.abs(self.value.w - other.value.w) <= tolerance)

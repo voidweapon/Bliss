@@ -56,7 +56,7 @@ namespace Bliss
             NetworkProfiler.Instance?.Dispose();
         }
         
-        public static void Update(this NetworkComponent self)
+        public static void EarlyUpdate(this NetworkComponent self)
         {
             self.ProcessMainThreadOperation();
         }

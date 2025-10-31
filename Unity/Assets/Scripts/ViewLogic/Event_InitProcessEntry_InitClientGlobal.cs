@@ -66,6 +66,8 @@ namespace Bliss.ViewLogic
             {
                 Latency = 25,
                 LatencyVariance = 2,
+                // LatencyMin = 100,
+                // Jitter = 25,
             };
             clientScene.GetComponent<NetworkComponent>().NetDriver.SetNetSimulationSettings(networkSimulateSetting);
             remoteClientScene.GetComponent<NetworkComponent>().NetDriver.SetNetSimulationSettings(networkSimulateSetting);

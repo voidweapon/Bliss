@@ -66,11 +66,14 @@ namespace Bliss
 
             if (self.NetRole == ENetRole.SimulatedProxy)
             {
+                GameDebugStates.Instance.SetDebugStat("TsmSync", nameof(self.NetworkSmoothingMode), self.NetworkSmoothingMode, new float4(0,0,0,1));
+                GameDebugStates.Instance.SetDebugStat("TsmSync", nameof(self.SyncInterval), self.SyncInterval, new float4(0,0,0,1));
                 GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client, long>("TsmSync", self.ClientData, nameof(NetworkPredictionData_Client.SmoothingClientTimeStamp), new float4(0,0,0,1));
                 GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client, long>("TsmSync", self.ClientData, nameof(NetworkPredictionData_Client.SmoothingServerTimeStamp), new float4(0,0,0,1));
                 GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client, long>("TsmSync", self.ClientData, nameof(NetworkPredictionData_Client.LastCorrectionTime), new float4(0,0,0,1));
                 GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client, long>("TsmSync", self.ClientData, nameof(NetworkPredictionData_Client.LastCorrectionDelta), new float4(0,0,0,1));
                 GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client, float3>("TsmSync", self.ClientData, nameof(NetworkPredictionData_Client.MeshTranslationOffset), new float4(0,0,0,1));
+                GameDebugStates.Instance.AddDebugStat<PeriodicMotionComponent, float3>("TsmSync", self, nameof(PeriodicMotionComponent.CurrentAngularVelocity), new float4(0,0,0,1));
                 GameDebugStates.Instance.AddDebugStat<PeriodicMotionComponent, bool>("TsmSync", self, nameof(PeriodicMotionComponent.IsNetworkSmoothingComplete), new float4(0,0,0,1), true);
             }
         }
@@ -311,6 +314,7 @@ namespace Bliss
             self.StartRotation =  transformCmp.Transform.Rotation;
             self.StartVelocity = mover.CurrentVelocity;
             self.StartAcceleration = float3.zero;
+            self.StartAngularVelocity = mover.CurrentAngularVelocity;
             self.StartMoveMode = !mover.InMode2 ? 0 : 1;
         }
 
@@ -320,14 +324,20 @@ namespace Bliss
             self.EndPosition = transformCmp.Transform.Location;
             self.EndRotation =  transformCmp.Transform.Rotation;
             self.EndVelocity = mover.CurrentVelocity;
-            self.StartAcceleration = float3.zero;
+            self.EndAcceleration = float3.zero;
+            self.EndAngularVelocity = mover.CurrentAngularVelocity;
             self.EndMoveMode = !mover.InMode2 ? 0 : 1;
 
             if (self.StartVelocity.Equals(float3.zero) != self.EndVelocity.Equals(float3.zero))
             {
                 self.IsForceNoCombine = true;
             }
-
+            
+            if (self.StartAngularVelocity.Equals(float3.zero) != self.EndAngularVelocity.Equals(float3.zero))
+            {
+                self.IsForceNoCombine = true;
+            }
+            
             if (self.StartMoveMode != self.EndMoveMode)
             {
                 self.IsForceNoCombine = true;
@@ -399,29 +409,35 @@ namespace Bliss
             long dtMS = now - self.OnewayTimer;
             float dt = dtMS / 1000f;
             
-            var transformCmp = self.Parent.GetComponent<TransformComponent>();
-            float3 saveViewRelativeLocation = transformCmp.ViewRelativeTransform.Location;
-            quaternion savedRotation = transformCmp.Transform.Rotation;
-            bool preventViewMove = !self.IsNetworkSmoothingComplete;
-            using (var _ = ScopedPreventViewMove.Create(preventViewMove ? transformCmp : null))
+            //TODO:  ENetworkSmoothingMode.Linear 模式下预测旋转有问题
+            if (self.NetworkSmoothingMode != ENetworkSmoothingMode.Disabled)
             {
-                self.SimulateMovement_UE(dt);
-            }
-
-            // With Linear smoothing we need to know if the rotation changes, since the mesh should follow along with that (if it was prevented above).
-            // This should be rare that rotation changes during simulation, but it can happen when ShouldRemainVertical() changes, or standing on a moving base.
-            bool validateRotation = preventViewMove && (self.NetworkSmoothingMode == ENetworkSmoothingMode.Linear);
-            if (validateRotation)
-            {
-                // Same mesh with different rotation?
-                quaternion newRotation = transformCmp.Transform.Rotation;
-                if (!newRotation.Equals(savedRotation, 1e-6f) && self.ClientData != null)
+                var transformCmp = self.Parent.GetComponent<TransformComponent>();
+                float3 saveViewRelativeLocation = transformCmp.ViewRelativeTransform.Location;
+                quaternion savedViewRelativeRotation = transformCmp.ViewRelativeTransform.Rotation;
+                quaternion savedRotation = transformCmp.Transform.Rotation;
+                bool preventViewMove = !self.IsNetworkSmoothingComplete;
+                using (var _ = ScopedPreventViewMove.Create(preventViewMove ? transformCmp : null))
                 {
-                    // Smoothing should lerp toward this new rotation target, otherwise it will just try to go back toward the old rotation.
-                    self.ClientData.MeshRotationTarget = newRotation;
-                    transformCmp.SynViewRelativeTranslationAndRotation(saveViewRelativeLocation, transformCmp.ViewRelativeTransform.Rotation);
+                    self.SimulateMovement_UE(dt);
+                }
+
+                // With Linear smoothing we need to know if the rotation changes, since the mesh should follow along with that (if it was prevented above).
+                // This should be rare that rotation changes during simulation, but it can happen when ShouldRemainVertical() changes, or standing on a moving base.
+                bool validateRotation = preventViewMove && (self.NetworkSmoothingMode == ENetworkSmoothingMode.Linear);
+                if (validateRotation)
+                {
+                    // Same mesh with different rotation?
+                    quaternion newRotation = transformCmp.Transform.Rotation;
+                    if (!newRotation.Equals(savedRotation, 1e-6f) && self.ClientData != null)
+                    {
+                        // Smoothing should lerp toward this new rotation target, otherwise it will just try to go back toward the old rotation.
+                        self.ClientData.MeshRotationTarget = newRotation;
+                        transformCmp.SynViewRelativeTranslationAndRotation(saveViewRelativeLocation, savedViewRelativeRotation);
+                    }
                 }
             }
+            
             
             if (!self.IsNetworkSmoothingComplete)
             {
@@ -433,11 +449,9 @@ namespace Bliss
         {
             var transformCmp = self.Parent.GetComponent<TransformComponent>();
             var newPosition = transformCmp.Transform.Location + self.CurrentVelocity * dt;
-            
-            //var deltaRotation = quaternion.EulerZXY(self.CurrentAngularVelocity * dt);
-            //var newRotation = math.mul(transformCmp.Transform.Rotation, deltaRotation);
-            var newRotation = transformCmp.Transform.Rotation;
-            
+
+            var deltaRotation = quaternion.EulerZXY(self.CurrentAngularVelocity * dt);
+            var newRotation = math.mul(transformCmp.Transform.Rotation, deltaRotation);
             transformCmp.SetPositionAndRotation(newPosition, newRotation);
         }
         
@@ -452,6 +466,13 @@ namespace Bliss
             var transformCmp = self.Parent.GetComponent<TransformComponent>();
             
             self.IsNetworkSmoothingComplete = false;
+
+            if (self.NetworkSmoothingMode == ENetworkSmoothingMode.Disabled)
+            {
+                transformCmp.SetPositionAndRotation(newPosition, newRotation);
+                self.IsNetworkSmoothingComplete = true;
+                return;
+            }
 
             float3 newToOldVector = (oldPosition - newPosition);
             float dist = math.lengthsq(newToOldVector);
@@ -628,6 +649,7 @@ namespace Bliss
                     // Slowly decay rotation offset
                     float lerpPercent = (float)((double)deltaTimeMS / clientData.SmoothNetUpdateRotationTime);
                     clientData.MeshRotationOffset = math.nlerp(clientData.MeshRotationOffset, meshRotationTarget, lerpPercent);
+                    //clientData.MeshRotationOffset = mathEx.FastLerp(clientData.MeshRotationOffset, meshRotationTarget, lerpPercent);
                 }
                 else
                 {

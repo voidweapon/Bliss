@@ -7,7 +7,7 @@ using Bliss.Core.Network;
 
 namespace Bliss
 {
-    public class NetworkComponent : Entity, IAwake<NetworkClientParam>, IAwake<NetworkServerParam>, IUpdate, IDestroy
+    public class NetworkComponent : Entity, IAwake<NetworkClientParam>, IAwake<NetworkServerParam>, IEarlyUpdate, IDestroy
     {
         public ANetDriver NetDriver;
         public Thread NetThread;
