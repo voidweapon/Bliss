@@ -5,7 +5,6 @@ using Bliss.Id;
 using Bliss.Timer;
 using Bliss.ViewLogic.Debugger;
 using Bliss.ViewModel;
-//using Bliss.ViewModel.Debuger;
 using Bliss.ViewModel.Debugger;
 using ET;
 using Unity.Mathematics;
@@ -22,12 +21,7 @@ namespace Bliss.ViewLogic
             mainScene.AddComponent<TransformStatDebugComponent>();
             World.Instance.AddSingleton<GameDebugStates>();
             World.Instance.AddSingleton<GameDebugStatesView>();
-
-            //Testaa.TestData = 22;
-            //Testaa.TestData2 = 2332;
-            //GameDebugStates.Instance.AddStaticDebugStat<int>("TestG", typeof(Testaa), nameof(Testaa.TestData), new float4(0,0,0,1), true);
-            //GameDebugStates.Instance.AddStaticDebugStat<int>("TestG", typeof(Testaa), nameof(Testaa.TestData2), new float4(0,0,0,1), true);
-
+            
             var clientScene = LogicSceneFactory.CreateLogicScene(mainScene, 0, IdGenerator.Instance.GenerateInstanceId(), ELogicSceneType.Client, "LocalClient");
             World.Instance.AddSingleton<Console, LogicScene>(clientScene);
             clientScene.AddComponent<ResourcesLoaderComponent>();
@@ -64,7 +58,7 @@ namespace Bliss.ViewLogic
 
             var networkSimulateSetting = new NetworkSimulationSettings()
             {
-                Latency = 25,
+                Latency = 1000,
                 LatencyVariance = 2,
                 // LatencyMin = 100,
                 // Jitter = 25,
@@ -98,12 +92,7 @@ namespace Bliss.ViewLogic
             
             mainScene.GetComponent<TransformStatDebugComponent>().RegisterWatchTransform(0, clientActor0.GetComponent<GameObjectViewComponent>().View.transform);
             mainScene.GetComponent<TransformStatDebugComponent>().RegisterWatchTransform(2, serverActor0.GetComponent<GameObjectViewComponent>().View.transform);
+            mainScene.GetComponent<TransformStatDebugComponent>().RegisterWatchCmp(0, serverActor0.GetComponent<PeriodicMotionComponent>(), clientActor0.GetComponent<PeriodicMotionComponent>());
         }
     }
-    
-    // public static class Testaa
-    // {
-    //     public static int TestData;
-    //     public static int TestData2;
-    // }
 }

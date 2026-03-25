@@ -58,6 +58,35 @@ namespace Bliss
                 });
             }
         }
+        
+        public static void SetRotation(this TransformComponent self, quaternion rotation, bool additionalSyncViewPosition)
+        {
+            if (self.Transform.Rotation.Equals(rotation))
+            {
+                return;
+            }
+            
+            self.Transform.SetRotation(rotation);
+            
+            EventSystem.Instance.Push(self.Scene<LogicScene>(), new Event_TransformChange()
+            {
+                Entity = self.Parent,
+                Flags = ETransformChangeFlag.Rotation,
+                Rotation = rotation,
+            });
+            
+            if (self.ViewSyncBarrier.Count == 0)
+            {
+                var flag = additionalSyncViewPosition ? (ETransformChangeFlag.Position | ETransformChangeFlag.Rotation ) : ETransformChangeFlag.Rotation;
+                EventSystem.Instance.Push(self.Scene<LogicScene>(), new Event_SyncViewTransform()
+                {
+                    Entity = self.Parent,
+                    Flags = flag,
+                    Position = self.Transform.TransformPosition(self.ViewRelativeTransform.Location),
+                    Rotation = self.Transform.TransformRotation(self.ViewRelativeTransform.Rotation),
+                });
+            }
+        }
 
         public static void SetPositionAndRotation(this TransformComponent self, float3 position, quaternion rotation)
         {

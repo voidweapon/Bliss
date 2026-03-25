@@ -13,6 +13,15 @@ namespace Bliss
 
         public transform ViewRelativeTransform = new transform(float3.zero);
     }
+
+    public static class EntityTransformExtension
+    {
+        public static transform GetTransform(this Entity entity)
+        {
+            return entity.GetComponent<TransformComponent>()?.Transform ?? new transform(float3.zero);
+        }
+    }
+        
     
     [Flags]
     public enum ETransformChangeFlag : byte

@@ -39,9 +39,9 @@ namespace Bliss
         
         internal void EarlyUpdate()
         {
-            UpdateTiming(EarlyUUpdateAction);
+            UpdateTiming(EarlyUpdateAction);
 
-            void EarlyUUpdateAction(Root root)
+            void EarlyUpdateAction(Root root)
             {
                 root.EarlyUpdate();
             }

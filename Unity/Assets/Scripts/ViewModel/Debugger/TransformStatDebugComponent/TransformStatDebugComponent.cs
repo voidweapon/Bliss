@@ -8,11 +8,14 @@ namespace Bliss.ViewModel.Debugger
         public GameObject UI;
         public Varaince_DataUIGraphic TransformGraphic;
         public Varaince_DataUIGraphic RotationGraphic;
+        public Varaince_DataUIGraphic TimeLineGraphic;
 
         public long Time;
         
         public Dictionary<int, Transform> WatchTransforms = new Dictionary<int, Transform>();
         public Dictionary<int, TransformTraceData> TransformsTrace = new Dictionary<int, TransformTraceData>();
+        
+        public Dictionary<int, (PeriodicMotionComponent, PeriodicMotionComponent)> WatchCmp = new ();
         
         public class TransformTraceData
         {

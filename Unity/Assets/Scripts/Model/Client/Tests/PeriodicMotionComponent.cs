@@ -44,6 +44,7 @@ namespace Bliss
         public long ServerTimeStampSyncTimer = 0;
         public float NetworkMaxSmoothUpdateDistance = 2.56f;
         public float NetworkNoSmoothUpdateDistance = 3.84f;
+        public bool EnablePredication;
         
         public struct InitParam
         {
@@ -81,6 +82,7 @@ namespace Bliss
             public float3 EndAngularVelocity;
             public int EndMoveMode;
         }
+
     }
     
     public class NetworkPredictionData_Client

@@ -29,6 +29,13 @@ namespace Bliss.ViewLogic.Debugger
             self.TransformsTrace[categoryIndex] = new TransformStatDebugComponent.TransformTraceData();
             self.TransformsTrace[categoryIndex].Init(transform);
         }
+
+        public static void RegisterWatchCmp(this TransformStatDebugComponent self,
+            int categoryIndex, PeriodicMotionComponent cmpLhs, PeriodicMotionComponent cmpRhs)
+        {
+            self.WatchCmp[categoryIndex] = (cmpLhs, cmpRhs);
+        }
+        
         
         public static void Update(this TransformStatDebugComponent self)
         {
@@ -47,6 +54,14 @@ namespace Bliss.ViewLogic.Debugger
                 self.TransformsTrace[categoryIndex].Update(pair.Value, dt);
                 self.TransformGraphic.SetValue(categoryIndex, self.TransformsTrace[categoryIndex].Velocity.magnitude);
                 self.RotationGraphic.SetValue(categoryIndex, self.TransformsTrace[categoryIndex].AngularVelocity);
+            }
+
+            foreach (var pair in self.WatchCmp)
+            {
+                int categoryIndex = pair.Key;
+                var cmp = pair.Value;
+                var diff = cmp.Item1.ServerLastTransformUpdateTimeStamp - cmp.Item2.ServerLastTransformUpdateTimeStamp;
+                self.TimeLineGraphic.SetValue(categoryIndex, diff);
             }
         }
 
@@ -75,6 +90,7 @@ namespace Bliss.ViewLogic.Debugger
             self.UI = GameObject.Instantiate(prefab, viewGlobal.UGUI_Canvas_Debug);
             self.TransformGraphic = self.UI.transform.Find("TransformChart").GetComponent<Varaince_DataUIGraphic>();
             self.RotationGraphic = self.UI.transform.Find("RotationChart").GetComponent<Varaince_DataUIGraphic>();
+            self.TimeLineGraphic = self.UI.transform.Find("TimeLineChart").GetComponent<Varaince_DataUIGraphic>();
             self.UI.gameObject.SetActive(false); 
         }
     }

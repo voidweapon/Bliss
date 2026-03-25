@@ -61,6 +61,7 @@ namespace Bliss
             self.CurrentAngularVelocity = param.AngularVelocity;
             self.EnterMode2Time = self.InitState.ChangeRotationInterval;
             self.RotateRandom = new Unity.Mathematics.Random((uint)self.InstanceId);
+            self.EnablePredication = true;
             
             self.TransformSyncTestMode = 2;
 
@@ -75,6 +76,11 @@ namespace Bliss
                 GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client, float3>("TsmSync", self.ClientData, nameof(NetworkPredictionData_Client.MeshTranslationOffset), new float4(0,0,0,1));
                 GameDebugStates.Instance.AddDebugStat<PeriodicMotionComponent, float3>("TsmSync", self, nameof(PeriodicMotionComponent.CurrentAngularVelocity), new float4(0,0,0,1));
                 GameDebugStates.Instance.AddDebugStat<PeriodicMotionComponent, bool>("TsmSync", self, nameof(PeriodicMotionComponent.IsNetworkSmoothingComplete), new float4(0,0,0,1), true);
+                GameDebugStates.Instance.AddDebugStat<PeriodicMotionComponent, long>("TsmSync", self, nameof(PeriodicMotionComponent.ReplicatedServerLastTransformUpdateTimeStamp), new float4(0,0,0,1));
+            }
+            if (self.NetRole == ENetRole.SimulatedProxy)
+            {
+                GameDebugStates.Instance.AddDebugStat<PeriodicMotionComponent, long>("TsmSync", self, nameof(PeriodicMotionComponent.ServerLastTransformUpdateTimeStamp), new float4(0,0,0,1));
             }
         }
         public static void Destroy(this PeriodicMotionComponent self)
@@ -346,7 +352,6 @@ namespace Bliss
 
         #endregion
 
-
         #region 关键状态变更精确识别 + UE Smooth 方案 （不预测服务器时间）
 
         private static void OnEndSimulate_UE(this PeriodicMotionComponent self, long now)
@@ -410,7 +415,7 @@ namespace Bliss
             float dt = dtMS / 1000f;
             
             //TODO:  ENetworkSmoothingMode.Linear 模式下预测旋转有问题
-            if (self.NetworkSmoothingMode != ENetworkSmoothingMode.Disabled)
+            if (self.NetworkSmoothingMode != ENetworkSmoothingMode.Disabled && self.EnablePredication)
             {
                 var transformCmp = self.Parent.GetComponent<TransformComponent>();
                 float3 saveViewRelativeLocation = transformCmp.ViewRelativeTransform.Location;
@@ -450,8 +455,16 @@ namespace Bliss
             var transformCmp = self.Parent.GetComponent<TransformComponent>();
             var newPosition = transformCmp.Transform.Location + self.CurrentVelocity * dt;
 
+            var oldRotation = transformCmp.Transform.Rotation;
+            if (self.NetworkSmoothingMode == ENetworkSmoothingMode.Linear)
+            {
+                //我不认为在UpdateComponent的Rotation上直接插值的Linear模式，直接用UpdateComponent的Rotation这个插值中间值是对的，
+                //预测的目的是赶上对端，那么Linear模式下，要么用在MeshRotationTarget的基础上更新Rotation然后更新MeshRotationTarget
+                oldRotation = self.ClientData.MeshRotationTarget;
+            }
+            
             var deltaRotation = quaternion.EulerZXY(self.CurrentAngularVelocity * dt);
-            var newRotation = math.mul(transformCmp.Transform.Rotation, deltaRotation);
+            var newRotation = math.mul(oldRotation, deltaRotation);
             transformCmp.SetPositionAndRotation(newPosition, newRotation);
         }
         
@@ -502,7 +515,7 @@ namespace Bliss
                 self.ClientData.OriginalMeshRotationOffset = oldRotation;
                 self.ClientData.MeshRotationOffset = oldRotation;
                 self.ClientData.MeshRotationTarget = newRotation;
-
+                
                 if (!oldPosition.Equals(newPosition))
                 {
                     using var _ = ScopedPreventViewMove.Create(transformCmp);
@@ -683,8 +696,15 @@ namespace Bliss
                 float3 newRealLocation = clientData.MeshRotationOffset.UnrotateVector(clientData.MeshTranslationOffset);
                 if (!transformCmp.Transform.Rotation.Equals(clientData.MeshRotationOffset, float.Epsilon))
                 {
-                    transformCmp.SynViewRelativeTranslation(newRealLocation);
-                    transformCmp.SetRotation(clientData.MeshRotationOffset);
+                    quaternion oldRotation = transformCmp.Transform.Rotation;
+                    transformCmp.ViewRelativeTransform.Location = newRealLocation;
+                    transformCmp.SetRotation(clientData.MeshRotationOffset, true);
+
+                    if (transformCmp.Transform.Rotation.Equals(oldRotation))
+                    {
+                        transformCmp.ViewRelativeTransform.Location = newRealLocation;
+                        transformCmp.SynViewRelativeTranslation(newRealLocation);
+                    }
                 }
                 else
                 {

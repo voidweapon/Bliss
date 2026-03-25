@@ -64,12 +64,12 @@ namespace Bliss
 
         public void EarlyUpdate()
         {
+            TimeInfo.Instance.Update();
             RootManager.Instance.EarlyUpdate();
         }
 
         public void Update()
         {
-            TimeInfo.Instance.Update();
             RootManager.Instance.Update();
         }
 

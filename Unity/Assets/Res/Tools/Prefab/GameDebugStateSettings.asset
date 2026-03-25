@@ -24,8 +24,8 @@ MonoBehaviour:
   - GroupName: TsmSync
     GroupRect:
       serializedVersion: 2
-      x: 703
-      y: 336
-      width: 400
-      height: 300
+      x: 525.0284
+      y: 57.600002
+      width: 666
+      height: 400
     IsFold: 0

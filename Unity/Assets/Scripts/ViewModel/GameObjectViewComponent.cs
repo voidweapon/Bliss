@@ -14,9 +14,10 @@ namespace Bliss.ViewModel
         /// </summary>
         public GameObject View;
         public bool IsViewFromPool;
-        
+#if UNITY_EDITOR
         public Camera[] DrawTargets;
         public Camera[] DrawTargets2;
+#endif
     }
 
     public struct GameObjectViewComponentInitParam
