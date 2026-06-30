@@ -3,12 +3,13 @@ using Bliss.Core.EventSystem;
 
 namespace Bliss
 {
-    [Invoke((long)ELogicSceneType.Main)]
-    public class InvokeHandler_OnReceiveMessage : AInvokeHandlerHandler<Invoke_OnReceiveMessage>
+    [Invoke((long)ELogicSceneType.Client)]
+    public class InvokeHandler_OnReceiveMessage : AInvokeHandler<Invoke_OnReceiveMessage>
     {
         public override void Handle(Invoke_OnReceiveMessage args)
         {
             Session session = args.Session;
+            
             object message = args.Message;
             switch (message)
             {
@@ -24,7 +25,15 @@ namespace Bliss
                 }
                 case IActorMessage actorMessage:
                 {
-                    session.Scene<LogicScene>().GetComponent<LevelNetworkObjectCollectionComponent>().DispatchMessage(actorMessage);
+                    //session.Scene<LogicScene>().GetComponent<LevelNetworkObjectCollectionComponent>().DispatchMessage(actorMessage);
+                    
+                    var rootScene = session.RootScene();
+                    break;
+                }
+                case IMessage messageObj:
+                {
+                    var scene = session.Scene<LogicScene>();
+                    MessageDispatcher.Instance.HandleMessageAsync(scene, scene.Root.RootAddress, (MessageObject)messageObj).Coroutine();
                     break;
                 }
                 default:

@@ -9,4 +9,6 @@ public class DefEntitySystem
     public List<string> generic_types { get; set; }
     
     public string return_type { get; set; }
+    
+    public int system_priority { get; set; }
 }

@@ -27,6 +27,15 @@ namespace Bliss.Debugger.GameDebugStats
             _debugStatGroups.Clear();
         }
 
+        /// <summary>
+        /// 手动设置属性
+        /// </summary>
+        /// <param name="groupName"></param>
+        /// <param name="propertyName"></param>
+        /// <param name="value"></param>
+        /// <param name="color"></param>
+        /// <param name="highlightWhenChange"></param>
+        /// <typeparam name="TValue"></typeparam>
         public void SetDebugStat<TValue>(string groupName, 
             string propertyName,
             TValue value,
@@ -42,6 +51,16 @@ namespace Bliss.Debugger.GameDebugStats
             group.SetDebugStat(propertyName, value, color, highlightWhenChange);
         }
         
+        /// <summary>
+        /// 自动追踪对象的属性
+        /// </summary>
+        /// <param name="groupName"></param>
+        /// <param name="obj"></param>
+        /// <param name="propertyName"></param>
+        /// <param name="color"></param>
+        /// <param name="highlightWhenChange"></param>
+        /// <typeparam name="TObj"></typeparam>
+        /// <typeparam name="TValue"></typeparam>
         public void AddDebugStat<TObj, TValue>(string groupName, 
             TObj obj, string propertyName, 
             float4 color,
@@ -56,6 +75,15 @@ namespace Bliss.Debugger.GameDebugStats
             group.AddWeakDebugStat<TObj, TValue>(obj, propertyName,  color, highlightWhenChange);
         }
         
+        /// <summary>
+        /// 自动追踪Static对象的属性
+        /// </summary>
+        /// <param name="groupName"></param>
+        /// <param name="staticType"></param>
+        /// <param name="propertyName"></param>
+        /// <param name="color"></param>
+        /// <param name="highlightWhenChange"></param>
+        /// <typeparam name="TValue"></typeparam>
         public void AddStaticDebugStat<TValue>(string groupName, Type staticType, string propertyName,
             float4 color,
             bool highlightWhenChange = false)
@@ -69,6 +97,13 @@ namespace Bliss.Debugger.GameDebugStats
             group.AddStaticDebugStat<TValue>(staticType, propertyName,  color, highlightWhenChange);
         }
 
+        /// <summary>
+        /// 移除自动追踪对象的属性
+        /// </summary>
+        /// <param name="groupName"></param>
+        /// <param name="obj"></param>
+        /// <param name="propertyName"></param>
+        /// <typeparam name="TObj"></typeparam>
         public void RemoveDebugStat<TObj>(string groupName,
             TObj obj, string propertyName)
         {
@@ -78,6 +113,13 @@ namespace Bliss.Debugger.GameDebugStats
             }
         }
         
+        
+        /// <summary>
+        /// 移除Static对象的属性的追踪
+        /// </summary>
+        /// <param name="groupName"></param>
+        /// <param name="staticType"></param>
+        /// <param name="propertyName"></param>
         public void RemoveStaticDebugStat(string groupName, Type staticType, string propertyName)
         {
             if (_debugStatGroups.TryGetValue(groupName, out var group))

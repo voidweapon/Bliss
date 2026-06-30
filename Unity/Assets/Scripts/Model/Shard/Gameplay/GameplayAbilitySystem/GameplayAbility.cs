@@ -5,7 +5,6 @@ using Bliss.Base.Collections;
 using Bliss.Base.Event;
 using Bliss.Gameplay.GameplayTags;
 using Bliss.Gameplay.GameplayTasks;
-using Mono.CSharp;
 
 namespace Bliss.Gameplay.GameplayAbilitySystem
 {
@@ -471,7 +470,6 @@ namespace Bliss.Gameplay.GameplayAbilitySystem
         public bool IsPredictingClient()
         {
             throw new NotImplementedException();
-            return false;
         }
 
         /// <summary>
@@ -1689,7 +1687,7 @@ namespace Bliss.Gameplay.GameplayAbilitySystem
         /// </summary>
         protected void ConfirmTaskByInstanceName(string instanceName, bool bEndTask)
         {
-            using ListComponent<GameplayTask> namedTasks =  new ListComponent<GameplayTask>();
+            using ListComponent<GameplayTask> namedTasks = ListComponent<GameplayTask>.Create();
             foreach (var task in ActiveTasks)
             {
                 if (task != null && task.GetInstanceName() == instanceName)
@@ -1710,7 +1708,7 @@ namespace Bliss.Gameplay.GameplayAbilitySystem
 
         protected void EndOrCancelTasksByInstanceName()
         {
-            using ListComponent<GameplayTask> namedTasks =  new ListComponent<GameplayTask>();
+            using ListComponent<GameplayTask> namedTasks = ListComponent<GameplayTask>.Create();
             
             // Call Endtask on everything in EndTaskInstanceNames list
             for (int i = 0; i < EndTaskInstanceNames.Count; i++)

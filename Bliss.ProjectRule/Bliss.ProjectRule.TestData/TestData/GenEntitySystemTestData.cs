@@ -46,6 +46,11 @@ public interface IAwakeSystem<T>
 
 public abstract class AwakeSystem<TEntity, T> : IAwakeSystem<T> where TEntity : Mode.Entity, IAwake<T>
 {
+    public virtual int GetPriority()
+    {
+        return 0;
+    }
+    
     public void Run(Mode.Entity entity, T param)
     {
         Awake((TEntity)entity, param);
@@ -55,10 +60,11 @@ public abstract class AwakeSystem<TEntity, T> : IAwakeSystem<T> where TEntity : 
 }
 
 
+
 [EntitySystemOf(typeof(Mode.Entity))]
 public static partial class GenEntitySystemTestData2
 {
-    public static void Awake(this Entity self, int param1)
+    private static void Awake(this Entity self, int param1)
     {
 
     }

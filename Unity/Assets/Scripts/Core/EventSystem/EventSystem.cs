@@ -8,8 +8,6 @@ using ET;
 
 namespace Bliss
 {
-
-
     public partial class EventSystem : Singleton<EventSystem>
     {
         /// <summary>
@@ -123,7 +121,7 @@ namespace Bliss
                 throw new Exception($"Not Found Invoke Handler ArgumentType={typeof(TArg).FullName} invokeType={invokeType}");
             }
 
-            if (invokeHandler is not AInvokeHandlerHandler<TArg> handler)
+            if (invokeHandler is not AInvokeHandler<TArg> handler)
             {
                 throw new Exception($"invokeHandler is  not AInvokeHandler: {invokeHandler.GetType()} {typeof(TArg).FullName}");
             }
@@ -135,10 +133,10 @@ namespace Bliss
         {
             if (!TryGetInvoke(typeof(TArg), invokeType, out var invokeHandler))
             {
-                throw new Exception($"Not Found Invoke Handler ArgumentType={typeof(TArg).FullName} invokeType={invokeType}");
+                throw new Exception($"Not Found Invoke Handler invokeType={invokeType}  ArgumentType={typeof(TArg).FullName} Assembly.Location={typeof(TArg).Assembly.Location} HashCode={typeof(TArg).GetHashCode()} ");
             }
 
-            if (invokeHandler is not AInvokeHandlerHandler<TArg, TResult> handler)
+            if (invokeHandler is not AInvokeHandler<TArg, TResult> handler)
             {
                 throw new Exception($"invokeHandler is  not AInvokeHandler: {invokeHandler.GetType()} {typeof(TArg).FullName}");
             }

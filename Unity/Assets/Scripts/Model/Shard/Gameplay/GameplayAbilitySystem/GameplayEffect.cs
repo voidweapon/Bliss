@@ -464,7 +464,7 @@ namespace Bliss.Gameplay.GameplayAbilitySystem
 		    // Force a lock because the removals could cause other removals earlier in the array, so iterating backwards is not safe all by itself
 		    using var _ = new ScopedActiveGameplayEffectLock(this);
 
-		    int NumRemoved = 0;
+		    //int NumRemoved = 0;
 		    
 		    // Manually iterating through in reverse because this is a removal operation
 		    throw new NotImplementedException();

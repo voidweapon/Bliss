@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Bliss;
+using Bliss.Base.Event;
 using ET;
 using UnityEngine;
 using YooAsset;
@@ -33,22 +34,27 @@ namespace Bliss
         }
     }
 
-    public sealed class SimpleResourcesComponent : Singleton<SimpleResourcesComponent>, ISingletonInit<EPlayMode>
+    public sealed class SimpleResourcesComponent : Singleton<SimpleResourcesComponent>, ISingletonInit
     {
-        private EPlayMode _playMode;
+        public AutoEventAction<WeakReference<DownloaderOperation>> OnDownloadEvent = new AutoEventAction<WeakReference<DownloaderOperation>>();
+        public AutoEventAction<WeakReference<ClearCacheFilesOperation>> OnClearCacheFileEvent = new AutoEventAction<WeakReference<ClearCacheFilesOperation>>();
+        public AutoEventAction<WeakReference<AsyncOperationBase>> OnErrorEvent = new AutoEventAction<WeakReference<AsyncOperationBase>>();
+        
 
-        public void Init(EPlayMode playMode)
+        public void Init()
         {
             YooAssets.Initialize();
-            _playMode = playMode;
         }
 
         protected override void Destroy()
         {
             YooAssets.Destroy();
+            OnDownloadEvent.Dispose();
+            OnClearCacheFileEvent.Dispose();
+            OnErrorEvent.Dispose();
         }
-
-        public async ETTask CreatePackageAsync(string packageName, bool isDefault = false)
+        
+        public async ETTask<bool> CreatePackageAsync(EPlayMode playMode, string packageName, bool isDefault = false, bool haveBuildInFiles = true)
         {
             ResourcePackage package = YooAssets.CreatePackage(packageName);
             if (isDefault)
@@ -57,11 +63,11 @@ namespace Bliss
             }
 
             InitializationOperation initOperation = null;
-            switch (_playMode)
+            switch (playMode)
             {
                 case EPlayMode.EditorSimulateMode:
                 {
-                    var buildResult = EditorSimulateModeHelper.SimulateBuild("DefaultPackage");
+                    var buildResult = EditorSimulateModeHelper.SimulateBuild(packageName);
                     var packageRoot = buildResult.PackageRootDirectory;
                     var fileSystemParams = FileSystemParameters.CreateDefaultEditorFileSystemParameters(packageRoot);
 
@@ -84,12 +90,17 @@ namespace Bliss
                 }
                 case EPlayMode.HostPlayMode:
                 {
-                    string defaultHostServer = "http://127.0.0.1/CDN/Android/v1.0";
-                    string fallbackHostServer = "http://127.0.0.1/CDN/Android/v1.0";
+                    string defaultHostServer = GetHostServerURL(GlobalDefine.BootSetting.ResDefaultHostServer, GlobalDefine.BootSetting.AppVersion,  packageName);
+                    string fallbackHostServer = GetHostServerURL(GlobalDefine.BootSetting.ResFallbackHostServer, GlobalDefine.BootSetting.AppVersion, packageName);
+                     Log.Info($"[ResourcesComponent][{packageName}] RemoteService defaults={defaultHostServer}, Fallback={fallbackHostServer}");
                     IRemoteServices remoteServices = new RemoteServices(defaultHostServer, fallbackHostServer);
-                    var cacheFileSystemParams =
-                        FileSystemParameters.CreateDefaultCacheFileSystemParameters(remoteServices);
-                    var buildinFileSystemParams = FileSystemParameters.CreateDefaultBuildinFileSystemParameters();
+                    var cacheFileSystemParams = FileSystemParameters.CreateDefaultCacheFileSystemParameters(remoteServices);
+
+                    FileSystemParameters buildinFileSystemParams = null;
+                    if (haveBuildInFiles)
+                    { 
+                        buildinFileSystemParams = FileSystemParameters.CreateDefaultBuildinFileSystemParameters();
+                    }
 
                     var createParameters = new HostPlayModeParameters();
                     createParameters.BuildinFileSystemParameters = buildinFileSystemParams;
@@ -101,8 +112,8 @@ namespace Bliss
                 }
                 case EPlayMode.WebPlayMode:
                 {
-                    string defaultHostServer = "http://127.0.0.1/CDN/Android/v1.0";
-                    string fallbackHostServer = "http://127.0.0.1/CDN/Android/v1.0";
+                    string defaultHostServer = GetHostServerURL(GlobalDefine.BootSetting.ResDefaultHostServer, GlobalDefine.BootSetting.AppVersion, packageName);
+                    string fallbackHostServer = GetHostServerURL(GlobalDefine.BootSetting.ResFallbackHostServer,  GlobalDefine.BootSetting.AppVersion,  packageName);
                     IRemoteServices remoteServices = new RemoteServices(defaultHostServer, fallbackHostServer);
                     var webServerFileSystemParams = FileSystemParameters.CreateDefaultWebServerFileSystemParameters();
                     var webRemoteFileSystemParams =
@@ -127,6 +138,8 @@ namespace Bliss
             else
             {
                 Debug.LogError($"资源包初始化失败：{initOperation.Error}");
+                OnErrorEvent.Invoke(new WeakReference<AsyncOperationBase>(initOperation));
+                return false;
             }
 
             var requestOperation =  package.RequestPackageVersionAsync();
@@ -138,6 +151,8 @@ namespace Bliss
             else
             {
                 Debug.LogError($"Request package version fail : {requestOperation.Error}");
+                OnErrorEvent.Invoke(new WeakReference<AsyncOperationBase>(requestOperation));
+                return false;
             }
 
             var updatePackageManifestOperation = package.UpdatePackageManifestAsync(requestOperation.PackageVersion);
@@ -148,14 +163,16 @@ namespace Bliss
             }
             else
             {
-                Debug.LogError($"update package manifest fail : {requestOperation.Error}");
+                Debug.LogError($"update package manifest fail : {updatePackageManifestOperation.Error}");
+                OnErrorEvent.Invoke(new WeakReference<AsyncOperationBase>(updatePackageManifestOperation));
+                return false;
             }
 
             var downloader = package.CreateResourceDownloader(10, 3);
             if (downloader.TotalDownloadCount == 0)
             {
                 //不需要更新
-                return;
+                return true;
             }
 
             // 发现新更新文件后走更新流程
@@ -165,15 +182,22 @@ namespace Bliss
             if (downloader.Status != EOperationStatus.Succeed)
             {
                 Debug.LogError($"update package  fail : {downloader.Error}");
+                OnErrorEvent.Invoke(new WeakReference<AsyncOperationBase>(downloader)); 
+                return false;
             }
 
             //清理未使用的Bundle
             var clearOp = package.ClearCacheFilesAsync(EFileClearMode.ClearUnusedBundleFiles);
             await clearOp.Task;
+            if (clearOp.Status != EOperationStatus.Succeed)
+            {
+                Debug.LogError($"clear operation fail : {clearOp.Error}");
+                OnErrorEvent.Invoke(new WeakReference<AsyncOperationBase>(clearOp));
+                return false;
+            }
+            return true;
         }
         
-        
-
         public void DestroyPackage(string packageName)
         {
             ResourcePackage package = YooAssets.GetPackage(packageName);
@@ -189,6 +213,14 @@ namespace Bliss
             return t;
         }
         
+        public T LoadAsset<T>(string packageName, string location) where T : UnityEngine.Object
+        {
+            var package = YooAssets.GetPackage(packageName);
+            AssetHandle handle = package.LoadAssetSync<T>(location);
+            T t = (T)handle.AssetObject;
+            handle.Release();
+            return t;
+        }
 
         /// <summary>
         /// 加载制定路径的资源
@@ -224,42 +256,47 @@ namespace Bliss
             return dictionary;
         }
 
-        static string GetHostServerURL()
+        static string GetHostServerURL(string hostServer, string appVersion, string packageName)
         {
             //string hostServerIP = "http://10.0.2.2"; //安卓模拟器地址
-            string hostServerIP = "http://127.0.0.1";
-            string appVersion = "v1.0";
-
+            
 #if UNITY_EDITOR
             if (UnityEditor.EditorUserBuildSettings.activeBuildTarget == UnityEditor.BuildTarget.Android)
             {
-                return $"{hostServerIP}/CDN/Android/{appVersion}";
+                return $"{hostServer}/CDN/Android/{appVersion}/{packageName}";
             }
             else if (UnityEditor.EditorUserBuildSettings.activeBuildTarget == UnityEditor.BuildTarget.iOS)
             {
-                return $"{hostServerIP}/CDN/IPhone/{appVersion}";
+                return $"{hostServer}/CDN/IPhone/{appVersion}/{packageName}";
             }
             else if (UnityEditor.EditorUserBuildSettings.activeBuildTarget == UnityEditor.BuildTarget.WebGL)
             {
-                return $"{hostServerIP}/CDN/WebGL/{appVersion}";
+                return $"{hostServer}/CDN/WebGL/{appVersion}/{packageName}";
             }
-
-            return $"{hostServerIP}/CDN/PC/{appVersion}";
+            else if (UnityEditor.EditorUserBuildSettings.activeBuildTarget == UnityEditor.BuildTarget.StandaloneOSX)
+            {
+                return $"{hostServer}/CDN/StandaloneOSX/{appVersion}/{packageName}";
+            }
+            return $"{hostServer}/CDN/PC/{appVersion}/{packageName}";
 #else
             if (Application.platform == RuntimePlatform.Android)
             {
-                return $"{hostServerIP}/CDN/Android/{appVersion}";
+                return $"{hostServer}/CDN/Android/{appVersion}/{packageName}";
             }
             else if (Application.platform == RuntimePlatform.IPhonePlayer)
             {
-                return $"{hostServerIP}/CDN/IPhone/{appVersion}";
+                return $"{hostServer}/CDN/IPhone/{appVersion}/{packageName}";
             }
             else if (Application.platform == RuntimePlatform.WebGLPlayer)
             {
-                return $"{hostServerIP}/CDN/WebGL/{appVersion}";
+                return $"{hostServer}/CDN/WebGL/{appVersion}/{packageName}";
+            }
+            else if (Application.platform == RuntimePlatform.OSXPlayer)
+            {
+                return $"{hostServer}/CDN/StandaloneOSX/{appVersion}/{packageName}";
             }
 
-            return $"{hostServerIP}/CDN/PC/{appVersion}";
+            return $"{hostServer}/CDN/PC/{appVersion}/{packageName}";
 #endif
         }
     }

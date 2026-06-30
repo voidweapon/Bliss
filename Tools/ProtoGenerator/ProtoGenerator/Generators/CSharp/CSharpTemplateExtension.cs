@@ -52,6 +52,20 @@ public class CSharpTemplateExtension : ScriptObject
         return sb.ToString();
     }
     
+    public static string define_property(ProtoPropertyInfo propertyInfo)
+    {
+        switch (propertyInfo.CollectionMode)
+        {
+            case ESupportedCollection.None:
+            case ESupportedCollection.Array:
+                return $"public {propertyInfo.property_type} {propertyInfo.name} {{ get; set; }}";
+            case ESupportedCollection.List:
+            case ESupportedCollection.Dictionary:
+                return $"public {propertyInfo.property_type} {propertyInfo.name} {{ get; set; }} = new {propertyInfo.property_type}();";
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
+    }
     
     public static string clear_property(string propertyType, string propertyName)
     {
@@ -61,7 +75,7 @@ public class CSharpTemplateExtension : ScriptObject
             case EPropertyTypeCategory.Literal:
                 return $"this.{propertyName} = default;";
             case EPropertyTypeCategory.Collection:
-                return $"this.{propertyName}.Clear();";
+                return $"this.{propertyName}?.Clear();";
             default:
                 throw new ArgumentOutOfRangeException();
         }
@@ -89,7 +103,7 @@ public class CSharpTemplateExtension : ScriptObject
                 
                 if (!_propertySizeof.TryGetValue(propertyInfo.property_type, out var sizeofStr))
                 {
-                    sizeofStr = $"sizeof({propertyInfo.property_type})";
+                    sizeofStr = $"System.Runtime.CompilerServices.Unsafe.SizeOf<{propertyInfo.property_type}>()";
                 }
 
                 if (i != 0)

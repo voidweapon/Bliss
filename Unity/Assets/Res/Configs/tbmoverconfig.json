@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "Name": "TestMover1",
+    "Stages": [
+      {
+        "$type": "StraightLineMoverStageCfg",
+        "TargetType": 1,
+        "Duration": 5,
+        "Speed": 10
+      }
+    ]
+  }
+]

@@ -1261,7 +1261,7 @@ namespace Bliss.Gameplay.GameplayAbilitySystem
 
             public override int GetHashCode()
             {
-                return _handle;;
+                return _handle;
             }
         }
 

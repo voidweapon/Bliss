@@ -4,9 +4,9 @@ using Unity.Mathematics;
 
 namespace Bliss
 {
-    public static class ActorCreateHelper
+    public static partial class ActorCreateHelper
     {
-        public static async ETTask<SceneActor> CreateSceneActor(LogicScene scene, int id, ENetRole netRole, ENetRole remoteNetRole, bool isReplicate, string viewAssetPath = null)
+        public static async ETTask<SceneActor> CreateTestActor(LogicScene scene, int id, ENetRole netRole, ENetRole remoteNetRole, bool isReplicate, string viewAssetPath = null)
         {
             var actor = scene.AddChildWithId<SceneActor>(id);
             actor.AddComponent<NetRoleComponent, NetRoleComponentInitParam>(new NetRoleComponentInitParam()
@@ -48,11 +48,5 @@ namespace Bliss
 
             return actor;
         }
-    }
-
-    public struct Event_AfterCreateSceneActor
-    {
-        public SceneActor Actor;
-        public string ViewAssetPath;
     }
 }

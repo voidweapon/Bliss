@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Bliss.Id;
 using Bliss;
+using Bliss.Base.Event;
 using Bliss.Pool;
 
 namespace Bliss
@@ -29,6 +30,7 @@ namespace Bliss
                 kv.Value.Dispose();
             }
             _singletons.Clear();
+            OnGUICallback.Clear();
             
             ObjectPool.Instance.Dispose();
         }
@@ -76,6 +78,14 @@ namespace Bliss
         public void LateUpdate()
         {
             RootManager.Instance.LateUpdate();
+        }
+        
+        
+        public AutoEventAction OnGUICallback = new AutoEventAction();
+
+        public void OnGUI()
+        {
+            OnGUICallback.Invoke();
         }
     }
 }

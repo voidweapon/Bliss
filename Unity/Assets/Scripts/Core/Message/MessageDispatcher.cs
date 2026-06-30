@@ -26,7 +26,7 @@ namespace Bliss
 
             if (messageHandler == null)
             {
-                throw new Exception($"message handler not inherit IMActorHandler abstract class: {messageHandler.GetType().FullName}");
+                throw new Exception($"message handler not inherit IMActorHandler abstract class: {type.FullName}");
             }
             
             object[] attrs = type.GetCustomAttributes(typeof(MessageHandlerAttribute), true);
@@ -41,7 +41,7 @@ namespace Bliss
                 Type handleResponseType = messageHandler.GetResponseType();
                 if (handleResponseType != null)
                 {
-                    Type responseType = MessageOpcodeManager.Instance.GetRequestTypeBy(messageType);
+                    Type responseType = MessageOpcodeManager.Instance.GetResponseTypeBy(messageType);
                     if (handleResponseType != responseType)
                     {
                         throw new Exception($"message handler response type error: {messageType.FullName}");
@@ -53,11 +53,11 @@ namespace Bliss
             }
         }
 
-        public async ETTask HandleMessageAsync(Entity entity, MessageObject message)
+        public async ETTask HandleMessageAsync(Entity entity, RootAddress fromAddress, MessageObject message)
         {
             if (!_messageHandlers.TryGetValue(message.GetType(), out var messageDispatcherInfoList))
             {
-                Log.Error($"ot found message handler: <{entity.GetType().FullName},{message.GetType().FullName}>");
+                Log.Error($"not found message handler: <{entity.GetType().FullName},{message.GetType().FullName}>");
                 return;
             }
 
@@ -69,7 +69,7 @@ namespace Bliss
                     continue;
                 }
 
-                await messageDispatcherInfo.MessageHandler.Handle(entity, message);
+                await messageDispatcherInfo.MessageHandler.Handle(entity, fromAddress, message);
             }
         }
         

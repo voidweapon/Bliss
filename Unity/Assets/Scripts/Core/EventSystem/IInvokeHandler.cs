@@ -7,14 +7,14 @@ namespace Bliss
         Type ArgumentType { get; }
     }
 
-    public abstract class AInvokeHandlerHandler<TArg> : IInvokeHandler where TArg : struct
+    public abstract class AInvokeHandler<TArg> : IInvokeHandler where TArg : struct
     {
         public Type ArgumentType => typeof(TArg);
         
         public abstract void Handle(TArg args);
     }
     
-    public abstract class AInvokeHandlerHandler<TArg, TResult> : IInvokeHandler where TArg : struct
+    public abstract class AInvokeHandler<TArg, TResult> : IInvokeHandler where TArg : struct
     {
         public Type ArgumentType => typeof(TArg);
         

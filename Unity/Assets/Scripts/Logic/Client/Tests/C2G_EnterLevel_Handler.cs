@@ -9,7 +9,7 @@ namespace Bliss
         {
             var playerMgr = session.Scene<LogicScene>().GetComponent<LevelPlayerMgrComponent>();
             var player = playerMgr.AddChild<Player>();
-            player.AddComponent<PlayerNetworkComponent, Session>(session);
+            player.AddComponent<PlayerSessionComponent, Session>(session);
             await ETTask.CompletedTask;
         }
     }

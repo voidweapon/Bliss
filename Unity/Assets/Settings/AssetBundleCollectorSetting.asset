@@ -14,16 +14,52 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ShowPackageView: 1
   ShowEditorAlias: 0
-  UniqueBundleName: 0
+  UniqueBundleName: 1
   Packages:
+  - PackageName: BootPackage
+    PackageDesc: 
+    EnableAddressable: 0
+    SupportExtensionless: 1
+    LocationToLower: 0
+    IncludeAssetGUID: 0
+    AutoCollectShaders: 1
+    IgnoreRuleName: NormalIgnoreRule
+    Groups:
+    - GroupName: BootUI
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Res/BootRes/UI
+        CollectorGUID: dc5830af64a2a4c8e8206872ff6be633
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
   - PackageName: DefaultPackage
     PackageDesc: 
     EnableAddressable: 0
+    SupportExtensionless: 1
     LocationToLower: 0
     IncludeAssetGUID: 0
     AutoCollectShaders: 0
     IgnoreRuleName: NormalIgnoreRule
     Groups:
+    - GroupName: AotCode
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Res/AotCode
+        CollectorGUID: 600895f728b9a470f99a075ebe7f5b56
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
     - GroupName: Code
       GroupDesc: 
       AssetTags: 
@@ -33,7 +69,7 @@ MonoBehaviour:
         CollectorGUID: ac295f58491ec414d89eeaaa4e759e8e
         CollectorType: 0
         AddressRuleName: AddressByFileName
-        PackRuleName: PackSeparately
+        PackRuleName: PackDirectory
         FilterRuleName: CollectAll
         AssetTags: 
         UserData: 
@@ -70,6 +106,32 @@ MonoBehaviour:
       Collectors:
       - CollectPath: Assets/Res/Tools
         CollectorGUID: e7ecb316fc8bc49138bb3826e8a44d13
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: UI
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Res/UI
+        CollectorGUID: 19c2fb3201a1a4d79aac86d07b20f91c
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: Config
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Res/Configs
+        CollectorGUID: 2e2f26f358ab74907802e7bfc76592ef
         CollectorType: 0
         AddressRuleName: AddressByFileName
         PackRuleName: PackDirectory

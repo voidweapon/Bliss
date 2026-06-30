@@ -89,7 +89,7 @@ public class EntitySystemMethodCodeFixProvider : CodeFixProvider
         string paramsDefine = sb.ToString();
 
         string sourceCode = $$"""
-                               public static void {{methodName}}({{paramsDefine}}) 
+                               private static void {{methodName}}({{paramsDefine}}) 
                                {
                                
                                }

@@ -7,6 +7,12 @@ namespace Bliss
     {
         public int Id { get; private set; }
         public int Zone { get; private set; }
+
+        public int Process => Options.Instance.Process;
+        
+        public RootAddress RootAddress => new RootAddress(Process, Id);
+        
+        
         public LogicScene Scene { get; private set; }
         
         public bool IsDisposed { get; private set; }
@@ -36,7 +42,7 @@ namespace Bliss
         {
             Id = id;
             Zone = zone;
-            Scene = new LogicScene(this, id, 1, sceneType, name);
+            Scene = new LogicScene(this, id, ActorAddress.CFirstInstanceId, sceneType, name);
             RootNode = this;
             EntitySystem = new EntitySystem();
         }

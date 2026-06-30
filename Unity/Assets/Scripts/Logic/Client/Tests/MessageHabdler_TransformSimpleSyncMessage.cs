@@ -5,9 +5,9 @@ namespace Bliss
     [MessageHandler(ELogicSceneType.Client)]
     public class MessageHabdler_TransformSimpleSyncMessage : MessageHandler<SceneActor, TransformSimpleSyncMessage>
     {
-        protected override async ETTask Run(SceneActor entity, TransformSimpleSyncMessage message)
+        protected override async ETTask Run(SceneActor clientScene, TransformSimpleSyncMessage message)
         {
-            var motionCmp =  entity.GetComponent<PeriodicMotionComponent>();
+            var motionCmp =  clientScene.GetComponent<PeriodicMotionComponent>();
             if (motionCmp == null)
             {
                 return;

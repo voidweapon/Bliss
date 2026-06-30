@@ -348,7 +348,7 @@ public class ProtoSyntaxParser
                 {
                     ReportLineError(lineContent, lineNumber);
                 }
-                _protoPropertyBuilder.property_type = ConvertType(world);
+                _protoPropertyBuilder.property_type = ConvertType(world, ref collectionMode);
                 propertyMode = EPropertyMode.Name;
             }
             else if (propertyMode <= EPropertyMode.Name)
@@ -403,8 +403,13 @@ public class ProtoSyntaxParser
 
     #endregion
 
-    private static string ConvertType(string type)
+    private static string ConvertType(string type, ref ESupportedCollection collectionType)
     {
+        if (type == "bytes")
+        {
+            collectionType =  ESupportedCollection.Array;
+        }
+        
         return type switch
         {
             "int16" => "short",
@@ -469,6 +474,7 @@ public class ProtoSyntaxParser
 public enum ESupportedCollection
 {
     None,
+    Array,
     List,
     Dictionary,
 }

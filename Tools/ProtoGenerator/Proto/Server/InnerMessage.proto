@@ -1,0 +1,131 @@
+syntax = "proto3";
+
+package Bliss;
+
+message ObjectAddRequest : IRequest response : Bliss.ObjectAddResponse
+{
+  int32 RpcId = 1;
+  int32 Type = 2;
+  int64 Key = 3;
+  ActorAddress ActorId = 4;
+}
+
+message ObjectAddResponse : IResponse
+{
+  int32 RpcId = 1;
+  int32 Error = 2;
+  string Message = 3;
+}
+
+message ObjectRemoveRequest : IRequest response : Bliss.ObjectRemoveResponse
+{
+  int32 RpcId = 1;
+  int32 Type = 2;
+  int64 Key = 3;
+}
+
+message ObjectRemoveResponse : IResponse
+{
+  int32 RpcId = 1;
+  int32 Error = 2;
+  string Message = 3;
+}
+
+message ObjectGetRequest : IRequest response : Bliss.ObjectGetResponse
+{
+  int32 RpcId = 1;
+  int32 Type = 2;
+  int64 Key = 3;
+}
+
+message ObjectGetResponse : IResponse
+{
+  int32 RpcId = 1;
+  int32 Error = 2;
+  string Message = 3;
+  int32 Type = 4;
+  ActorAddress ActorId = 5;
+}
+
+message ObjectLockRequest : IRequest response : Bliss.ObjectLockResponse
+{
+  int32 RpcId = 1;
+  int32 Type = 2;
+  int64 Key = 3;
+  ActorAddress ActorId = 4;
+  int32 Time = 5;
+}
+
+message ObjectLockResponse : IResponse
+{
+  int32 RpcId = 1;
+  int32 Error = 2;
+  string Message = 3;
+}
+
+message ObjectUnLockRequest : IRequest response : Bliss.ObjectUnLockResponse
+{
+  int32 RpcId = 1;
+  int32 Type = 2;
+  int64 Key = 3;
+  ActorAddress OldActorId = 4;
+  ActorAddress NewActorId = 5;
+}
+
+message ObjectUnLockResponse : IResponse
+{
+  int32 RpcId = 1;
+  int32 Error = 2;
+  string Message = 3;
+}
+
+message ObjectQueryRequest : IRequest response : Bliss.ObjectQueryResponse
+{
+  int32 RpcId = 1;
+  int64 Key = 2;
+  int64 InstanceId = 3;
+}
+
+message ObjectQueryResponse : IResponse
+{
+  int32 RpcId = 1;
+  int32 Error = 2;
+  string Message = 3;
+  bytes Entity = 4;
+}
+
+message R2G_LoginTokenRequest : IRequest response : Bliss.G2R_LoginTokenResponse
+{
+  int32 RpcId = 1;
+  string Account = 2;
+  string Password = 3;
+}
+
+message G2R_LoginTokenResponse : IResponse
+{
+  int32 RpcId = 1;
+  int32 Error = 2;
+  string Message = 3;
+  int64 Token = 4;
+}
+
+message G2M_PlayerOfflineMessage : ILocationMessage response : Bliss.ResponseMessage
+{
+  int32 RpcId = 1;
+  int64 PlayerId = 2;
+}
+
+message M2M_UnitTransferRequest : IRequest response : Bliss.M2M_UnitTransferResponse
+{
+  int32 RpcId = 1;
+  bool IsLogin = 2;
+  ActorAddress FromAddress = 3;
+  bytes RawEntity = 4;
+}
+
+message M2M_UnitTransferResponse : IResponse
+{
+  int32 RpcId = 1;
+  int32 Error = 2;
+  string Message = 3;
+}

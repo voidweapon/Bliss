@@ -3,6 +3,8 @@
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
         <RootNamespace>Bliss</RootNamespace>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <Nullable>disable</Nullable>
     </PropertyGroup>
 
     <PropertyGroup>
@@ -21,7 +23,6 @@
         <OutputPath>..\..\Bin\</OutputPath>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <Optimize>true</Optimize>
-        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <NoWarn>0169,0649,3021,8981,CS9193,CS9192</NoWarn>
     </PropertyGroup>
     
@@ -36,6 +37,15 @@
         <ProjectReference Include="..\Core\Core.csproj" />
         <ProjectReference Include="..\ThirdParty\ThirdParty.csproj" />
         <ProjectReference Include="..\..\Bliss.ProjectRule\Bliss.ProjectRule\Bliss.ProjectRule.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="..\..\Unity\Assets\Scripts\Model\Shard\AOI\">
+        <Link>Shard\AOI</Link>
+      </Folder>
+      <Folder Include="Server\Generated\Configs\" />
+      <Folder Include="Server\Generated\Message\" />
+      <Folder Include="Server\Generated\Message\Server\" />
     </ItemGroup>
     
 </Project>

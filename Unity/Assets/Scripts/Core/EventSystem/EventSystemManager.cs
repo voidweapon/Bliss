@@ -6,7 +6,7 @@ using Bliss.Core.EventSystem;
 
 namespace Bliss
 {
-    [SingletonManger]
+    [SingletonManger(int.MinValue)]
     public partial class EventSystem : ISingletonInit
     {
         private MultiMapList<Type, EventInfo> _allStaticEvents = new MultiMapList<Type, EventInfo>();

@@ -36,6 +36,11 @@ namespace Bliss.Core
             }
         }
 
+        /// <summary>
+        /// 根据属性类型获取类型集合
+        /// </summary>
+        /// <param name="attributeType">属性类型</param>
+        /// <returns>具有指定属性的类型集合</returns>
         public HashSet<Type> GetTypes(Type attributeType)
         {
             if (!_typeCategorySet.ContainsKey(attributeType))
@@ -62,11 +67,51 @@ namespace Bliss.Core
         public void CreateAutoSingletonManager()
         {
             var hashSet = GetTypes(typeof (SingletonMangerAttribute));
-            foreach (Type type in hashSet)
+            
+            //排序SingletonManger
+            using var managerTypes = ListComponent<Type>.Create();
+            managerTypes.AddRange(hashSet);
+            managerTypes.Sort(_sortTypeSorter);
+            
+            foreach (Type type in managerTypes)
             {
                 object obj = Activator.CreateInstance(type);
-                ((ISingletonInit)obj).Init();
+                ISingletonInit singletonInit = (ISingletonInit)obj;
+                if (singletonInit == null)
+                {
+                    World.Instance.AddSingleton((ASingleton)obj);
+                    Log.Info($"Singleton manager {type.FullName} does not implement {nameof(ISingletonInit)}");
+                    continue;
+                }
+                
+                singletonInit.Init();
                 World.Instance.AddSingleton((ASingleton)obj);
+            }
+        }
+        
+        private static SingletonMangerTypeSorter _sortTypeSorter = new SingletonMangerTypeSorter();
+        private class SingletonMangerTypeSorter : IComparer<Type>
+        {
+            public int Compare(Type x, Type y)
+            {
+                int orderX = 0;
+                int orderY = 0;
+
+                object[] attrsX = x.GetCustomAttributes(typeof(SingletonMangerAttribute), true);
+                if (attrsX.Length > 0)
+                {
+                    SingletonMangerAttribute attrX = attrsX[0] as SingletonMangerAttribute;
+                    orderX = attrX.Priority;
+                }
+
+                object[] attrsY = y.GetCustomAttributes(typeof(SingletonMangerAttribute), true);
+                if (attrsY.Length > 0)
+                {
+                    SingletonMangerAttribute attrY = attrsY[0] as SingletonMangerAttribute;
+                    orderY = attrY.Priority;
+                }
+
+                return orderX.CompareTo(orderY);
             }
         }
     }

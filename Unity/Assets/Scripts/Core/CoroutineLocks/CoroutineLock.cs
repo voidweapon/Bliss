@@ -6,14 +6,14 @@ namespace Bliss.CoroutineLocks
     [EntitySystemOf(typeof(CoroutineLock))]
     public static partial class CoroutineLockSystems
     {
-        public static void Awake(this CoroutineLock self, CoroutineLockInitParam param1)
+        private static void Awake(this CoroutineLock self, CoroutineLockInitParam param1)
         {
             self.LockType = param1.LockType;
             self.Identifier = param1.Identifier;
             self.LockDepth = param1.LockDepth;
         }
         
-        public static void Destroy(this CoroutineLock self)
+        private static void Destroy(this CoroutineLock self)
         {
             self.RootCoroutineLockComponent().RunNextCoroutine(self.LockType, self.Identifier, self.LockDepth + 1);
             self.LockDepth = ECoroutineLockType.None;

@@ -1,6 +1,10 @@
 namespace Bliss.Timer
 {
-    public abstract class ATimer<TArg> : AInvokeHandlerHandler<TimerCallback> where TArg : class
+    /// <summary>
+    /// <seealso cref="Bliss.Core.EventSystem.InvokeAttribute"/>
+    /// </summary>
+    /// <typeparam name="TArg"></typeparam>
+    public abstract class ATimer<TArg> : AInvokeHandler<TimerCallback> where TArg : class
     {
         public override void Handle(TimerCallback args)
         {

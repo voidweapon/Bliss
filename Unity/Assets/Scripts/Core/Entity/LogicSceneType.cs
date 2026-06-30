@@ -5,11 +5,22 @@ namespace Bliss
     [Flags]
     public enum ELogicSceneType : long
     {
-        None = 0,
+        None = 0L,
         
-        Main = 1 << 0,
+        Main = 1L << 0,
+        //服务器
+        Realm = 1L << 1,
+        Gate = 1L << 2,
+        Location = 1 << 3,
+        Map = 1 << 4,
         
-        Client = 1 << 0,
+        GameplayWorld = 1L << 5,
+        //GamePlay的GameplayWorld下的一个Level
+        Level = 1 << 6,
+        
+        
+        //客户端
+        Client = 1L << 32,
     }
 
     public static class ELogicSceneTypeHelper

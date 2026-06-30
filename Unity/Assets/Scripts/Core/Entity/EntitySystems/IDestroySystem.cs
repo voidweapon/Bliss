@@ -7,9 +7,8 @@ namespace Bliss
         
     }
     
-    public interface IDestroySystem :ISystem
+    public interface IDestroySystem : IEventSystem
     {
-        void Run(Entity entity);
     }
     
     public abstract class DestroySystem<TEntity> : SystemObject, IDestroySystem where TEntity : Entity, IDestroy
@@ -27,6 +26,15 @@ namespace Bliss
         public ESystemUpdateGroup GetUpdateGroup()
         {
             return ESystemUpdateGroup.None;
+        }
+        
+        public virtual int GetPriority()
+        {
+            return 0;
+        }
+        public int CompareTo(ISystem other)
+        {
+            return GetPriority() - other.GetPriority();
         }
 
         public void Run(Entity entity)

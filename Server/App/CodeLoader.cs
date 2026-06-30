@@ -15,21 +15,21 @@ public class CodeLoader : Singleton<CodeLoader>, ISingletonInit
     
     public void Init()
     {
-        LoadModel();
+        Assembly modelAssembly = LoadModel();
         Assembly logicAssembly = LoadLogic();
 
         List<Assembly> assemblies = new List<Assembly>();
         assemblies.Add(typeof(CodeLoader).Assembly);
         assemblies.Add(typeof(BaseAssembly).Assembly);
         assemblies.Add(typeof(CoreAssembly).Assembly);
-        assemblies.Add(_modelAssembly);
+        assemblies.Add(modelAssembly);
         assemblies.Add(logicAssembly);
         World.Instance.AddSingleton<TypeManager, List<Assembly>>(assemblies);
         
         Entry.Start();
     }
 
-    private void LoadModel()
+    private Assembly LoadModel()
     {
         Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
         foreach (Assembly assembly in assemblies)
@@ -40,6 +40,7 @@ public class CodeLoader : Singleton<CodeLoader>, ISingletonInit
                 break;
             }
         }
+        return _modelAssembly;
     }
 
     private Assembly LoadLogic()

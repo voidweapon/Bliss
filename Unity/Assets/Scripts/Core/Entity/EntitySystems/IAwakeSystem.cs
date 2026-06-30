@@ -49,12 +49,22 @@ namespace Bliss
            return ESystemUpdateGroup.None;
         }
 
+        public virtual int GetPriority()
+        {
+            return 0;
+        }
+
         public void Run(Entity entity)
         {
             Awake((TEntity)entity);
         }
         
         protected abstract void Awake(TEntity self);
+
+        public int CompareTo(ISystem other)
+        {
+            return GetPriority() - other.GetPriority();
+        }
     }
     
     public abstract class AwakeSystem<TEntity, TParamA> : SystemObject, IAwakeSystem<TParamA> where TEntity : Entity,IAwake<TParamA>
@@ -73,6 +83,16 @@ namespace Bliss
         public ESystemUpdateGroup GetUpdateGroup()
         {
             return ESystemUpdateGroup.None;
+        }
+        
+        public virtual int GetPriority()
+        {
+            return 0;
+        }
+        
+        public int CompareTo(ISystem other)
+        {
+            return GetPriority() - other.GetPriority();
         }
         
         public void Run(Entity entity, TParamA param)

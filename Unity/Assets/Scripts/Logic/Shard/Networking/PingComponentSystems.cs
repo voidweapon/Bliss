@@ -7,7 +7,7 @@ namespace Bliss
     [EntitySystemOf(typeof(PingComponent))]
     public static partial class PingComponentSystems
     {
-        public static void Awake(this PingComponent self)
+        private static void Awake(this PingComponent self)
         {
             self.OutLagPacketId = new int[PingComponent.OutLagPacketCountLimit];
             self.OutLagPacketSendTime = new long[PingComponent.OutLagPacketCountLimit];
@@ -15,7 +15,7 @@ namespace Bliss
             self.RTT_EMA = new ExponentialMovingAverage(PingComponent.RTT_MA_Window, ExponentialMovingAverage.EMode.StandardDeviation);
             self.Jitter_EMA = new ExponentialMovingAverage(4);
         }
-        public static void Update(this PingComponent self)
+        private static void Update(this PingComponent self)
         {
             long nowTIme = TimeInfo.Instance.ClientNow();
             if (nowTIme - self.LastPingTimeMS > self.PingIntervalMS)
@@ -24,7 +24,7 @@ namespace Bliss
                 self.SendPing();
             }
         }
-        public static void Destroy(this PingComponent self)
+        private static void Destroy(this PingComponent self)
         {
 
         }

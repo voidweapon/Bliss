@@ -50,12 +50,12 @@ namespace Bliss.Timer
     [EntitySystemOf(typeof(TimerComponent))]
     public static partial class TimerComponentSystems
     {
-        public static void Awake(this TimerComponent self)
+        private static void Awake(this TimerComponent self)
         {
 
         }
         
-        public static void Update(this TimerComponent self)
+        private static void Update(this TimerComponent self)
         {
             if (self.TimeBucket.Count == 0)
             {

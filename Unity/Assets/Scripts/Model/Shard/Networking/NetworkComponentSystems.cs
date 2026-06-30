@@ -13,7 +13,7 @@ namespace Bliss
         
         #region Entity Systems
 
-        public static void Awake(this NetworkComponent self, NetworkClientParam param1)
+        private static void Awake(this NetworkComponent self, NetworkClientParam param1)
         {
             NetworkProfiler.Create();
             self.IsStop = false;
@@ -28,7 +28,7 @@ namespace Bliss
             }
         }
         
-        public static void Awake(this NetworkComponent self, NetworkServerParam param1)
+        private static void Awake(this NetworkComponent self, NetworkServerParam param1)
         {
             NetworkProfiler.Create();
             self.IsStop = false;
@@ -42,7 +42,7 @@ namespace Bliss
             }
         }
         
-        public static void Destroy(this NetworkComponent self)
+        private static void Destroy(this NetworkComponent self)
         {
             self.IsStop = true;
             self.NetThread.Join(1000);
@@ -56,7 +56,7 @@ namespace Bliss
             NetworkProfiler.Instance?.Dispose();
         }
         
-        public static void EarlyUpdate(this NetworkComponent self)
+        private static void EarlyUpdate(this NetworkComponent self)
         {
             self.ProcessMainThreadOperation();
         }
@@ -97,7 +97,7 @@ namespace Bliss
             }
             
             uint connectionId = self.NetDriver.CreateLocalConnectionId();
-            var session = self.AddChildWithId<Session>(connectionId);
+            var session = self.AddChildWithId<Session, NetworkComponent>(connectionId, self);
             session.RemoteEndPoint = remoteEndPoint;
             
             self.NetThreadOpQueue.Enqueue(new NetThreadOperation()
@@ -158,7 +158,7 @@ namespace Bliss
 
         private static void OnAcceptConnection(this NetworkComponent self, uint connectionId, IPEndPoint remoteEndPoint)
         {
-            var session = self.AddChildWithId<Session>(connectionId);
+            var session = self.AddChildWithId<Session, NetworkComponent>(connectionId, self);
             session.RemoteEndPoint = remoteEndPoint;
             
             EventSystem.Instance.Push(self.LogicScene, new Event_OnAcceiptConnection()
@@ -204,6 +204,8 @@ namespace Bliss
             {
                 bufferRef.Dispose();
             }
+            
+            LogMsg.Instance.Debug(self, message);
             
             //分发消息
             EventSystem.Instance.Invoke((long)self.LogicScene.SceneType, new Invoke_OnReceiveMessage()

@@ -9,6 +9,16 @@ namespace Bliss
     [AttributeUsage(AttributeTargets.Class)]
     public class SingletonMangerAttribute : BaseAttribute
     {
+        public int Priority { get; }
+
+        public SingletonMangerAttribute()
+        {
+            Priority = 0;
+        }
         
+        public SingletonMangerAttribute(int priority)
+        {
+            Priority = priority;
+        }
     }
 }

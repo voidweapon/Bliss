@@ -247,8 +247,13 @@ namespace Bliss.Gameplay.GameplayAbilitySystem
     *		-Pass by reference in blueprints
     *		-Polymophism in TargetData structure
     */
-    public struct GameplayAbilityTargetDataHandle
+    public struct GameplayAbilityTargetDataHandle : IEquatable<GameplayAbilityTargetDataHandle>
     {
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(Data, UniqueId);
+        }
+
         public GameplayAbilityTargetDataHandle(GameplayAbilityTargetData targetData)
         {
             Data = new List<GameplayAbilityTargetData>();
@@ -336,6 +341,16 @@ namespace Bliss.Gameplay.GameplayAbilitySystem
         public static bool operator !=(GameplayAbilityTargetDataHandle a, GameplayAbilityTargetDataHandle b)
         {
             return !(a == b);
+        }
+        
+        public bool Equals(GameplayAbilityTargetDataHandle other)
+        {
+            return Equals(Data, other.Data) && UniqueId == other.UniqueId;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is GameplayAbilityTargetDataHandle other && Equals(other);
         }
     }
 

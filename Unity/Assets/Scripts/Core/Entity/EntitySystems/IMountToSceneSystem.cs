@@ -11,9 +11,8 @@ namespace Bliss
         
     }
     
-    public interface IMountToSceneSystem : ISystem
+    public interface IMountToSceneSystem : IEventSystem
     {
-        void Run(Entity entity);
     }
     public abstract class MountToSceneSystem<TEntity> : SystemObject, IMountToSceneSystem where TEntity : Entity,IMountToScene
     {
@@ -30,6 +29,15 @@ namespace Bliss
         public ESystemUpdateGroup GetUpdateGroup()
         {
             return ESystemUpdateGroup.None;
+        }
+        
+        public virtual int GetPriority()
+        {
+            return 0;
+        }
+        public int CompareTo(ISystem other)
+        {
+            return GetPriority() - other.GetPriority();
         }
 
         public void Run(Entity entity)

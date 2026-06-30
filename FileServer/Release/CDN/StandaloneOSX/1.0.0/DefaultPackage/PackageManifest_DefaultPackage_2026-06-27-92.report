@@ -1,0 +1,2959 @@
+{
+    "Summary": {
+        "YooVersion": "2.3.19",
+        "UnityVersion": "6000.3.6f1",
+        "BuildDate": "6/27/2026 1:32:59 AM",
+        "BuildSeconds": 5,
+        "BuildTarget": 2,
+        "BuildPipeline": "ScriptableBuildPipeline",
+        "BuildBundleType": 2,
+        "BuildPackageName": "DefaultPackage",
+        "BuildPackageVersion": "2026-06-27-92",
+        "BuildPackageNote": "6/27/2026 1:32:53 AM",
+        "UniqueBundleName": true,
+        "EnableAddressable": false,
+        "SupportExtensionless": true,
+        "LocationToLower": false,
+        "IncludeAssetGUID": false,
+        "AutoCollectShaders": false,
+        "IgnoreRuleName": "YooAsset.Editor.NormalIgnoreRule",
+        "ClearBuildCacheFiles": false,
+        "UseAssetDependencyDB": false,
+        "EnableSharePackRule": true,
+        "SingleReferencedPackAlone": true,
+        "EncryptionServicesClassName": "YooAsset.Editor.EncryptionNone",
+        "ManifestProcessServicesClassName": "YooAsset.Editor.ManifestProcessNone",
+        "ManifestRestoreServicesClassName": "YooAsset.Editor.ManifestRestoreNone",
+        "FileNameStyle": 0,
+        "CompressOption": 2,
+        "DisableWriteTypeTree": false,
+        "IgnoreTypeTreeChanges": true,
+        "ReplaceAssetPathWithAddress": false,
+        "WriteLinkXML": true,
+        "CacheServerHost": "",
+        "CacheServerPort": 0,
+        "BuiltinShadersBundleName": "defaultpackage_unityshaders.bundle",
+        "MonoScriptsBundleName": "",
+        "AssetFileTotalCount": 164,
+        "MainAssetTotalCount": 42,
+        "AllBundleTotalCount": 27,
+        "AllBundleTotalSize": 36658562,
+        "EncryptedBundleTotalCount": 0,
+        "EncryptedBundleTotalSize": 0
+    },
+    "AssetInfos": [
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/AotCode/Bliss.Base.dll.bytes",
+            "AssetGUID": "3b5e60f0ca6e946ceab597e18653646e",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_aotcode.bundle",
+            "MainBundleSize": 2126804,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/AotCode/Bliss.Core.dll.bytes",
+            "AssetGUID": "bf3ef3299411d4c86bcd2bb3e331d9f2",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_aotcode.bundle",
+            "MainBundleSize": 2126804,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/AotCode/Bliss.ThirdParty.dll.bytes",
+            "AssetGUID": "82aee4ff3323742cbb69f4824a2b2bf0",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_aotcode.bundle",
+            "MainBundleSize": 2126804,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/AotCode/Bliss.Unity.dll.bytes",
+            "AssetGUID": "066158ae2d01d430cb2744f31f4dd6c3",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_aotcode.bundle",
+            "MainBundleSize": 2126804,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/AotCode/MemoryPack.dll.bytes",
+            "AssetGUID": "9f98be98257984c14949ffa581cf92bf",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_aotcode.bundle",
+            "MainBundleSize": 2126804,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/AotCode/mscorlib.dll.bytes",
+            "AssetGUID": "b2f7f7d495bb74c2a9af15ea4db20f35",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_aotcode.bundle",
+            "MainBundleSize": 2126804,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/AotCode/System.Core.dll.bytes",
+            "AssetGUID": "33495ca3c173448f192a8757fc985a87",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_aotcode.bundle",
+            "MainBundleSize": 2126804,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/AotCode/System.dll.bytes",
+            "AssetGUID": "ebef8cabab5124f80bea8deb6652a4e9",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_aotcode.bundle",
+            "MainBundleSize": 2126804,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/AotCode/System.Runtime.CompilerServices.Unsafe.dll.bytes",
+            "AssetGUID": "8bcee0ca4f1bb414887fe3b82baa0f9b",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_aotcode.bundle",
+            "MainBundleSize": 2126804,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Code/Bliss.Logic.dll.bytes",
+            "AssetGUID": "7d282e0deee9543ad931b59ec488cd8f",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_code.bundle",
+            "MainBundleSize": 428277,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Code/Bliss.Logic.pdb.bytes",
+            "AssetGUID": "8d45afcd256134f5ca38c687f8697648",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_code.bundle",
+            "MainBundleSize": 428277,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Code/Bliss.Model.dll.bytes",
+            "AssetGUID": "3b1117cb77e784421a2c73890a6fcd67",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_code.bundle",
+            "MainBundleSize": 428277,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Code/Bliss.Model.pdb.bytes",
+            "AssetGUID": "614750a0675034711b73858f34c03176",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_code.bundle",
+            "MainBundleSize": 428277,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Code/Bliss.ViewLogic.dll.bytes",
+            "AssetGUID": "a765b9347fbe8489f99b3b60b6ef849b",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_code.bundle",
+            "MainBundleSize": 428277,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Code/Bliss.ViewLogic.pdb.bytes",
+            "AssetGUID": "93bdedc3a98714247b41d23bcde9ebe5",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_code.bundle",
+            "MainBundleSize": 428277,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Code/Bliss.ViewModel.dll.bytes",
+            "AssetGUID": "9d29a12dd3649410688c26b0335cf571",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_code.bundle",
+            "MainBundleSize": 428277,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Code/Bliss.ViewModel.pdb.bytes",
+            "AssetGUID": "bef836425705248258e6b270ac50fa6d",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_code.bundle",
+            "MainBundleSize": 428277,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Configs/tbbulletconfig.json",
+            "AssetGUID": "c907d589e36284da9807d0888ee4cc9b",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_configs.bundle",
+            "MainBundleSize": 1617,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Configs/tblevelconfig.json",
+            "AssetGUID": "5d0ffa980172c4f8e99f8f2ca04fcb65",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_configs.bundle",
+            "MainBundleSize": 1617,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Configs/tbmoverconfig.json",
+            "AssetGUID": "dc03e74ab32fb411998c42266b9a4d92",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_configs.bundle",
+            "MainBundleSize": 1617,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Configs/tbunitconfig.json",
+            "AssetGUID": "3dd1a6061a93f4ca7bb2fa6724e0eafb",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_configs.bundle",
+            "MainBundleSize": 1617,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Prefabs/Gear-Shooter.prefab",
+            "AssetGUID": "6b1ff746c41e6457eb22071e4ea500db",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_prefabs.bundle",
+            "MainBundleSize": 6709,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/Art/Prefabs/pb_Mesh-1000514.asset",
+                    "AssetGUID": "65eb7873700704020ba2f2e707d07147"
+                },
+                {
+                    "AssetPath": "Assets/Art/Prefabs/pb_Mesh-1000530.asset",
+                    "AssetGUID": "3d4dcdcac1b374b6fa60ff54ccc6b766"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Materials/URP/Prototype_512x512_Red.mat",
+                    "AssetGUID": "a4b62a69d54e80347bd546999c6d4b9e"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Textures/prototype_512x512_normal.png",
+                    "AssetGUID": "44ae09ed76086b14e82d37feb30c7650"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Textures/prototype_512x512_red.png",
+                    "AssetGUID": "3d6064e2e1cd7214e9f67f3a68f494fb"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Runtime/Materials/Lit.mat",
+                    "AssetGUID": "31321ba15b8f8eb4c954353edc038b1d"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+                    "AssetGUID": "933532a4fcc9baf4fa0491de14d08ed7"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_prefabs.bundle",
+                "defaultpackage_share_assets_art_tools_probuilder_data_thirdparty_ciathyza_gridbox_prototype_materials_materials_urp.bundle",
+                "defaultpackage_share_assets_art_tools_probuilder_data_thirdparty_ciathyza_gridbox_prototype_materials_textures.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_runtime_materials.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Prefabs/Gear-Shooter_Physical.prefab",
+            "AssetGUID": "cac17308c49c245cb98d8d7e0f92c7d1",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_prefabs.bundle",
+            "MainBundleSize": 6709,
+            "DependAssets": [],
+            "DependBundles": [
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Prefabs/Gear-Shooter_View.prefab",
+            "AssetGUID": "89df22c5dc61c4123848b0473ab8dced",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_prefabs.bundle",
+            "MainBundleSize": 6709,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/Art/Prefabs/pb_Mesh-1000514.asset",
+                    "AssetGUID": "65eb7873700704020ba2f2e707d07147"
+                },
+                {
+                    "AssetPath": "Assets/Art/Prefabs/pb_Mesh-1000530.asset",
+                    "AssetGUID": "3d4dcdcac1b374b6fa60ff54ccc6b766"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Materials/URP/Prototype_512x512_Red.mat",
+                    "AssetGUID": "a4b62a69d54e80347bd546999c6d4b9e"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Textures/prototype_512x512_normal.png",
+                    "AssetGUID": "44ae09ed76086b14e82d37feb30c7650"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Textures/prototype_512x512_red.png",
+                    "AssetGUID": "3d6064e2e1cd7214e9f67f3a68f494fb"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Runtime/Materials/Lit.mat",
+                    "AssetGUID": "31321ba15b8f8eb4c954353edc038b1d"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+                    "AssetGUID": "933532a4fcc9baf4fa0491de14d08ed7"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_prefabs.bundle",
+                "defaultpackage_share_assets_art_tools_probuilder_data_thirdparty_ciathyza_gridbox_prototype_materials_materials_urp.bundle",
+                "defaultpackage_share_assets_art_tools_probuilder_data_thirdparty_ciathyza_gridbox_prototype_materials_textures.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_runtime_materials.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Prefabs/MovablePlatform.prefab",
+            "AssetGUID": "a8b05380e971141d69055d47cfb3a0af",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_prefabs.bundle",
+            "MainBundleSize": 6709,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/Art/Materials/DemoSceneRes/Blue.mat",
+                    "AssetGUID": "60c42fb470eea2b4198867ba20e2b905"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+                    "AssetGUID": "933532a4fcc9baf4fa0491de14d08ed7"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_materials_demosceneres.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Prefabs/MovablePlatform_Physical.prefab",
+            "AssetGUID": "15ec83fd0c41d4d14899734a3b03d9ec",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_prefabs.bundle",
+            "MainBundleSize": 6709,
+            "DependAssets": [],
+            "DependBundles": [
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Prefabs/MovablePlatform_View.prefab",
+            "AssetGUID": "683f008e59c5c43358ff624606ea7f56",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_prefabs.bundle",
+            "MainBundleSize": 6709,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/Art/Materials/DemoSceneRes/Blue.mat",
+                    "AssetGUID": "60c42fb470eea2b4198867ba20e2b905"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+                    "AssetGUID": "933532a4fcc9baf4fa0491de14d08ed7"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_materials_demosceneres.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Prefabs/PlayerSpawnPoint.prefab",
+            "AssetGUID": "b9c8e25676fa84dd888286296d007287",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_prefabs.bundle",
+            "MainBundleSize": 6709,
+            "DependAssets": [],
+            "DependBundles": [
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Prefabs/Scenes/DemoScene_Physical.prefab",
+            "AssetGUID": "0395d4e2de75b4e6e987be774f08e3ee",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_prefabs_scenes.bundle",
+            "MainBundleSize": 126399,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/BigMesh.fbx",
+                    "AssetGUID": "7b3263440d2fce2469af539f2ea112d4"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/ComplexShape.fbx",
+                    "AssetGUID": "8ff8d641e32922b46af689259eba176b"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/ConcaveCorridor.fbx",
+                    "AssetGUID": "2b7ce2fb71ab23245a79364c94a76c48"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/ConcaveSteps.fbx",
+                    "AssetGUID": "ea44a31176a10784b9002ca976fea196"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/DualTriSlope.fbx",
+                    "AssetGUID": "2e973c5a9dd49cf409c99021ad5a63a4"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/LedgeSlope.fbx",
+                    "AssetGUID": "2b3e390293a5bb142868f65fe568b1f7"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/Materials/No Name.mat",
+                    "AssetGUID": "6c6572d67b2ed4140a21a7617df3d874"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/ring.fbx",
+                    "AssetGUID": "94c29bfdbb24c4e45a3bc0982aedb13b"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/StepTest1.fbx",
+                    "AssetGUID": "1e5829d00378bbb488aff5a4a8bfbadb"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/StepTest2.fbx",
+                    "AssetGUID": "528aba6b065f6b24f85b2da0c3a616c9"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/StepTest3.fbx",
+                    "AssetGUID": "541ef61594cba1c4b848171826d808e0"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/Suzanne.fbx",
+                    "AssetGUID": "24cbc0be5f22f1c4681decf899eac879"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/TriSlope1.fbx",
+                    "AssetGUID": "d6d109edf651dc54697e5b35f498a328"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/TriSlope2.fbx",
+                    "AssetGUID": "af0439a59cb6f5d4a864c8702e0978ac"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/TriSlope3.fbx",
+                    "AssetGUID": "69b8dd2a641b84e478ade36da7893ffe"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/TriSlope4.fbx",
+                    "AssetGUID": "a1fb5ad061b41ec4f88dee5615c25a82"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/weirdthingy.fbx",
+                    "AssetGUID": "6e73d5ad97bcae4479606a8f6e375fa7"
+                },
+                {
+                    "AssetPath": "Assets/KinematicCharacterController/Examples/Terrain/New Terrain.asset",
+                    "AssetGUID": "584986c7300830640ab9700710efbd75"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Ground 4.asset",
+                    "AssetGUID": "80db5d0773f93449ab22261a2314cdb8"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 60.asset",
+                    "AssetGUID": "bd74d6bee67094e9d93a75e24efe3f97"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 61.asset",
+                    "AssetGUID": "a625316945ab24622a3de594a54aebf0"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 62.asset",
+                    "AssetGUID": "62ae8be86ab5440d6afcbb158d22348e"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 63.asset",
+                    "AssetGUID": "6844e7c707f9049f5bf0962d8db4bc1d"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 64.asset",
+                    "AssetGUID": "230d15741dc5e462cac23607d0f1b854"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 65.asset",
+                    "AssetGUID": "c7929b5b1b9ab4f29b7c74811387aa5a"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 66.asset",
+                    "AssetGUID": "bc8ec58e3a1364075b9d08b4a3748795"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 67.asset",
+                    "AssetGUID": "fe31db11ff0af47819b7a476aa4e686f"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 68.asset",
+                    "AssetGUID": "de69464fc972c4428a7cace277afc458"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 69.asset",
+                    "AssetGUID": "b8c03d525ebc4415c93d162e104b6130"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 70.asset",
+                    "AssetGUID": "e1211fa3869a44320888ba7e5e8ed193"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 71.asset",
+                    "AssetGUID": "6eafe66440b084365b411df6091b5ae7"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 72.asset",
+                    "AssetGUID": "dfbbaffb0583843689896a193e9bae9b"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 73.asset",
+                    "AssetGUID": "8879ff556a2244f74ad46d967a989d7a"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 74.asset",
+                    "AssetGUID": "34031628271ba4c38a84cb8f013ba965"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/pb_Mesh-813712 4.asset",
+                    "AssetGUID": "89a1b5bfab14049bab8934081fdbb70e"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Wall 16.asset",
+                    "AssetGUID": "3436877200711498aa164669bd74bfd7"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Wall 17.asset",
+                    "AssetGUID": "04d9e65343fe84bc39862537cc63a5ca"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Wall 18.asset",
+                    "AssetGUID": "2201b98831e5a41ceb7e8b94f37c4ef6"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Wall 19.asset",
+                    "AssetGUID": "c73685be40216493db65856132762273"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Runtime/Materials/TerrainLit.mat",
+                    "AssetGUID": "594ea882c5a793440b60ff72d896021e"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+                    "AssetGUID": "933532a4fcc9baf4fa0491de14d08ed7"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Shaders/Terrain/TerrainLit.shader",
+                    "AssetGUID": "69c1f799e772cb6438f56c23efccb782"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_models_demosceneres.bundle",
+                "defaultpackage_share_assets_art_models_demosceneres_materials.bundle",
+                "defaultpackage_share_assets_kinematiccharactercontroller_examples_terrain.bundle",
+                "defaultpackage_share_assets_res_scenes_demoscene_probuilder_meshes.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_runtime_materials.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders_terrain.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Prefabs/Scenes/DemoScene_RuntimeLightDataAsset.asset",
+            "AssetGUID": "bfa9830b38bef466eaf7af19ef1c9230",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_prefabs_scenes.bundle",
+            "MainBundleSize": 126399,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-0_comp_dir.png",
+                    "AssetGUID": "11ef6098016cb4454834f46649f11746"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-0_comp_light.exr",
+                    "AssetGUID": "5ce1d1d428d40469da30515555500ceb"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-1_comp_dir.png",
+                    "AssetGUID": "a56e724401cc64488b112d33d2801c64"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-1_comp_light.exr",
+                    "AssetGUID": "e26f0b2d89fca4b66b9eb2cc45917f42"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-10_comp_dir.png",
+                    "AssetGUID": "c735ceed1f6a746f2b98e73b48f073a1"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-10_comp_light.exr",
+                    "AssetGUID": "3c4795ec1974e4cd4aa31f1ccbca4359"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-11_comp_dir.png",
+                    "AssetGUID": "e3b795429aca549ab9fe1a4e0be873e7"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-11_comp_light.exr",
+                    "AssetGUID": "f50bc97e431e648d1a9b665367157817"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-12_comp_dir.png",
+                    "AssetGUID": "9ae9415e3fef049a1abd9408400afac8"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-12_comp_light.exr",
+                    "AssetGUID": "96add54f4bf4346dc8af3e5a9d03ddc4"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-13_comp_dir.png",
+                    "AssetGUID": "3b1ecbee3bd82467789b150c6cf04028"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-13_comp_light.exr",
+                    "AssetGUID": "91a5f505078a440149a7998cdf9685fb"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-14_comp_dir.png",
+                    "AssetGUID": "d6bf6b19e831549aeab0ab4fcd2469a1"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-14_comp_light.exr",
+                    "AssetGUID": "9ac2cc996c4a24e8a888a152d5b6ee82"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-15_comp_dir.png",
+                    "AssetGUID": "821344250e0094ce597c5ce405522349"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-15_comp_light.exr",
+                    "AssetGUID": "e54ae26f05e314597bea965723f9a993"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-16_comp_dir.png",
+                    "AssetGUID": "ab1108020200949d6b70dc7ee4cc10b3"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-16_comp_light.exr",
+                    "AssetGUID": "e354936b7ea314ef6a4b748760585200"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-17_comp_dir.png",
+                    "AssetGUID": "30db75ea0abfe4dbfb93203d7da4f56e"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-17_comp_light.exr",
+                    "AssetGUID": "01dbc0f7dcac34aad99fa45e63c32970"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-18_comp_dir.png",
+                    "AssetGUID": "42c713480637d403fa2de39a5864b52e"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-18_comp_light.exr",
+                    "AssetGUID": "7899b5e3e4d5345f79b1a509ee113465"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-19_comp_dir.png",
+                    "AssetGUID": "6dbb5759ef601490d9ab9a315c17a7e7"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-19_comp_light.exr",
+                    "AssetGUID": "1cb9396972db14910bfcf41a8b6e85e0"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-2_comp_dir.png",
+                    "AssetGUID": "da50518585d0e43b2988182181e676c3"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-2_comp_light.exr",
+                    "AssetGUID": "c55f29dbd1ad744a1996e12adfbd1213"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-20_comp_dir.png",
+                    "AssetGUID": "6435075cd31104279a7571f28eea1383"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-20_comp_light.exr",
+                    "AssetGUID": "e3f36ab3e50614df1adff93b7d55ba99"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-21_comp_dir.png",
+                    "AssetGUID": "c6ce454e6ec834724bc1ef509cadd621"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-21_comp_light.exr",
+                    "AssetGUID": "80b11eb49e910487683e7d81413e06d2"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-22_comp_dir.png",
+                    "AssetGUID": "8a47aeb6d471e4023a0b6f63bb771a9a"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-22_comp_light.exr",
+                    "AssetGUID": "6d6504a20b7a044d9b7d833c6d9ef112"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-23_comp_dir.png",
+                    "AssetGUID": "0e2951ef4ccef4fa68a95ede8be7d550"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-23_comp_light.exr",
+                    "AssetGUID": "a0c0f4fbe3aef42b680d45371445b2e8"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-24_comp_dir.png",
+                    "AssetGUID": "60667dc8c906b45b7849215d825a819a"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-24_comp_light.exr",
+                    "AssetGUID": "951671359bfbc47e9aafc7151c3f2c6f"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-25_comp_dir.png",
+                    "AssetGUID": "9c6fd44321c4740d8b859afd826fb504"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-25_comp_light.exr",
+                    "AssetGUID": "fe37dcdc3457c47be89f12dc59fce341"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-26_comp_dir.png",
+                    "AssetGUID": "8421018df499e46a48797e8d091a72a6"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-26_comp_light.exr",
+                    "AssetGUID": "5356cd5478ef94818885e12e817fc2b1"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-3_comp_dir.png",
+                    "AssetGUID": "e91a52bb1c3d64c91afd3f0f5d618291"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-3_comp_light.exr",
+                    "AssetGUID": "ef06e5d4f5a3e4d33bab4458b4b6d8dd"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-4_comp_dir.png",
+                    "AssetGUID": "b81d059046dac4b8b932954327cfd4da"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-4_comp_light.exr",
+                    "AssetGUID": "edc3c3ab7b9a544d2b047c4a738dab23"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-5_comp_dir.png",
+                    "AssetGUID": "e39c1b8445d0342b2ac3bea3f348a355"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-5_comp_light.exr",
+                    "AssetGUID": "be568e56ba4534d54b042b991baa6c18"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-6_comp_dir.png",
+                    "AssetGUID": "d3c3eab34ea494944b378ecacd9f86da"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-6_comp_light.exr",
+                    "AssetGUID": "64cdc4850ed3d42fa9b2d0695c2278bf"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-7_comp_dir.png",
+                    "AssetGUID": "6c68ce7176c9e4a2f99ca5e4bef06954"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-7_comp_light.exr",
+                    "AssetGUID": "60a29b371cab74cb4a6e5b049123d817"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-8_comp_dir.png",
+                    "AssetGUID": "17566a25412d148439fa3c90e1d26d3a"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-8_comp_light.exr",
+                    "AssetGUID": "817cfbfce3608412d935a5ae8fc3d95d"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-9_comp_dir.png",
+                    "AssetGUID": "b0f06b3f414544e65bb07514a9972d8c"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-9_comp_light.exr",
+                    "AssetGUID": "d57bc2c377e1e493fa0741d07da7e3b2"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/ReflectionProbe-0.exr",
+                    "AssetGUID": "b6a43b8bfa40646699b76693a230415c"
+                },
+                {
+                    "AssetPath": "Assets/Res/Prefabs/Scenes/DemoScene_RuntimeLightProbeAsset.asset",
+                    "AssetGUID": "6c293ac8c4bf743c098deccab6360af0"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene.unity",
+                    "AssetGUID": "95cb38e5f3f7441fe9fafc64a99a468b"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_assets_res_scenes_demoscene.bundle",
+                "defaultpackage_share_assets_art_scenes_demoscene.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Prefabs/Scenes/DemoScene_RuntimeLightProbeAsset.asset",
+            "AssetGUID": "6c293ac8c4bf743c098deccab6360af0",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_prefabs_scenes.bundle",
+            "MainBundleSize": 126399,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-0_comp_dir.png",
+                    "AssetGUID": "11ef6098016cb4454834f46649f11746"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-0_comp_light.exr",
+                    "AssetGUID": "5ce1d1d428d40469da30515555500ceb"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-1_comp_dir.png",
+                    "AssetGUID": "a56e724401cc64488b112d33d2801c64"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-1_comp_light.exr",
+                    "AssetGUID": "e26f0b2d89fca4b66b9eb2cc45917f42"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-10_comp_dir.png",
+                    "AssetGUID": "c735ceed1f6a746f2b98e73b48f073a1"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-10_comp_light.exr",
+                    "AssetGUID": "3c4795ec1974e4cd4aa31f1ccbca4359"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-11_comp_dir.png",
+                    "AssetGUID": "e3b795429aca549ab9fe1a4e0be873e7"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-11_comp_light.exr",
+                    "AssetGUID": "f50bc97e431e648d1a9b665367157817"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-12_comp_dir.png",
+                    "AssetGUID": "9ae9415e3fef049a1abd9408400afac8"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-12_comp_light.exr",
+                    "AssetGUID": "96add54f4bf4346dc8af3e5a9d03ddc4"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-13_comp_dir.png",
+                    "AssetGUID": "3b1ecbee3bd82467789b150c6cf04028"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-13_comp_light.exr",
+                    "AssetGUID": "91a5f505078a440149a7998cdf9685fb"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-14_comp_dir.png",
+                    "AssetGUID": "d6bf6b19e831549aeab0ab4fcd2469a1"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-14_comp_light.exr",
+                    "AssetGUID": "9ac2cc996c4a24e8a888a152d5b6ee82"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-15_comp_dir.png",
+                    "AssetGUID": "821344250e0094ce597c5ce405522349"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-15_comp_light.exr",
+                    "AssetGUID": "e54ae26f05e314597bea965723f9a993"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-16_comp_dir.png",
+                    "AssetGUID": "ab1108020200949d6b70dc7ee4cc10b3"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-16_comp_light.exr",
+                    "AssetGUID": "e354936b7ea314ef6a4b748760585200"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-17_comp_dir.png",
+                    "AssetGUID": "30db75ea0abfe4dbfb93203d7da4f56e"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-17_comp_light.exr",
+                    "AssetGUID": "01dbc0f7dcac34aad99fa45e63c32970"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-18_comp_dir.png",
+                    "AssetGUID": "42c713480637d403fa2de39a5864b52e"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-18_comp_light.exr",
+                    "AssetGUID": "7899b5e3e4d5345f79b1a509ee113465"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-19_comp_dir.png",
+                    "AssetGUID": "6dbb5759ef601490d9ab9a315c17a7e7"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-19_comp_light.exr",
+                    "AssetGUID": "1cb9396972db14910bfcf41a8b6e85e0"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-2_comp_dir.png",
+                    "AssetGUID": "da50518585d0e43b2988182181e676c3"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-2_comp_light.exr",
+                    "AssetGUID": "c55f29dbd1ad744a1996e12adfbd1213"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-20_comp_dir.png",
+                    "AssetGUID": "6435075cd31104279a7571f28eea1383"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-20_comp_light.exr",
+                    "AssetGUID": "e3f36ab3e50614df1adff93b7d55ba99"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-21_comp_dir.png",
+                    "AssetGUID": "c6ce454e6ec834724bc1ef509cadd621"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-21_comp_light.exr",
+                    "AssetGUID": "80b11eb49e910487683e7d81413e06d2"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-22_comp_dir.png",
+                    "AssetGUID": "8a47aeb6d471e4023a0b6f63bb771a9a"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-22_comp_light.exr",
+                    "AssetGUID": "6d6504a20b7a044d9b7d833c6d9ef112"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-23_comp_dir.png",
+                    "AssetGUID": "0e2951ef4ccef4fa68a95ede8be7d550"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-23_comp_light.exr",
+                    "AssetGUID": "a0c0f4fbe3aef42b680d45371445b2e8"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-24_comp_dir.png",
+                    "AssetGUID": "60667dc8c906b45b7849215d825a819a"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-24_comp_light.exr",
+                    "AssetGUID": "951671359bfbc47e9aafc7151c3f2c6f"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-25_comp_dir.png",
+                    "AssetGUID": "9c6fd44321c4740d8b859afd826fb504"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-25_comp_light.exr",
+                    "AssetGUID": "fe37dcdc3457c47be89f12dc59fce341"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-26_comp_dir.png",
+                    "AssetGUID": "8421018df499e46a48797e8d091a72a6"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-26_comp_light.exr",
+                    "AssetGUID": "5356cd5478ef94818885e12e817fc2b1"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-3_comp_dir.png",
+                    "AssetGUID": "e91a52bb1c3d64c91afd3f0f5d618291"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-3_comp_light.exr",
+                    "AssetGUID": "ef06e5d4f5a3e4d33bab4458b4b6d8dd"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-4_comp_dir.png",
+                    "AssetGUID": "b81d059046dac4b8b932954327cfd4da"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-4_comp_light.exr",
+                    "AssetGUID": "edc3c3ab7b9a544d2b047c4a738dab23"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-5_comp_dir.png",
+                    "AssetGUID": "e39c1b8445d0342b2ac3bea3f348a355"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-5_comp_light.exr",
+                    "AssetGUID": "be568e56ba4534d54b042b991baa6c18"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-6_comp_dir.png",
+                    "AssetGUID": "d3c3eab34ea494944b378ecacd9f86da"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-6_comp_light.exr",
+                    "AssetGUID": "64cdc4850ed3d42fa9b2d0695c2278bf"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-7_comp_dir.png",
+                    "AssetGUID": "6c68ce7176c9e4a2f99ca5e4bef06954"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-7_comp_light.exr",
+                    "AssetGUID": "60a29b371cab74cb4a6e5b049123d817"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-8_comp_dir.png",
+                    "AssetGUID": "17566a25412d148439fa3c90e1d26d3a"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-8_comp_light.exr",
+                    "AssetGUID": "817cfbfce3608412d935a5ae8fc3d95d"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-9_comp_dir.png",
+                    "AssetGUID": "b0f06b3f414544e65bb07514a9972d8c"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-9_comp_light.exr",
+                    "AssetGUID": "d57bc2c377e1e493fa0741d07da7e3b2"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/ReflectionProbe-0.exr",
+                    "AssetGUID": "b6a43b8bfa40646699b76693a230415c"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene.unity",
+                    "AssetGUID": "95cb38e5f3f7441fe9fafc64a99a468b"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_assets_res_scenes_demoscene.bundle",
+                "defaultpackage_share_assets_art_scenes_demoscene.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Prefabs/Scenes/DemoScene_View.prefab",
+            "AssetGUID": "edf26d547a2c148139e68bc3a9729940",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_prefabs_scenes.bundle",
+            "MainBundleSize": 126399,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/Art/Materials/DemoSceneRes/Blue.mat",
+                    "AssetGUID": "60c42fb470eea2b4198867ba20e2b905"
+                },
+                {
+                    "AssetPath": "Assets/Art/Materials/DemoSceneRes/Dark.mat",
+                    "AssetGUID": "ac0fa2f3d7139704ba1ad516325833cc"
+                },
+                {
+                    "AssetPath": "Assets/Art/Materials/DemoSceneRes/Orange.mat",
+                    "AssetGUID": "cdd98aff9e51e5b4c9f98f2d337d0fb1"
+                },
+                {
+                    "AssetPath": "Assets/Art/Materials/DemoSceneRes/Red.mat",
+                    "AssetGUID": "fa7583f4941f3ec4695e3315f9ab341c"
+                },
+                {
+                    "AssetPath": "Assets/Art/Materials/DemoSceneRes/Teleporter.mat",
+                    "AssetGUID": "a4dda9ab07d60364890bdfe5abf41670"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/BigMesh.fbx",
+                    "AssetGUID": "7b3263440d2fce2469af539f2ea112d4"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/ComplexShape.fbx",
+                    "AssetGUID": "8ff8d641e32922b46af689259eba176b"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/ConcaveCorridor.fbx",
+                    "AssetGUID": "2b7ce2fb71ab23245a79364c94a76c48"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/ConcaveSteps.fbx",
+                    "AssetGUID": "ea44a31176a10784b9002ca976fea196"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/DualTriSlope.fbx",
+                    "AssetGUID": "2e973c5a9dd49cf409c99021ad5a63a4"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/LedgeSlope.fbx",
+                    "AssetGUID": "2b3e390293a5bb142868f65fe568b1f7"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/Materials/No Name.mat",
+                    "AssetGUID": "6c6572d67b2ed4140a21a7617df3d874"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/ring.fbx",
+                    "AssetGUID": "94c29bfdbb24c4e45a3bc0982aedb13b"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/StepTest1.fbx",
+                    "AssetGUID": "1e5829d00378bbb488aff5a4a8bfbadb"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/StepTest2.fbx",
+                    "AssetGUID": "528aba6b065f6b24f85b2da0c3a616c9"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/StepTest3.fbx",
+                    "AssetGUID": "541ef61594cba1c4b848171826d808e0"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/Suzanne.fbx",
+                    "AssetGUID": "24cbc0be5f22f1c4681decf899eac879"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/TriSlope1.fbx",
+                    "AssetGUID": "d6d109edf651dc54697e5b35f498a328"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/TriSlope2.fbx",
+                    "AssetGUID": "af0439a59cb6f5d4a864c8702e0978ac"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/TriSlope3.fbx",
+                    "AssetGUID": "69b8dd2a641b84e478ade36da7893ffe"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/TriSlope4.fbx",
+                    "AssetGUID": "a1fb5ad061b41ec4f88dee5615c25a82"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/weirdthingy.fbx",
+                    "AssetGUID": "6e73d5ad97bcae4479606a8f6e375fa7"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Materials/URP/Prototype_512x512_Blue1.mat",
+                    "AssetGUID": "0f29e3c1c576f6641b9e474f6b194480"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Materials/URP/Prototype_512x512_Grey1.mat",
+                    "AssetGUID": "dfc08c90188302847afb04f628582097"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Materials/URP/Prototype_512x512_White.mat",
+                    "AssetGUID": "2ab8149ec4775284bada96c1b85b4a09"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Textures/prototype_512x512_blue1.png",
+                    "AssetGUID": "44cced520ecfd9f4292979a4fe8268c4"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Textures/prototype_512x512_grey1.png",
+                    "AssetGUID": "dd29f35641da38647a1eeb1028211f1a"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Textures/prototype_512x512_normal.png",
+                    "AssetGUID": "44ae09ed76086b14e82d37feb30c7650"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Textures/prototype_512x512_white.png",
+                    "AssetGUID": "9397418d1d7b12543bf27fb61b93bbea"
+                },
+                {
+                    "AssetPath": "Assets/KinematicCharacterController/Examples/Terrain/New Terrain.asset",
+                    "AssetGUID": "584986c7300830640ab9700710efbd75"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Ground 4.asset",
+                    "AssetGUID": "80db5d0773f93449ab22261a2314cdb8"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 60.asset",
+                    "AssetGUID": "bd74d6bee67094e9d93a75e24efe3f97"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 61.asset",
+                    "AssetGUID": "a625316945ab24622a3de594a54aebf0"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 62.asset",
+                    "AssetGUID": "62ae8be86ab5440d6afcbb158d22348e"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 63.asset",
+                    "AssetGUID": "6844e7c707f9049f5bf0962d8db4bc1d"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 64.asset",
+                    "AssetGUID": "230d15741dc5e462cac23607d0f1b854"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 65.asset",
+                    "AssetGUID": "c7929b5b1b9ab4f29b7c74811387aa5a"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 66.asset",
+                    "AssetGUID": "bc8ec58e3a1364075b9d08b4a3748795"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 67.asset",
+                    "AssetGUID": "fe31db11ff0af47819b7a476aa4e686f"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 68.asset",
+                    "AssetGUID": "de69464fc972c4428a7cace277afc458"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 69.asset",
+                    "AssetGUID": "b8c03d525ebc4415c93d162e104b6130"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 70.asset",
+                    "AssetGUID": "e1211fa3869a44320888ba7e5e8ed193"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 71.asset",
+                    "AssetGUID": "6eafe66440b084365b411df6091b5ae7"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 72.asset",
+                    "AssetGUID": "dfbbaffb0583843689896a193e9bae9b"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 73.asset",
+                    "AssetGUID": "8879ff556a2244f74ad46d967a989d7a"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 74.asset",
+                    "AssetGUID": "34031628271ba4c38a84cb8f013ba965"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/pb_Mesh-813712 4.asset",
+                    "AssetGUID": "89a1b5bfab14049bab8934081fdbb70e"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Wall 16.asset",
+                    "AssetGUID": "3436877200711498aa164669bd74bfd7"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Wall 17.asset",
+                    "AssetGUID": "04d9e65343fe84bc39862537cc63a5ca"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Wall 18.asset",
+                    "AssetGUID": "2201b98831e5a41ceb7e8b94f37c4ef6"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Wall 19.asset",
+                    "AssetGUID": "c73685be40216493db65856132762273"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Runtime/Materials/Lit.mat",
+                    "AssetGUID": "31321ba15b8f8eb4c954353edc038b1d"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Runtime/Materials/TerrainLit.mat",
+                    "AssetGUID": "594ea882c5a793440b60ff72d896021e"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+                    "AssetGUID": "933532a4fcc9baf4fa0491de14d08ed7"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Shaders/Terrain/TerrainLit.shader",
+                    "AssetGUID": "69c1f799e772cb6438f56c23efccb782"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_materials_demosceneres.bundle",
+                "defaultpackage_share_assets_art_models_demosceneres.bundle",
+                "defaultpackage_share_assets_art_models_demosceneres_materials.bundle",
+                "defaultpackage_share_assets_art_tools_probuilder_data_thirdparty_ciathyza_gridbox_prototype_materials_materials_urp.bundle",
+                "defaultpackage_share_assets_art_tools_probuilder_data_thirdparty_ciathyza_gridbox_prototype_materials_textures.bundle",
+                "defaultpackage_share_assets_kinematiccharactercontroller_examples_terrain.bundle",
+                "defaultpackage_share_assets_res_scenes_demoscene_probuilder_meshes.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_runtime_materials.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders_terrain.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Prefabs/TestActor.prefab",
+            "AssetGUID": "a40adf1f0a213479bb1d94603f286e8a",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_prefabs.bundle",
+            "MainBundleSize": 6709,
+            "DependAssets": [
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Runtime/Materials/Lit.mat",
+                    "AssetGUID": "31321ba15b8f8eb4c954353edc038b1d"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+                    "AssetGUID": "933532a4fcc9baf4fa0491de14d08ed7"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_runtime_materials.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Prefabs/TestBullet.prefab",
+            "AssetGUID": "c3f49efff644b4923814d75efa2a62a5",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_prefabs.bundle",
+            "MainBundleSize": 6709,
+            "DependAssets": [
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Runtime/Materials/Lit.mat",
+                    "AssetGUID": "31321ba15b8f8eb4c954353edc038b1d"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+                    "AssetGUID": "933532a4fcc9baf4fa0491de14d08ed7"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_runtime_materials.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Scenes/DemoScene.unity",
+            "AssetGUID": "95cb38e5f3f7441fe9fafc64a99a468b",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_scenes_demoscene.bundle",
+            "MainBundleSize": 7263,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-0_comp_dir.png",
+                    "AssetGUID": "11ef6098016cb4454834f46649f11746"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-0_comp_light.exr",
+                    "AssetGUID": "5ce1d1d428d40469da30515555500ceb"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-1_comp_dir.png",
+                    "AssetGUID": "a56e724401cc64488b112d33d2801c64"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-1_comp_light.exr",
+                    "AssetGUID": "e26f0b2d89fca4b66b9eb2cc45917f42"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-10_comp_dir.png",
+                    "AssetGUID": "c735ceed1f6a746f2b98e73b48f073a1"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-10_comp_light.exr",
+                    "AssetGUID": "3c4795ec1974e4cd4aa31f1ccbca4359"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-11_comp_dir.png",
+                    "AssetGUID": "e3b795429aca549ab9fe1a4e0be873e7"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-11_comp_light.exr",
+                    "AssetGUID": "f50bc97e431e648d1a9b665367157817"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-12_comp_dir.png",
+                    "AssetGUID": "9ae9415e3fef049a1abd9408400afac8"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-12_comp_light.exr",
+                    "AssetGUID": "96add54f4bf4346dc8af3e5a9d03ddc4"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-13_comp_dir.png",
+                    "AssetGUID": "3b1ecbee3bd82467789b150c6cf04028"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-13_comp_light.exr",
+                    "AssetGUID": "91a5f505078a440149a7998cdf9685fb"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-14_comp_dir.png",
+                    "AssetGUID": "d6bf6b19e831549aeab0ab4fcd2469a1"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-14_comp_light.exr",
+                    "AssetGUID": "9ac2cc996c4a24e8a888a152d5b6ee82"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-15_comp_dir.png",
+                    "AssetGUID": "821344250e0094ce597c5ce405522349"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-15_comp_light.exr",
+                    "AssetGUID": "e54ae26f05e314597bea965723f9a993"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-16_comp_dir.png",
+                    "AssetGUID": "ab1108020200949d6b70dc7ee4cc10b3"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-16_comp_light.exr",
+                    "AssetGUID": "e354936b7ea314ef6a4b748760585200"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-17_comp_dir.png",
+                    "AssetGUID": "30db75ea0abfe4dbfb93203d7da4f56e"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-17_comp_light.exr",
+                    "AssetGUID": "01dbc0f7dcac34aad99fa45e63c32970"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-18_comp_dir.png",
+                    "AssetGUID": "42c713480637d403fa2de39a5864b52e"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-18_comp_light.exr",
+                    "AssetGUID": "7899b5e3e4d5345f79b1a509ee113465"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-19_comp_dir.png",
+                    "AssetGUID": "6dbb5759ef601490d9ab9a315c17a7e7"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-19_comp_light.exr",
+                    "AssetGUID": "1cb9396972db14910bfcf41a8b6e85e0"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-2_comp_dir.png",
+                    "AssetGUID": "da50518585d0e43b2988182181e676c3"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-2_comp_light.exr",
+                    "AssetGUID": "c55f29dbd1ad744a1996e12adfbd1213"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-20_comp_dir.png",
+                    "AssetGUID": "6435075cd31104279a7571f28eea1383"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-20_comp_light.exr",
+                    "AssetGUID": "e3f36ab3e50614df1adff93b7d55ba99"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-21_comp_dir.png",
+                    "AssetGUID": "c6ce454e6ec834724bc1ef509cadd621"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-21_comp_light.exr",
+                    "AssetGUID": "80b11eb49e910487683e7d81413e06d2"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-22_comp_dir.png",
+                    "AssetGUID": "8a47aeb6d471e4023a0b6f63bb771a9a"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-22_comp_light.exr",
+                    "AssetGUID": "6d6504a20b7a044d9b7d833c6d9ef112"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-23_comp_dir.png",
+                    "AssetGUID": "0e2951ef4ccef4fa68a95ede8be7d550"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-23_comp_light.exr",
+                    "AssetGUID": "a0c0f4fbe3aef42b680d45371445b2e8"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-24_comp_dir.png",
+                    "AssetGUID": "60667dc8c906b45b7849215d825a819a"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-24_comp_light.exr",
+                    "AssetGUID": "951671359bfbc47e9aafc7151c3f2c6f"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-25_comp_dir.png",
+                    "AssetGUID": "9c6fd44321c4740d8b859afd826fb504"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-25_comp_light.exr",
+                    "AssetGUID": "fe37dcdc3457c47be89f12dc59fce341"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-26_comp_dir.png",
+                    "AssetGUID": "8421018df499e46a48797e8d091a72a6"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-26_comp_light.exr",
+                    "AssetGUID": "5356cd5478ef94818885e12e817fc2b1"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-3_comp_dir.png",
+                    "AssetGUID": "e91a52bb1c3d64c91afd3f0f5d618291"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-3_comp_light.exr",
+                    "AssetGUID": "ef06e5d4f5a3e4d33bab4458b4b6d8dd"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-4_comp_dir.png",
+                    "AssetGUID": "b81d059046dac4b8b932954327cfd4da"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-4_comp_light.exr",
+                    "AssetGUID": "edc3c3ab7b9a544d2b047c4a738dab23"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-5_comp_dir.png",
+                    "AssetGUID": "e39c1b8445d0342b2ac3bea3f348a355"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-5_comp_light.exr",
+                    "AssetGUID": "be568e56ba4534d54b042b991baa6c18"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-6_comp_dir.png",
+                    "AssetGUID": "d3c3eab34ea494944b378ecacd9f86da"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-6_comp_light.exr",
+                    "AssetGUID": "64cdc4850ed3d42fa9b2d0695c2278bf"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-7_comp_dir.png",
+                    "AssetGUID": "6c68ce7176c9e4a2f99ca5e4bef06954"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-7_comp_light.exr",
+                    "AssetGUID": "60a29b371cab74cb4a6e5b049123d817"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-8_comp_dir.png",
+                    "AssetGUID": "17566a25412d148439fa3c90e1d26d3a"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-8_comp_light.exr",
+                    "AssetGUID": "817cfbfce3608412d935a5ae8fc3d95d"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-9_comp_dir.png",
+                    "AssetGUID": "b0f06b3f414544e65bb07514a9972d8c"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-9_comp_light.exr",
+                    "AssetGUID": "d57bc2c377e1e493fa0741d07da7e3b2"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/ReflectionProbe-0.exr",
+                    "AssetGUID": "b6a43b8bfa40646699b76693a230415c"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_scenes_demoscene.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Scenes/Loading.unity",
+            "AssetGUID": "89b4688ce6bf345258a6fcab17224bf2",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_scenes_loading.bundle",
+            "MainBundleSize": 4624,
+            "DependAssets": [],
+            "DependBundles": [
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Tools/Prefab/DataVaraince Stat.prefab",
+            "AssetGUID": "8dfcfa9064e9f41ac96fbd0ca9e60f64",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_tools_prefab.bundle",
+            "MainBundleSize": 9794,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/Art/Materials/DiagramLines.mat",
+                    "AssetGUID": "f1db120213cd845178c6ce0fea91360e"
+                },
+                {
+                    "AssetPath": "Assets/Art/Shaders/Chart/DiagramLines.shader",
+                    "AssetGUID": "f226d174b76404f0cba321154e7efd9a"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Fonts/LiberationSans.ttf",
+                    "AssetGUID": "e3265ab4bf004d28a9537516768c1c75"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset",
+                    "AssetGUID": "2e498d1c8094910479dc3e1b768306a4"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset",
+                    "AssetGUID": "8f586378b4e144a9851e7b34d9b748ee"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Shaders/TMP_SDF-Mobile.shader",
+                    "AssetGUID": "fe393ace9b354375a9cb14cdbbc28be4"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_materials.bundle",
+                "defaultpackage_share_assets_art_shaders_chart.bundle",
+                "defaultpackage_share_assets_textmesh_pro_fonts.bundle",
+                "defaultpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+                "defaultpackage_share_assets_textmesh_pro_shaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Tools/Prefab/GameDebugStateSetting.asset",
+            "AssetGUID": "97290da45fb884b5d9789e8798ec1ab3",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_tools_prefab.bundle",
+            "MainBundleSize": 9794,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/Tools/Prefab/Net Stat.prefab",
+            "AssetGUID": "9d8497b09ca7946ea99a55047307844c",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_tools_prefab.bundle",
+            "MainBundleSize": 9794,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/Art/Materials/DiagramStacked.mat",
+                    "AssetGUID": "8d558d80d7c71479ebf097f9dc2c6c1b"
+                },
+                {
+                    "AssetPath": "Assets/Art/Shaders/Chart/DiagramStacked.shader",
+                    "AssetGUID": "e7fcd49b69ac419f82836a5d5626e6ba"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Fonts/LiberationSans.ttf",
+                    "AssetGUID": "e3265ab4bf004d28a9537516768c1c75"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset",
+                    "AssetGUID": "2e498d1c8094910479dc3e1b768306a4"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset",
+                    "AssetGUID": "8f586378b4e144a9851e7b34d9b748ee"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Shaders/TMP_SDF-Mobile.shader",
+                    "AssetGUID": "fe393ace9b354375a9cb14cdbbc28be4"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_materials.bundle",
+                "defaultpackage_share_assets_art_shaders_chart.bundle",
+                "defaultpackage_share_assets_textmesh_pro_fonts.bundle",
+                "defaultpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+                "defaultpackage_share_assets_textmesh_pro_shaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/UI/UILoading.prefab",
+            "AssetGUID": "a6f67251f4f744671bf936a585c7b686",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_ui.bundle",
+            "MainBundleSize": 12527,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Fonts/LiberationSans.ttf",
+                    "AssetGUID": "e3265ab4bf004d28a9537516768c1c75"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset",
+                    "AssetGUID": "2e498d1c8094910479dc3e1b768306a4"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset",
+                    "AssetGUID": "8f586378b4e144a9851e7b34d9b748ee"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Shaders/TMP_SDF-Mobile.shader",
+                    "AssetGUID": "fe393ace9b354375a9cb14cdbbc28be4"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_share_assets_textmesh_pro_fonts.bundle",
+                "defaultpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+                "defaultpackage_share_assets_textmesh_pro_shaders.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/UI/UILogin.prefab",
+            "AssetGUID": "3268caaf949c845de9ddb339d3e28dfc",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_ui.bundle",
+            "MainBundleSize": 12527,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Fonts/LiberationSans.ttf",
+                    "AssetGUID": "e3265ab4bf004d28a9537516768c1c75"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset",
+                    "AssetGUID": "2e498d1c8094910479dc3e1b768306a4"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset",
+                    "AssetGUID": "8f586378b4e144a9851e7b34d9b748ee"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Shaders/TMP_SDF-Mobile.shader",
+                    "AssetGUID": "fe393ace9b354375a9cb14cdbbc28be4"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_share_assets_textmesh_pro_fonts.bundle",
+                "defaultpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+                "defaultpackage_share_assets_textmesh_pro_shaders.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/UI/UIMapSelect.prefab",
+            "AssetGUID": "4ff458efdc1cd42d68dcdf3493e3bb24",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_res_ui.bundle",
+            "MainBundleSize": 12527,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Fonts/LiberationSans.ttf",
+                    "AssetGUID": "e3265ab4bf004d28a9537516768c1c75"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset",
+                    "AssetGUID": "2e498d1c8094910479dc3e1b768306a4"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset",
+                    "AssetGUID": "8f586378b4e144a9851e7b34d9b748ee"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Shaders/TMP_SDF-Mobile.shader",
+                    "AssetGUID": "fe393ace9b354375a9cb14cdbbc28be4"
+                }
+            ],
+            "DependBundles": [
+                "defaultpackage_share_assets_textmesh_pro_fonts.bundle",
+                "defaultpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+                "defaultpackage_share_assets_textmesh_pro_shaders.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ]
+        }
+    ],
+    "BundleInfos": [
+        {
+            "BundleName": "defaultpackage_assets_res_aotcode.bundle",
+            "FileName": "da849e68a83a7aaf565b1df76eb8a9d6.bundle",
+            "FileHash": "da849e68a83a7aaf565b1df76eb8a9d6",
+            "FileCRC": 2205483960,
+            "FileSize": 2126804,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Res/AotCode/Bliss.Base.dll.bytes",
+                    "AssetGUID": "3b5e60f0ca6e946ceab597e18653646e"
+                },
+                {
+                    "AssetPath": "Assets/Res/AotCode/Bliss.Core.dll.bytes",
+                    "AssetGUID": "bf3ef3299411d4c86bcd2bb3e331d9f2"
+                },
+                {
+                    "AssetPath": "Assets/Res/AotCode/Bliss.ThirdParty.dll.bytes",
+                    "AssetGUID": "82aee4ff3323742cbb69f4824a2b2bf0"
+                },
+                {
+                    "AssetPath": "Assets/Res/AotCode/Bliss.Unity.dll.bytes",
+                    "AssetGUID": "066158ae2d01d430cb2744f31f4dd6c3"
+                },
+                {
+                    "AssetPath": "Assets/Res/AotCode/MemoryPack.dll.bytes",
+                    "AssetGUID": "9f98be98257984c14949ffa581cf92bf"
+                },
+                {
+                    "AssetPath": "Assets/Res/AotCode/mscorlib.dll.bytes",
+                    "AssetGUID": "b2f7f7d495bb74c2a9af15ea4db20f35"
+                },
+                {
+                    "AssetPath": "Assets/Res/AotCode/System.Core.dll.bytes",
+                    "AssetGUID": "33495ca3c173448f192a8757fc985a87"
+                },
+                {
+                    "AssetPath": "Assets/Res/AotCode/System.dll.bytes",
+                    "AssetGUID": "ebef8cabab5124f80bea8deb6652a4e9"
+                },
+                {
+                    "AssetPath": "Assets/Res/AotCode/System.Runtime.CompilerServices.Unsafe.dll.bytes",
+                    "AssetGUID": "8bcee0ca4f1bb414887fe3b82baa0f9b"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_assets_res_code.bundle",
+            "FileName": "6bbee76a0b1e463fea5622f8fc71168a.bundle",
+            "FileHash": "6bbee76a0b1e463fea5622f8fc71168a",
+            "FileCRC": 1038782533,
+            "FileSize": 428277,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Res/Code/Bliss.Logic.dll.bytes",
+                    "AssetGUID": "7d282e0deee9543ad931b59ec488cd8f"
+                },
+                {
+                    "AssetPath": "Assets/Res/Code/Bliss.Logic.pdb.bytes",
+                    "AssetGUID": "8d45afcd256134f5ca38c687f8697648"
+                },
+                {
+                    "AssetPath": "Assets/Res/Code/Bliss.Model.dll.bytes",
+                    "AssetGUID": "3b1117cb77e784421a2c73890a6fcd67"
+                },
+                {
+                    "AssetPath": "Assets/Res/Code/Bliss.Model.pdb.bytes",
+                    "AssetGUID": "614750a0675034711b73858f34c03176"
+                },
+                {
+                    "AssetPath": "Assets/Res/Code/Bliss.ViewLogic.dll.bytes",
+                    "AssetGUID": "a765b9347fbe8489f99b3b60b6ef849b"
+                },
+                {
+                    "AssetPath": "Assets/Res/Code/Bliss.ViewLogic.pdb.bytes",
+                    "AssetGUID": "93bdedc3a98714247b41d23bcde9ebe5"
+                },
+                {
+                    "AssetPath": "Assets/Res/Code/Bliss.ViewModel.dll.bytes",
+                    "AssetGUID": "9d29a12dd3649410688c26b0335cf571"
+                },
+                {
+                    "AssetPath": "Assets/Res/Code/Bliss.ViewModel.pdb.bytes",
+                    "AssetGUID": "bef836425705248258e6b270ac50fa6d"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_assets_res_configs.bundle",
+            "FileName": "4518a47b8641000afb81c2ad68f74da5.bundle",
+            "FileHash": "4518a47b8641000afb81c2ad68f74da5",
+            "FileCRC": 1997823746,
+            "FileSize": 1617,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Res/Configs/tbbulletconfig.json",
+                    "AssetGUID": "c907d589e36284da9807d0888ee4cc9b"
+                },
+                {
+                    "AssetPath": "Assets/Res/Configs/tblevelconfig.json",
+                    "AssetGUID": "5d0ffa980172c4f8e99f8f2ca04fcb65"
+                },
+                {
+                    "AssetPath": "Assets/Res/Configs/tbmoverconfig.json",
+                    "AssetGUID": "dc03e74ab32fb411998c42266b9a4d92"
+                },
+                {
+                    "AssetPath": "Assets/Res/Configs/tbunitconfig.json",
+                    "AssetGUID": "3dd1a6061a93f4ca7bb2fa6724e0eafb"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_assets_res_prefabs.bundle",
+            "FileName": "0109243933517e45f55a949aad43ba26.bundle",
+            "FileHash": "0109243933517e45f55a949aad43ba26",
+            "FileCRC": 2104245913,
+            "FileSize": 6709,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_materials_demosceneres.bundle",
+                "defaultpackage_share_assets_art_prefabs.bundle",
+                "defaultpackage_share_assets_art_tools_probuilder_data_thirdparty_ciathyza_gridbox_prototype_materials_materials_urp.bundle",
+                "defaultpackage_share_assets_art_tools_probuilder_data_thirdparty_ciathyza_gridbox_prototype_materials_textures.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_runtime_materials.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders_terrain.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ],
+            "ReferenceBundles": [],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Res/Prefabs/Gear-Shooter.prefab",
+                    "AssetGUID": "6b1ff746c41e6457eb22071e4ea500db"
+                },
+                {
+                    "AssetPath": "Assets/Res/Prefabs/Gear-Shooter_Physical.prefab",
+                    "AssetGUID": "cac17308c49c245cb98d8d7e0f92c7d1"
+                },
+                {
+                    "AssetPath": "Assets/Res/Prefabs/Gear-Shooter_View.prefab",
+                    "AssetGUID": "89df22c5dc61c4123848b0473ab8dced"
+                },
+                {
+                    "AssetPath": "Assets/Res/Prefabs/MovablePlatform.prefab",
+                    "AssetGUID": "a8b05380e971141d69055d47cfb3a0af"
+                },
+                {
+                    "AssetPath": "Assets/Res/Prefabs/MovablePlatform_Physical.prefab",
+                    "AssetGUID": "15ec83fd0c41d4d14899734a3b03d9ec"
+                },
+                {
+                    "AssetPath": "Assets/Res/Prefabs/MovablePlatform_View.prefab",
+                    "AssetGUID": "683f008e59c5c43358ff624606ea7f56"
+                },
+                {
+                    "AssetPath": "Assets/Res/Prefabs/PlayerSpawnPoint.prefab",
+                    "AssetGUID": "b9c8e25676fa84dd888286296d007287"
+                },
+                {
+                    "AssetPath": "Assets/Res/Prefabs/TestActor.prefab",
+                    "AssetGUID": "a40adf1f0a213479bb1d94603f286e8a"
+                },
+                {
+                    "AssetPath": "Assets/Res/Prefabs/TestBullet.prefab",
+                    "AssetGUID": "c3f49efff644b4923814d75efa2a62a5"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_assets_res_prefabs_scenes.bundle",
+            "FileName": "25b05acebac1cde660189eafa462cddc.bundle",
+            "FileHash": "25b05acebac1cde660189eafa462cddc",
+            "FileCRC": 497677540,
+            "FileSize": 126399,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_materials_demosceneres.bundle",
+                "defaultpackage_share_assets_art_models_demosceneres.bundle",
+                "defaultpackage_share_assets_art_models_demosceneres_materials.bundle",
+                "defaultpackage_share_assets_art_scenes_demoscene.bundle",
+                "defaultpackage_share_assets_art_tools_probuilder_data_thirdparty_ciathyza_gridbox_prototype_materials_materials_urp.bundle",
+                "defaultpackage_share_assets_art_tools_probuilder_data_thirdparty_ciathyza_gridbox_prototype_materials_textures.bundle",
+                "defaultpackage_share_assets_kinematiccharactercontroller_examples_terrain.bundle",
+                "defaultpackage_share_assets_res_scenes_demoscene_probuilder_meshes.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_runtime_materials.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders_terrain.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ],
+            "ReferenceBundles": [],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Res/Prefabs/Scenes/DemoScene_Physical.prefab",
+                    "AssetGUID": "0395d4e2de75b4e6e987be774f08e3ee"
+                },
+                {
+                    "AssetPath": "Assets/Res/Prefabs/Scenes/DemoScene_RuntimeLightDataAsset.asset",
+                    "AssetGUID": "bfa9830b38bef466eaf7af19ef1c9230"
+                },
+                {
+                    "AssetPath": "Assets/Res/Prefabs/Scenes/DemoScene_RuntimeLightProbeAsset.asset",
+                    "AssetGUID": "6c293ac8c4bf743c098deccab6360af0"
+                },
+                {
+                    "AssetPath": "Assets/Res/Prefabs/Scenes/DemoScene_View.prefab",
+                    "AssetGUID": "edf26d547a2c148139e68bc3a9729940"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_assets_res_scenes_demoscene.bundle",
+            "FileName": "9b3cdd2dd7289a6d37f328b96721aedb.bundle",
+            "FileHash": "9b3cdd2dd7289a6d37f328b96721aedb",
+            "FileCRC": 4201363385,
+            "FileSize": 7263,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_scenes_demoscene.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ],
+            "ReferenceBundles": [],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene.unity",
+                    "AssetGUID": "95cb38e5f3f7441fe9fafc64a99a468b"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_assets_res_scenes_loading.bundle",
+            "FileName": "25ce8e668045f3eed8a0e3356726e602.bundle",
+            "FileHash": "25ce8e668045f3eed8a0e3356726e602",
+            "FileCRC": 1159998992,
+            "FileSize": 4624,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "defaultpackage_unityshaders.bundle"
+            ],
+            "ReferenceBundles": [],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Res/Scenes/Loading.unity",
+                    "AssetGUID": "89b4688ce6bf345258a6fcab17224bf2"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_assets_res_tools_prefab.bundle",
+            "FileName": "9445be0bd1414592d96dd9bc628d1fc9.bundle",
+            "FileHash": "9445be0bd1414592d96dd9bc628d1fc9",
+            "FileCRC": 1964197951,
+            "FileSize": 9794,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_materials.bundle",
+                "defaultpackage_share_assets_art_shaders_chart.bundle",
+                "defaultpackage_share_assets_textmesh_pro_fonts.bundle",
+                "defaultpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+                "defaultpackage_share_assets_textmesh_pro_shaders.bundle"
+            ],
+            "ReferenceBundles": [],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Res/Tools/Prefab/DataVaraince Stat.prefab",
+                    "AssetGUID": "8dfcfa9064e9f41ac96fbd0ca9e60f64"
+                },
+                {
+                    "AssetPath": "Assets/Res/Tools/Prefab/GameDebugStateSetting.asset",
+                    "AssetGUID": "97290da45fb884b5d9789e8798ec1ab3"
+                },
+                {
+                    "AssetPath": "Assets/Res/Tools/Prefab/Net Stat.prefab",
+                    "AssetGUID": "9d8497b09ca7946ea99a55047307844c"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_assets_res_ui.bundle",
+            "FileName": "362e080f1566c9c3cdc98678d9c6354f.bundle",
+            "FileHash": "362e080f1566c9c3cdc98678d9c6354f",
+            "FileCRC": 2994861692,
+            "FileSize": 12527,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "defaultpackage_share_assets_textmesh_pro_fonts.bundle",
+                "defaultpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+                "defaultpackage_share_assets_textmesh_pro_shaders.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ],
+            "ReferenceBundles": [],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Res/UI/UILoading.prefab",
+                    "AssetGUID": "a6f67251f4f744671bf936a585c7b686"
+                },
+                {
+                    "AssetPath": "Assets/Res/UI/UILogin.prefab",
+                    "AssetGUID": "3268caaf949c845de9ddb339d3e28dfc"
+                },
+                {
+                    "AssetPath": "Assets/Res/UI/UIMapSelect.prefab",
+                    "AssetGUID": "4ff458efdc1cd42d68dcdf3493e3bb24"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_assets_art_materials.bundle",
+            "FileName": "58e7a24a8128ed0aa35e031c2341b31a.bundle",
+            "FileHash": "58e7a24a8128ed0aa35e031c2341b31a",
+            "FileCRC": 2712366668,
+            "FileSize": 3032,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_shaders_chart.bundle"
+            ],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_tools_prefab.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Art/Materials/DiagramLines.mat",
+                    "AssetGUID": "f1db120213cd845178c6ce0fea91360e"
+                },
+                {
+                    "AssetPath": "Assets/Art/Materials/DiagramStacked.mat",
+                    "AssetGUID": "8d558d80d7c71479ebf097f9dc2c6c1b"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_assets_art_materials_demosceneres.bundle",
+            "FileName": "7c4a21efe9e21642af0705539994df86.bundle",
+            "FileHash": "7c4a21efe9e21642af0705539994df86",
+            "FileCRC": 25891596,
+            "FileSize": 3565,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders.bundle"
+            ],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_prefabs.bundle",
+                "defaultpackage_assets_res_prefabs_scenes.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Art/Materials/DemoSceneRes/Blue.mat",
+                    "AssetGUID": "60c42fb470eea2b4198867ba20e2b905"
+                },
+                {
+                    "AssetPath": "Assets/Art/Materials/DemoSceneRes/Dark.mat",
+                    "AssetGUID": "ac0fa2f3d7139704ba1ad516325833cc"
+                },
+                {
+                    "AssetPath": "Assets/Art/Materials/DemoSceneRes/Orange.mat",
+                    "AssetGUID": "cdd98aff9e51e5b4c9f98f2d337d0fb1"
+                },
+                {
+                    "AssetPath": "Assets/Art/Materials/DemoSceneRes/Red.mat",
+                    "AssetGUID": "fa7583f4941f3ec4695e3315f9ab341c"
+                },
+                {
+                    "AssetPath": "Assets/Art/Materials/DemoSceneRes/Teleporter.mat",
+                    "AssetGUID": "a4dda9ab07d60364890bdfe5abf41670"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_assets_art_models_demosceneres.bundle",
+            "FileName": "7b15f61d041bcda98850591068a88859.bundle",
+            "FileHash": "7b15f61d041bcda98850591068a88859",
+            "FileCRC": 2944608637,
+            "FileSize": 121553,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_models_demosceneres_materials.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_prefabs_scenes.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/BigMesh.fbx",
+                    "AssetGUID": "7b3263440d2fce2469af539f2ea112d4"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/ComplexShape.fbx",
+                    "AssetGUID": "8ff8d641e32922b46af689259eba176b"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/ConcaveCorridor.fbx",
+                    "AssetGUID": "2b7ce2fb71ab23245a79364c94a76c48"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/ConcaveSteps.fbx",
+                    "AssetGUID": "ea44a31176a10784b9002ca976fea196"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/DualTriSlope.fbx",
+                    "AssetGUID": "2e973c5a9dd49cf409c99021ad5a63a4"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/LedgeSlope.fbx",
+                    "AssetGUID": "2b3e390293a5bb142868f65fe568b1f7"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/ring.fbx",
+                    "AssetGUID": "94c29bfdbb24c4e45a3bc0982aedb13b"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/StepTest1.fbx",
+                    "AssetGUID": "1e5829d00378bbb488aff5a4a8bfbadb"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/StepTest2.fbx",
+                    "AssetGUID": "528aba6b065f6b24f85b2da0c3a616c9"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/StepTest3.fbx",
+                    "AssetGUID": "541ef61594cba1c4b848171826d808e0"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/Suzanne.fbx",
+                    "AssetGUID": "24cbc0be5f22f1c4681decf899eac879"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/TriSlope1.fbx",
+                    "AssetGUID": "d6d109edf651dc54697e5b35f498a328"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/TriSlope2.fbx",
+                    "AssetGUID": "af0439a59cb6f5d4a864c8702e0978ac"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/TriSlope3.fbx",
+                    "AssetGUID": "69b8dd2a641b84e478ade36da7893ffe"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/TriSlope4.fbx",
+                    "AssetGUID": "a1fb5ad061b41ec4f88dee5615c25a82"
+                },
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/weirdthingy.fbx",
+                    "AssetGUID": "6e73d5ad97bcae4479606a8f6e375fa7"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_assets_art_models_demosceneres_materials.bundle",
+            "FileName": "acd9c9b5930d8549c8d59e8031036f80.bundle",
+            "FileHash": "acd9c9b5930d8549c8d59e8031036f80",
+            "FileCRC": 3798996861,
+            "FileSize": 2675,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "defaultpackage_unityshaders.bundle"
+            ],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_prefabs_scenes.bundle",
+                "defaultpackage_share_assets_art_models_demosceneres.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Art/Models/DemoSceneRes/Materials/No Name.mat",
+                    "AssetGUID": "6c6572d67b2ed4140a21a7617df3d874"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_assets_art_prefabs.bundle",
+            "FileName": "cbe8c1fa7ec00f858b8a28d8b471a918.bundle",
+            "FileHash": "cbe8c1fa7ec00f858b8a28d8b471a918",
+            "FileCRC": 2875356398,
+            "FileSize": 4514,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_prefabs.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Art/Prefabs/pb_Mesh-1000514.asset",
+                    "AssetGUID": "65eb7873700704020ba2f2e707d07147"
+                },
+                {
+                    "AssetPath": "Assets/Art/Prefabs/pb_Mesh-1000530.asset",
+                    "AssetGUID": "3d4dcdcac1b374b6fa60ff54ccc6b766"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_assets_art_scenes_demoscene.bundle",
+            "FileName": "8b908f3445f6ccc85a5b48797980aa0d.bundle",
+            "FileHash": "8b908f3445f6ccc85a5b48797980aa0d",
+            "FileCRC": 2211931847,
+            "FileSize": 31714701,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_prefabs_scenes.bundle",
+                "defaultpackage_assets_res_scenes_demoscene.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-0_comp_dir.png",
+                    "AssetGUID": "11ef6098016cb4454834f46649f11746"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-0_comp_light.exr",
+                    "AssetGUID": "5ce1d1d428d40469da30515555500ceb"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-1_comp_dir.png",
+                    "AssetGUID": "a56e724401cc64488b112d33d2801c64"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-1_comp_light.exr",
+                    "AssetGUID": "e26f0b2d89fca4b66b9eb2cc45917f42"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-10_comp_dir.png",
+                    "AssetGUID": "c735ceed1f6a746f2b98e73b48f073a1"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-10_comp_light.exr",
+                    "AssetGUID": "3c4795ec1974e4cd4aa31f1ccbca4359"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-11_comp_dir.png",
+                    "AssetGUID": "e3b795429aca549ab9fe1a4e0be873e7"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-11_comp_light.exr",
+                    "AssetGUID": "f50bc97e431e648d1a9b665367157817"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-12_comp_dir.png",
+                    "AssetGUID": "9ae9415e3fef049a1abd9408400afac8"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-12_comp_light.exr",
+                    "AssetGUID": "96add54f4bf4346dc8af3e5a9d03ddc4"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-13_comp_dir.png",
+                    "AssetGUID": "3b1ecbee3bd82467789b150c6cf04028"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-13_comp_light.exr",
+                    "AssetGUID": "91a5f505078a440149a7998cdf9685fb"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-14_comp_dir.png",
+                    "AssetGUID": "d6bf6b19e831549aeab0ab4fcd2469a1"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-14_comp_light.exr",
+                    "AssetGUID": "9ac2cc996c4a24e8a888a152d5b6ee82"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-15_comp_dir.png",
+                    "AssetGUID": "821344250e0094ce597c5ce405522349"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-15_comp_light.exr",
+                    "AssetGUID": "e54ae26f05e314597bea965723f9a993"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-16_comp_dir.png",
+                    "AssetGUID": "ab1108020200949d6b70dc7ee4cc10b3"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-16_comp_light.exr",
+                    "AssetGUID": "e354936b7ea314ef6a4b748760585200"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-17_comp_dir.png",
+                    "AssetGUID": "30db75ea0abfe4dbfb93203d7da4f56e"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-17_comp_light.exr",
+                    "AssetGUID": "01dbc0f7dcac34aad99fa45e63c32970"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-18_comp_dir.png",
+                    "AssetGUID": "42c713480637d403fa2de39a5864b52e"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-18_comp_light.exr",
+                    "AssetGUID": "7899b5e3e4d5345f79b1a509ee113465"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-19_comp_dir.png",
+                    "AssetGUID": "6dbb5759ef601490d9ab9a315c17a7e7"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-19_comp_light.exr",
+                    "AssetGUID": "1cb9396972db14910bfcf41a8b6e85e0"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-2_comp_dir.png",
+                    "AssetGUID": "da50518585d0e43b2988182181e676c3"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-2_comp_light.exr",
+                    "AssetGUID": "c55f29dbd1ad744a1996e12adfbd1213"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-20_comp_dir.png",
+                    "AssetGUID": "6435075cd31104279a7571f28eea1383"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-20_comp_light.exr",
+                    "AssetGUID": "e3f36ab3e50614df1adff93b7d55ba99"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-21_comp_dir.png",
+                    "AssetGUID": "c6ce454e6ec834724bc1ef509cadd621"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-21_comp_light.exr",
+                    "AssetGUID": "80b11eb49e910487683e7d81413e06d2"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-22_comp_dir.png",
+                    "AssetGUID": "8a47aeb6d471e4023a0b6f63bb771a9a"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-22_comp_light.exr",
+                    "AssetGUID": "6d6504a20b7a044d9b7d833c6d9ef112"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-23_comp_dir.png",
+                    "AssetGUID": "0e2951ef4ccef4fa68a95ede8be7d550"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-23_comp_light.exr",
+                    "AssetGUID": "a0c0f4fbe3aef42b680d45371445b2e8"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-24_comp_dir.png",
+                    "AssetGUID": "60667dc8c906b45b7849215d825a819a"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-24_comp_light.exr",
+                    "AssetGUID": "951671359bfbc47e9aafc7151c3f2c6f"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-25_comp_dir.png",
+                    "AssetGUID": "9c6fd44321c4740d8b859afd826fb504"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-25_comp_light.exr",
+                    "AssetGUID": "fe37dcdc3457c47be89f12dc59fce341"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-26_comp_dir.png",
+                    "AssetGUID": "8421018df499e46a48797e8d091a72a6"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-26_comp_light.exr",
+                    "AssetGUID": "5356cd5478ef94818885e12e817fc2b1"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-3_comp_dir.png",
+                    "AssetGUID": "e91a52bb1c3d64c91afd3f0f5d618291"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-3_comp_light.exr",
+                    "AssetGUID": "ef06e5d4f5a3e4d33bab4458b4b6d8dd"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-4_comp_dir.png",
+                    "AssetGUID": "b81d059046dac4b8b932954327cfd4da"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-4_comp_light.exr",
+                    "AssetGUID": "edc3c3ab7b9a544d2b047c4a738dab23"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-5_comp_dir.png",
+                    "AssetGUID": "e39c1b8445d0342b2ac3bea3f348a355"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-5_comp_light.exr",
+                    "AssetGUID": "be568e56ba4534d54b042b991baa6c18"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-6_comp_dir.png",
+                    "AssetGUID": "d3c3eab34ea494944b378ecacd9f86da"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-6_comp_light.exr",
+                    "AssetGUID": "64cdc4850ed3d42fa9b2d0695c2278bf"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-7_comp_dir.png",
+                    "AssetGUID": "6c68ce7176c9e4a2f99ca5e4bef06954"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-7_comp_light.exr",
+                    "AssetGUID": "60a29b371cab74cb4a6e5b049123d817"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-8_comp_dir.png",
+                    "AssetGUID": "17566a25412d148439fa3c90e1d26d3a"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-8_comp_light.exr",
+                    "AssetGUID": "817cfbfce3608412d935a5ae8fc3d95d"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-9_comp_dir.png",
+                    "AssetGUID": "b0f06b3f414544e65bb07514a9972d8c"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/Lightmap-9_comp_light.exr",
+                    "AssetGUID": "d57bc2c377e1e493fa0741d07da7e3b2"
+                },
+                {
+                    "AssetPath": "Assets/Art/Scenes/DemoScene/ReflectionProbe-0.exr",
+                    "AssetGUID": "b6a43b8bfa40646699b76693a230415c"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_assets_art_shaders_chart.bundle",
+            "FileName": "fe6af781ee7453bdad1d91dfb6abf3bc.bundle",
+            "FileHash": "fe6af781ee7453bdad1d91dfb6abf3bc",
+            "FileCRC": 65001342,
+            "FileSize": 22470,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_tools_prefab.bundle",
+                "defaultpackage_share_assets_art_materials.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Art/Shaders/Chart/DiagramLines.shader",
+                    "AssetGUID": "f226d174b76404f0cba321154e7efd9a"
+                },
+                {
+                    "AssetPath": "Assets/Art/Shaders/Chart/DiagramStacked.shader",
+                    "AssetGUID": "e7fcd49b69ac419f82836a5d5626e6ba"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_assets_art_tools_probuilder_data_thirdparty_ciathyza_gridbox_prototype_materials_materials_urp.bundle",
+            "FileName": "ec4c8379bad28490bb0303c82e894d7b.bundle",
+            "FileHash": "ec4c8379bad28490bb0303c82e894d7b",
+            "FileCRC": 2883531239,
+            "FileSize": 5372,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "defaultpackage_share_assets_art_tools_probuilder_data_thirdparty_ciathyza_gridbox_prototype_materials_textures.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders.bundle"
+            ],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_prefabs.bundle",
+                "defaultpackage_assets_res_prefabs_scenes.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Materials/URP/Prototype_512x512_Blue1.mat",
+                    "AssetGUID": "0f29e3c1c576f6641b9e474f6b194480"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Materials/URP/Prototype_512x512_Grey1.mat",
+                    "AssetGUID": "dfc08c90188302847afb04f628582097"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Materials/URP/Prototype_512x512_Red.mat",
+                    "AssetGUID": "a4b62a69d54e80347bd546999c6d4b9e"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Materials/URP/Prototype_512x512_White.mat",
+                    "AssetGUID": "2ab8149ec4775284bada96c1b85b4a09"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_assets_art_tools_probuilder_data_thirdparty_ciathyza_gridbox_prototype_materials_textures.bundle",
+            "FileName": "475c6ccf37944458afed851023c585f4.bundle",
+            "FileHash": "475c6ccf37944458afed851023c585f4",
+            "FileCRC": 2087230032,
+            "FileSize": 19001,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_prefabs.bundle",
+                "defaultpackage_assets_res_prefabs_scenes.bundle",
+                "defaultpackage_share_assets_art_tools_probuilder_data_thirdparty_ciathyza_gridbox_prototype_materials_materials_urp.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Textures/prototype_512x512_blue1.png",
+                    "AssetGUID": "44cced520ecfd9f4292979a4fe8268c4"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Textures/prototype_512x512_grey1.png",
+                    "AssetGUID": "dd29f35641da38647a1eeb1028211f1a"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Textures/prototype_512x512_normal.png",
+                    "AssetGUID": "44ae09ed76086b14e82d37feb30c7650"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Textures/prototype_512x512_red.png",
+                    "AssetGUID": "3d6064e2e1cd7214e9f67f3a68f494fb"
+                },
+                {
+                    "AssetPath": "Assets/Art/Tools/ProBuilder Data/Thirdparty/Ciathyza/Gridbox Prototype Materials/Textures/prototype_512x512_white.png",
+                    "AssetGUID": "9397418d1d7b12543bf27fb61b93bbea"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_assets_kinematiccharactercontroller_examples_terrain.bundle",
+            "FileName": "50a9f59ddb6477d29b1b0b208030ca09.bundle",
+            "FileHash": "50a9f59ddb6477d29b1b0b208030ca09",
+            "FileCRC": 3456801050,
+            "FileSize": 165222,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "defaultpackage_unityshaders.bundle"
+            ],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_prefabs_scenes.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/KinematicCharacterController/Examples/Terrain/New Terrain.asset",
+                    "AssetGUID": "584986c7300830640ab9700710efbd75"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_assets_res_scenes_demoscene_probuilder_meshes.bundle",
+            "FileName": "57d5a519f0b40d3592e90df1f9d83b87.bundle",
+            "FileHash": "57d5a519f0b40d3592e90df1f9d83b87",
+            "FileCRC": 3948686045,
+            "FileSize": 6631,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_prefabs_scenes.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Ground 4.asset",
+                    "AssetGUID": "80db5d0773f93449ab22261a2314cdb8"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 60.asset",
+                    "AssetGUID": "bd74d6bee67094e9d93a75e24efe3f97"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 61.asset",
+                    "AssetGUID": "a625316945ab24622a3de594a54aebf0"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 62.asset",
+                    "AssetGUID": "62ae8be86ab5440d6afcbb158d22348e"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 63.asset",
+                    "AssetGUID": "6844e7c707f9049f5bf0962d8db4bc1d"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 64.asset",
+                    "AssetGUID": "230d15741dc5e462cac23607d0f1b854"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 65.asset",
+                    "AssetGUID": "c7929b5b1b9ab4f29b7c74811387aa5a"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 66.asset",
+                    "AssetGUID": "bc8ec58e3a1364075b9d08b4a3748795"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 67.asset",
+                    "AssetGUID": "fe31db11ff0af47819b7a476aa4e686f"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 68.asset",
+                    "AssetGUID": "de69464fc972c4428a7cace277afc458"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 69.asset",
+                    "AssetGUID": "b8c03d525ebc4415c93d162e104b6130"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 70.asset",
+                    "AssetGUID": "e1211fa3869a44320888ba7e5e8ed193"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 71.asset",
+                    "AssetGUID": "6eafe66440b084365b411df6091b5ae7"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 72.asset",
+                    "AssetGUID": "dfbbaffb0583843689896a193e9bae9b"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 73.asset",
+                    "AssetGUID": "8879ff556a2244f74ad46d967a989d7a"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Obstacle 74.asset",
+                    "AssetGUID": "34031628271ba4c38a84cb8f013ba965"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/pb_Mesh-813712 4.asset",
+                    "AssetGUID": "89a1b5bfab14049bab8934081fdbb70e"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Wall 16.asset",
+                    "AssetGUID": "3436877200711498aa164669bd74bfd7"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Wall 17.asset",
+                    "AssetGUID": "04d9e65343fe84bc39862537cc63a5ca"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Wall 18.asset",
+                    "AssetGUID": "2201b98831e5a41ceb7e8b94f37c4ef6"
+                },
+                {
+                    "AssetPath": "Assets/Res/Scenes/DemoScene/ProBuilder Meshes/Wall 19.asset",
+                    "AssetGUID": "c73685be40216493db65856132762273"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_assets_textmesh_pro_fonts.bundle",
+            "FileName": "0033813bcb6648ddabbe9eb8f54d7fb1.bundle",
+            "FileHash": "0033813bcb6648ddabbe9eb8f54d7fb1",
+            "FileCRC": 106017335,
+            "FileSize": 227214,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_tools_prefab.bundle",
+                "defaultpackage_assets_res_ui.bundle",
+                "defaultpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Fonts/LiberationSans.ttf",
+                    "AssetGUID": "e3265ab4bf004d28a9537516768c1c75"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+            "FileName": "5ec04eae754dfed27a518fb8bbca35a4.bundle",
+            "FileHash": "5ec04eae754dfed27a518fb8bbca35a4",
+            "FileCRC": 2420779748,
+            "FileSize": 374093,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "defaultpackage_share_assets_textmesh_pro_fonts.bundle",
+                "defaultpackage_share_assets_textmesh_pro_shaders.bundle"
+            ],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_tools_prefab.bundle",
+                "defaultpackage_assets_res_ui.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset",
+                    "AssetGUID": "2e498d1c8094910479dc3e1b768306a4"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset",
+                    "AssetGUID": "8f586378b4e144a9851e7b34d9b748ee"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_assets_textmesh_pro_shaders.bundle",
+            "FileName": "a57b8a837910331f9f40ffacbd648b6c.bundle",
+            "FileHash": "a57b8a837910331f9f40ffacbd648b6c",
+            "FileCRC": 3660851993,
+            "FileSize": 21495,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_tools_prefab.bundle",
+                "defaultpackage_assets_res_ui.bundle",
+                "defaultpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Shaders/TMP_SDF-Mobile.shader",
+                    "AssetGUID": "fe393ace9b354375a9cb14cdbbc28be4"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_packages_com_unity_render-pipelines_universal_runtime_materials.bundle",
+            "FileName": "bdc40b2e1cf77fa2c38bb8d815d0ae88.bundle",
+            "FileHash": "bdc40b2e1cf77fa2c38bb8d815d0ae88",
+            "FileCRC": 840317034,
+            "FileSize": 3557,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders_terrain.bundle",
+                "defaultpackage_unityshaders.bundle"
+            ],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_prefabs.bundle",
+                "defaultpackage_assets_res_prefabs_scenes.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Runtime/Materials/Lit.mat",
+                    "AssetGUID": "31321ba15b8f8eb4c954353edc038b1d"
+                },
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Runtime/Materials/TerrainLit.mat",
+                    "AssetGUID": "594ea882c5a793440b60ff72d896021e"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders.bundle",
+            "FileName": "bf04464ff060fda3220e4b7d140eeb96.bundle",
+            "FileHash": "bf04464ff060fda3220e4b7d140eeb96",
+            "FileCRC": 3829278585,
+            "FileSize": 704654,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_prefabs.bundle",
+                "defaultpackage_assets_res_prefabs_scenes.bundle",
+                "defaultpackage_share_assets_art_materials_demosceneres.bundle",
+                "defaultpackage_share_assets_art_models_demosceneres.bundle",
+                "defaultpackage_share_assets_art_tools_probuilder_data_thirdparty_ciathyza_gridbox_prototype_materials_materials_urp.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_runtime_materials.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+                    "AssetGUID": "933532a4fcc9baf4fa0491de14d08ed7"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders_terrain.bundle",
+            "FileName": "9e80d84aa23965f6819abd9d2f973298.bundle",
+            "FileHash": "9e80d84aa23965f6819abd9d2f973298",
+            "FileCRC": 2064352259,
+            "FileSize": 442936,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "defaultpackage_unityshaders.bundle"
+            ],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_prefabs.bundle",
+                "defaultpackage_assets_res_prefabs_scenes.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_runtime_materials.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Packages/com.unity.render-pipelines.universal/Shaders/Terrain/TerrainLit.shader",
+                    "AssetGUID": "69c1f799e772cb6438f56c23efccb782"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_unityshaders.bundle",
+            "FileName": "4c49c112d7571dd93581bc345643850f.bundle",
+            "FileHash": "4c49c112d7571dd93581bc345643850f",
+            "FileCRC": 1876117379,
+            "FileSize": 91863,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [
+                "defaultpackage_assets_res_prefabs.bundle",
+                "defaultpackage_assets_res_prefabs_scenes.bundle",
+                "defaultpackage_assets_res_scenes_demoscene.bundle",
+                "defaultpackage_assets_res_scenes_loading.bundle",
+                "defaultpackage_assets_res_ui.bundle",
+                "defaultpackage_share_assets_art_models_demosceneres.bundle",
+                "defaultpackage_share_assets_art_models_demosceneres_materials.bundle",
+                "defaultpackage_share_assets_kinematiccharactercontroller_examples_terrain.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_runtime_materials.bundle",
+                "defaultpackage_share_packages_com_unity_render-pipelines_universal_shaders_terrain.bundle"
+            ],
+            "BundleContents": []
+        }
+    ],
+    "IndependAssets": []
+}

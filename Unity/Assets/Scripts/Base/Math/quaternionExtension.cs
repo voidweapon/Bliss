@@ -52,6 +52,15 @@ namespace Bliss.Mathematics
             return (math.abs(self.value.x - other.value.x) <= tolerance && math.abs(self.value.y - other.value.y) <= tolerance && math.abs(self.value.z - other.value.z) <= tolerance && math.abs(self.value.w - other.value.w) <= tolerance)
                    || (math.abs(self.value.x + other.value.x) <= tolerance && math.abs(self.value.y + other.value.y) <= tolerance && math.abs(self.value.z + other.value.z) <= tolerance && math.abs(self.value.w + other.value.w) <= tolerance);
         }
+
+        public static bool IsNaN(this quaternion self)
+        {
+            if (float.IsNaN(self.value.x) || float.IsNaN(self.value.y) || float.IsNaN(self.value.z) || float.IsNaN(self.value.w))
+            {
+                return true;
+            }
+            return false;
+        }
         
     }
 }

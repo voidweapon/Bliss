@@ -1,5 +1,6 @@
 using System;
 using Bliss.Core;
+using Bliss.Pool;
 using Bliss.Timer;
 using ET;
 
@@ -8,33 +9,42 @@ namespace Bliss
     [EntitySystemOf(typeof(Session))]
     public static partial class SessionSystem
     {
-        public static void Awake(this Session self)
+        private static void Awake(this Session self, NetworkComponent network)
         {
+            self.NetworkComponent = network;
             self.LastReceiveTime = self.LastSendTime = TimeInfo.Instance.ClientNow();
         }
-        public static void Destroy(this Session self)
+        private static void Destroy(this Session self)
         {
-            var networkComponent = self.Parent as NetworkComponent;
-            networkComponent.RemoveConnection((uint)self.Id, self.ErrorCode);
+            var networkComponent = self.NetworkComponent;
+            networkComponent?.RemoveConnection((uint)self.Id, self.ErrorCode);
+            self.NetworkComponent =  null;
         }
 
         public static SocketBufferRef MessageToNetStream(this Session self, MessageObject message)
         {
-            var networkComponent = self.Parent as NetworkComponent;
+            var networkComponent = self.NetworkComponent;
             SocketBufferRef netStreamRef = MessageSerializer.MessageToNetStream(networkComponent.NetDriver,  message);
             return netStreamRef;
         }
         
         public static void Send(this Session self, MessageObject message, bool isReliable = true)
         {
-            var networkComponent = self.Parent as NetworkComponent;
+            var networkComponent = self.NetworkComponent;
+            SocketBufferRef netStreamRef = MessageSerializer.MessageToNetStream(networkComponent.NetDriver,  message);
+            self.SendRaw(netStreamRef, isReliable);
+        }
+        
+        public static void Send(this Session self, ActorAddress actorAddress, MessageObject message, bool isReliable = true)
+        {
+            var networkComponent = self.NetworkComponent;
             SocketBufferRef netStreamRef = MessageSerializer.MessageToNetStream(networkComponent.NetDriver,  message);
             self.SendRaw(netStreamRef, isReliable);
         }
         
         public static void SendRawCopy(this Session self, SocketBufferRef buffer, bool isReliable = true)
         {
-            var networkComponent = self.Parent as NetworkComponent;
+            var networkComponent = self.NetworkComponent;
             var newBuffer = networkComponent.NetDriver.RentBuffer(buffer.Target.TrueLength);
             newBuffer.Target.Clone(buffer.Target);
             networkComponent.Send((uint)self.Id, newBuffer, isReliable);
@@ -42,15 +52,15 @@ namespace Bliss
         
         public static void SendRaw(this Session self, SocketBufferRef buffer, bool isReliable = true)
         {
-            var networkComponent = self.Parent as NetworkComponent;
+            var networkComponent = self.NetworkComponent;
             networkComponent.Send((uint)self.Id, buffer, isReliable);
         }
 
-        public static async ETTask<IResponse> Call(this Session self, IRequest request, ETCancellationToken cancellation)
+        public static async ETTask<IResponse> Call(this Session self, IRequest request, ETCancellationToken cancellation, bool needException = true)
         {
-            var requestType = MessageOpcodeManager.Instance.GetRequestTypeBy(request.GetType());
+            var responseType = MessageOpcodeManager.Instance.GetResponseTypeBy(request.GetType());
             int rpcId = self.GenRpcId();
-            var rpcInfo = new RpcInfo(rpcId);
+            var rpcInfo = new RpcInfo(request.GetType());
             self.RpcInfos.Add(rpcId, rpcInfo);
             request.RpcId = rpcId;
             self.Send((MessageObject)request);
@@ -71,24 +81,28 @@ namespace Bliss
 
             try
             {
-                cancellation.Add(CancelAction);
+                cancellation?.Add(CancelAction);
                 IResponse response = await rpcInfo.Wait();
                 return response;
             }
             finally
             {
-                cancellation.Remove(CancelAction);   
+                cancellation?.Remove(CancelAction);   
             }
         }
         
-        public static async ETTask<IResponse> Call(this Session self, IRequest request, long timeMS, ETCancellationToken cancellation)
+        public static async ETTask<IResponse> Call(this Session self, 
+            ActorAddress actorAddress,
+            IRequest request,
+            long timeOutMS, 
+            ETCancellationToken cancellation = null, bool needException = true)
         {
-            var requestType = MessageOpcodeManager.Instance.GetRequestTypeBy(request.GetType());
+            var responseType = MessageOpcodeManager.Instance.GetResponseTypeBy(request.GetType());
             int rpcId = self.GenRpcId();
-            var rpcInfo = new RpcInfo(rpcId);
+            var rpcInfo = new RpcInfo(request.GetType());
             self.RpcInfos.Add(rpcId, rpcInfo);
             request.RpcId = rpcId;
-            self.Send((MessageObject)request);
+            self.Send(actorAddress, (MessageObject)request);
             
             long instanceId = self.InstanceId;
             void CancelAction()
@@ -101,15 +115,27 @@ namespace Bliss
                 {
                     return;
                 }
-                pendingRcp.SetException(new TaskAbortedException());   
+
+                if (needException)
+                {
+                    pendingRcp.SetException(new TaskAbortedException());
+                }
+                else
+                {
+                    IResponse response = (IResponse)ObjectPool.Instance.Fetch(responseType);
+                    response.Error = ErrorCode.ERR_TASK_ABORTED;
+                    response.RpcId = rpcId;
+                    pendingRcp.SetResult(response);
+                }
+                
             }
 
-            if (timeMS > 0)
+            if (timeOutMS > 0)
             {
                 async ETTask Timeout()
                 {
                     long instanceId = self.InstanceId;
-                    await self.Root().GetComponent<TimerComponent>().WaitDurationAsync(timeMS, cancellation);
+                    bool isTimeOut = await self.RootScene().GetComponent<TimerComponent>().WaitDurationAsync(timeOutMS, cancellation);
  
                     if (self.IsDisposed || instanceId != self.InstanceId)
                     {
@@ -119,20 +145,36 @@ namespace Bliss
                     {
                         return;
                     }
-                    timeoutRpc.SetException(new TaskCanceledException($"session call timeout: requestType={requestType} rpcId={rpcId} timeMS={timeMS}"));
+
+                    if (!isTimeOut)
+                    {
+                        return;
+                    }
+                    
+                    if (needException)
+                    {
+                        timeoutRpc.SetException(new TaskCanceledException($"session call timeout: requestType={responseType} rpcId={rpcId} timeMS={timeOutMS}"));
+                    }
+                    else
+                    {
+                        IResponse response = (IResponse)ObjectPool.Instance.Fetch(responseType);
+                        response.Error = ErrorCode.ERR_TASK_TIMEOUT;
+                        response.RpcId = rpcId;
+                        timeoutRpc.SetResult(response);
+                    }
                 }
                 Timeout().Coroutine();
             }
 
             try
             {
-                cancellation.Add(CancelAction);
+                cancellation?.Add(CancelAction);
                 IResponse response = await rpcInfo.Wait();
                 return response;
             }
             finally
             {
-                cancellation.Remove(CancelAction);   
+                cancellation?.Remove(CancelAction);   
             }
         }
         

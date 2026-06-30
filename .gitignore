@@ -85,9 +85,14 @@ crashlytics-build.properties
 ~$*.xlsx.meta
 
 #Unity相关目录
-/Unity/Bundles
 /Unity/UserSettings
+/Unity/Bundles
+/Unity/XCodeProject
 /Unity/HybridCLRData
+/Unity/Release
+/Unity/ScenePhysicalData
+/Unity/Unity_BurstDebugInformation_DoNotShip
+/Unity/Logs
 /Unity/*.csproj
 /Unity/*.unityproj
 /Unity/*.sln

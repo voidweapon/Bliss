@@ -1,10 +1,14 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 
 namespace Bliss
 {
     [WeakRefConstraint]
     public struct EntityRef<T> where T : Entity
     {
+        public static readonly EqualityComparer Comparer = new EqualityComparer();
+
         private long _instanceId;
         private T _entity;
 
@@ -49,11 +53,30 @@ namespace Bliss
         {
             return v.UnPack;
         }
+
+        public override int GetHashCode()
+        {
+            return (int)_instanceId;
+        }
+
+        public class EqualityComparer : IEqualityComparer<EntityRef<T>>
+        {
+            public bool Equals(EntityRef<T> x, EntityRef<T> y)
+            {
+                return x._instanceId == y._instanceId;
+            }
+
+            public int GetHashCode(EntityRef<T> obj)
+            {
+                return (int)obj._instanceId;
+            }
+        }
     }
     
     [WeakRefConstraint]
     public struct EntityWeakRef<T> where T : Entity
     {
+        public static readonly EqualityComparer Comparer = new EqualityComparer();
         private long _instanceId;
         private WeakReference<T> _entityWeakRef;
 
@@ -103,5 +126,24 @@ namespace Bliss
         {
             return v.UnPack;
         }
+        
+        public override int GetHashCode()
+        {
+            return (int)_instanceId;
+        }
+        
+        public class EqualityComparer : IEqualityComparer<EntityWeakRef<T>>
+        {
+            public bool Equals(EntityWeakRef<T> x, EntityWeakRef<T> y)
+            {
+                return x._instanceId == y._instanceId;
+            }
+
+            public int GetHashCode(EntityWeakRef<T> obj)
+            {
+                return (int)obj._instanceId;
+            }
+        }
     }
+    
 }

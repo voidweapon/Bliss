@@ -9,12 +9,12 @@ namespace Bliss
     [EntitySystemOf(typeof(CoroutineLockComponent))]
     public static partial class CoroutineLockComponentSystems
     {
-        public static void Awake(this CoroutineLockComponent self)
+        private static void Awake(this CoroutineLockComponent self)
         {
 
         }
         
-        public static void Update(this CoroutineLockComponent self)
+        private static void Update(this CoroutineLockComponent self)
         {
             // 循环过程中会有对象继续加入队列
             while (self.NextFrameRun.Count > 0)

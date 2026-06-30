@@ -1,0 +1,9 @@
+[
+  {
+    "id": 1,
+    "Name": "TestBullet1",
+    "ModelPath": "Assets/Res/Prefabs/TestBullet.prefab",
+    "MoverId": 1,
+    "DurationMS": 10000
+  }
+]

@@ -16,13 +16,13 @@ namespace Bliss.CoroutineLocks
     [EntitySystemOf(typeof(CoroutineLockQueue))]
     public static partial class CoroutineLockQueueSystems
     {
-        public static void Awake(this CoroutineLockQueue self, int coroutineLockType)
+        private static void Awake(this CoroutineLockQueue self, int coroutineLockType)
         {
             self.IsStart = false;
             self.CoroutineLockType = coroutineLockType;
         }
 
-        public static void Destroy(this CoroutineLockQueue self)
+        private static void Destroy(this CoroutineLockQueue self)
         {
             self.LockQueue.Clear();
             self.IsStart = false;

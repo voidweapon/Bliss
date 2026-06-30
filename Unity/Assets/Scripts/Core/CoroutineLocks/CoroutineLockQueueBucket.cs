@@ -12,7 +12,7 @@ namespace Bliss.CoroutineLocks
     [EntitySystemOf(typeof(CoroutineLockQueueBucket))]
     public static partial class CoroutineLockQueueBucketSystem
     {
-        public static void Awake(this CoroutineLockQueueBucket self)
+        private static void Awake(this CoroutineLockQueueBucket self)
         {
 
         }

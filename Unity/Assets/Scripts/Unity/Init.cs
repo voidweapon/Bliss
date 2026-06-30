@@ -1,65 +1,61 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading.Tasks;
 using UnityEngine;
 using Bliss.Base;
+using Bliss.BootProcess;
 using Bliss.Core;
+using Bliss.SimpleUI;
 using ET;
+using Unity.UI;
 using YooAsset;
 
 namespace Bliss
 {
     public class Init : MonoBehaviour
     {
+        public BootSetting BootSetting;
+        
         private void Awake()
         {
-            InitFramework().Coroutine();
+            DontDestroyOnLoad(gameObject);
+            
+            Options options = new Options()
+            {
+                AppName = "Bliss"
+            };
+            World.Instance.AddSingleton(options);
+            World.Instance.AddSingleton<BootProcesser, BootSetting>(BootSetting);
+            BootProcesser.Instance.InitFramework().Coroutine();
         }
 
-        public void Update()
+        private void Update()
         {
             World.Instance.EarlyUpdate();
             World.Instance.Update();
         }
         
-        public void FixedUpdate()
+        private void FixedUpdate()
         {
             
         }
 
-        public void LateUpdate()
+        private void LateUpdate()
         {
             World.Instance.LateUpdate();
         }
 
 
-        public void OnApplicationQuit()
+        private void OnGUI()
         {
-            World.Instance.Dispose();
+            World.Instance.OnGUI();
         }
 
-        private async ETTask InitFramework()
-        {
-            Application.targetFrameRate = 60;
-            Application.runInBackground = true;
-            
-            DontDestroyOnLoad(gameObject);
-            
-            Log.Logger = new UnityLogger();
-            ETTask.ExceptionHandler += Log.Error;
-            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
-            {
-                Log.Error(e.ExceptionObject.ToString());
-            };
-            
-            World.Instance.AddSingleton<RootManager>();
 
-            await World.Instance.AddSingleton<SimpleResourcesComponent, EPlayMode>(EPlayMode.EditorSimulateMode).CreatePackageAsync("DefaultPackage", true);
-            
-            World.Instance.AddSingleton<CodeLoader>();
-            await CodeLoader.Instance.DownloadDllsAsync();
-            
-            CodeLoader.Instance.Start();
+        private void OnApplicationQuit()
+        {
+            World.Instance.Dispose();
         }
     }
 }

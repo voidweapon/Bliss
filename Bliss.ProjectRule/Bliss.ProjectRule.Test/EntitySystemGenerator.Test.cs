@@ -32,12 +32,27 @@ namespace Bliss.Core
         EntityType = entityType;
         }
     }
+
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+    public class SystemPriorityAttribute : System.Attribute
+    {
+        public Type SystemType  { get; private set; }
+        public int Priority { get; private set; }
+
+        public SystemPriorityAttribute(Type type, int priority)
+        {
+            SystemType = type;
+            Priority = priority;
+        }
+    }
 }
 
 
 namespace TestES
 {
-    [EntitySystemOf(typeof(Entity))]
+    using Bliss.Core;
+
+    [EntitySystemOfAttribute(typeof(Entity))]
     public static partial class GenTest
     {
 
@@ -64,7 +79,7 @@ namespace TestES
     }
 
 
-
+    [SystemPriorityAttribute(typeof(IUpdate), 1)]
     public class Entity : IAwake<int, EntityInitData>,  IUpdate
     {
 

@@ -183,7 +183,7 @@ namespace Bliss.Core.Network
                             ProcessConnectedPacket(packetSpan, protocolType);
                             break;
                         default:
-                            throw new ArgumentOutOfRangeException();
+                            throw new ArgumentOutOfRangeException($"protoTypeBit={protoTypeBit}");
                     }
                 }
                 catch (Exception e)

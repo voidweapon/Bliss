@@ -133,6 +133,30 @@ namespace Bliss.ProjectRule.Analyzer
 
             return null;
         }
+        
+        /// <summary>
+        ///     INamedTypeSymbol 获取指定类型的Attribute
+        /// </summary>
+        public static List<AttributeData> GetAttribute(this INamedTypeSymbol namedTypeSymbol, string attributeFullName, bool fullName = false)
+        {
+            List<AttributeData> result = new List<AttributeData>();
+            foreach (AttributeData? attributeData in namedTypeSymbol.GetAttributes())
+            {
+                if (fullName)
+                {
+                    if (attributeData.AttributeClass?.ToString() == attributeFullName)
+                    {
+                        result.Add(attributeData);
+                    }
+                }
+                if (attributeData.AttributeClass?.Name == attributeFullName)
+                {
+                    result.Add(attributeData);
+                }
+            }
+
+            return result;
+        }
 
         /// <summary>
         ///     INamedTypeSymbol 是否含有指定接口

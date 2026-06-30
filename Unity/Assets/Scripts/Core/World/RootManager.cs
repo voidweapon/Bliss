@@ -97,19 +97,26 @@ namespace Bliss
         }
 
 
-        public async ETTask<int> Create(int zone, ELogicSceneType sceneType, string name)
+        public async ETTask<int> Create(int id, int zone, ELogicSceneType sceneType, string name)
         {
-            int id = ++idGenerator;
             var root =  new Root(id, zone, sceneType, name);
             _children.Add(id, root);
             _addQueue.Enqueue(id);
             
+            Log.Info($"[{name}][{sceneType}]:Create Scene Id={id} Zone={zone}");
             await EventSystem.Instance.Invoke<Invoke_RootInit, ETTask>((long)sceneType, new Invoke_RootInit()
             {
                 Root = root
             });
             
             return id;
+        }
+        
+        public async ETTask<int> Create(int zone, ELogicSceneType sceneType, string name)
+        {
+            int id = ++idGenerator;
+  
+            return await Create(id, zone, sceneType, name);
         }
 
         public void Remove(int id)

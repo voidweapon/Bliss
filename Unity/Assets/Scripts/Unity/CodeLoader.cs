@@ -16,9 +16,6 @@ namespace Bliss
         private Assembly _modelAssembly;
         private Dictionary<string, TextAsset> _dlls;
         private Dictionary<string, TextAsset> _aotDlls;
-
-        private bool _useDLLInEditor = false;
-
         
         private const string _modelAssemblyName = "Bliss.Model";
         private const string _entryClassName = "Bliss.Entry";
@@ -39,14 +36,14 @@ namespace Bliss
         
         public void Init()
         {
-   
+            
         }
 
         public async ETTask DownloadDllsAsync()
         {
-            if(GlobalDefine.IsEditor) return;
-            
-            _dlls = await SimpleResourcesComponent.Instance.LoadAllAssetsAsync<TextAsset>($"{GlobalDefine.CodeDir}/Unity.Model.dll.bytes");
+            if(GlobalDefine.IsEditor && !GlobalDefine.BootSetting.TestABInEditor) return;
+            //LoadAllAssets 只需要提供包中任意资源路径
+            _dlls = await SimpleResourcesComponent.Instance.LoadAllAssetsAsync<TextAsset>($"{GlobalDefine.CodeDir}/Bliss.Model.dll.bytes");
             _aotDlls = await SimpleResourcesComponent.Instance.LoadAllAssetsAsync<TextAsset>($"{GlobalDefine.AOTCodeDir}/mscorlib.dll.bytes");
         }
 
@@ -73,13 +70,15 @@ namespace Bliss
 
         private void  LoadAOT()
         {
-            if (!GlobalDefine.IsEditor && GlobalDefine.EnableIL2CPP)
+            if ((!GlobalDefine.IsEditor && GlobalDefine.EnableIL2CPP) 
+                || (GlobalDefine.IsEditor && GlobalDefine.BootSetting.TestDLLInEditor))
             {
                 foreach (var kv in _aotDlls)
                 {
                     TextAsset textAsset = kv.Value;
                     RuntimeApi.LoadMetadataForAOTAssembly(textAsset.bytes, HomologousImageMode.SuperSet);
                 }
+                Log.Info($"[HybridCLR]AOT assemblies loaded successfully.");
             }
         }
         
@@ -88,12 +87,23 @@ namespace Bliss
             _modelAssemblies.Clear();
             if (GlobalDefine.IsEditor)
             {
-                if (_useDLLInEditor)
+                if (GlobalDefine.BootSetting.TestDLLInEditor)
                 {
                     foreach (string dllName in _modelDlls)
                     {
-                        var dll = File.ReadAllBytes(Path.Combine(GlobalDefine.CodeDir, $"{dllName}.dll.bytes"));
-                        var pdb = File.ReadAllBytes(Path.Combine(GlobalDefine.CodeDir, $"{dllName}.pdb.bytes"));
+                        byte[] dll;
+                        byte[] pdb;
+                        if (GlobalDefine.BootSetting.TestABInEditor)
+                        {
+                            dll = _dlls[$"{dllName}.dll"].bytes;
+                            pdb = _dlls[$"{dllName}.pdb"].bytes;
+                            Log.Info($"[HybridCLR]Load {dllName}.dll.bytes and {dllName}.pdb.bytes from AB In Editor ");
+                        }
+                        else
+                        {
+                            dll = File.ReadAllBytes(Path.Combine(GlobalDefine.CodeDir, $"{dllName}.dll.bytes"));
+                            pdb = File.ReadAllBytes(Path.Combine(GlobalDefine.CodeDir, $"{dllName}.pdb.bytes"));
+                        }
                         
                         var assembly = Assembly.Load(dll, pdb);
                         _modelAssemblies.Add(assembly);
@@ -102,7 +112,9 @@ namespace Bliss
                         {
                             _modelAssembly = assembly;
                         }
+                        Log.Info($"[HybridCLR]Load assembly {assembly.FullName} from {assembly.Location}");
                     }
+                    Log.Info($"[HybridCLR]In Editor Model assemblies loaded successfully.");
                 }
                 else
                 {
@@ -136,6 +148,7 @@ namespace Bliss
                         _modelAssembly = assembly;
                     }
                 }
+                Log.Info($"[HybridCLR]Model assemblies loaded successfully.");
             }
         }
         
@@ -144,21 +157,31 @@ namespace Bliss
             var logics = new List<Assembly>();
             if (GlobalDefine.IsEditor)
             {
-                if (_useDLLInEditor)
+                if (GlobalDefine.BootSetting.TestDLLInEditor)
                 {
                     foreach (string dllName in _logiclDlls)
                     {
-                        var dll = File.ReadAllBytes(Path.Combine(GlobalDefine.CodeDir, $"{dllName}.dll.bytes"));
-                        var pdb = File.ReadAllBytes(Path.Combine(GlobalDefine.CodeDir, $"{dllName}.pdb.bytes"));
+                        byte[] dll;
+                        byte[] pdb;
+                        if (GlobalDefine.BootSetting.TestABInEditor)
+                        {
+                            dll = _dlls[$"{dllName}.dll"].bytes;
+                            pdb = _dlls[$"{dllName}.pdb"].bytes;
+                            Log.Info($"[HybridCLR]Load {dllName}.dll.bytes and {dllName}.pdb.bytes from AB In Editor ");
+
+                        }
+                        else
+                        {
+                            dll = File.ReadAllBytes(Path.Combine(GlobalDefine.CodeDir, $"{dllName}.dll.bytes"));
+                            pdb = File.ReadAllBytes(Path.Combine(GlobalDefine.CodeDir, $"{dllName}.pdb.bytes"));
+                        }
                         
                         var assembly = Assembly.Load(dll, pdb);
-                        _modelAssemblies.Add(assembly);
-                    
-                        if (_modelAssemblyName == dllName)
-                        {
-                            _modelAssembly = assembly;
-                        }
+                        logics.Add(assembly);
+                        Log.Info($"[HybridCLR]Load assembly {assembly.FullName} from {assembly.Location}");
                     }
+
+                    Log.Info($"[HybridCLR]Logic assemblies loaded successfully In Editor.");
                 }
                 else
                 {
@@ -181,6 +204,7 @@ namespace Bliss
                     var pdb = _dlls[$"{dllName}.pdb"].bytes;
                     logics.Add(Assembly.Load(dll, pdb));
                 }
+                Log.Info($"[HybridCLR]Logic assemblies loaded successfully.");
             }
             
             return logics;

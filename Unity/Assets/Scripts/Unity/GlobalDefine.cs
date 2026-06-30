@@ -19,5 +19,7 @@ namespace Bliss
 #else
         public static bool EnableIL2CPP = false;
 #endif
+
+        public static BootSetting BootSetting;
     }
 }

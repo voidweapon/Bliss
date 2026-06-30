@@ -75,6 +75,7 @@ internal abstract class TemplateCodeTargetBase
         var extraEnvs = new ScriptObject()
         {
             {KeywordDefine.Namespace, context.NameSpace},
+            {KeywordDefine.SystemClassName, context.SystemClassName},
             {KeywordDefine.ClassName, context.ClassName},
             {KeywordDefine.IsDotNet, context.IsDotNet},
         };

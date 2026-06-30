@@ -22,6 +22,13 @@ namespace Bliss
             return GetRandom().RandInt32();
         }
 
+        public static long RandInt64()
+        {
+            uint r1 = RandUInt32();
+            uint r2 = RandUInt32();
+            return (long)(((ulong)r1 << 32) | r2);
+        }
+        
         public static int RandomNumber(int lower, int upper)
         {
             return GetRandom().RandomNumber(lower, upper);

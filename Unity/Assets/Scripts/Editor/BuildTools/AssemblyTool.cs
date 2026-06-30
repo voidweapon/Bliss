@@ -7,7 +7,7 @@ using UnityEditor;
 using UnityEditor.Build.Player;
 using UnityEngine;
 
-namespace Editor.BuildTools
+namespace Bliss.BuildTools
 {
     public static class AssemblyTool
     {
@@ -26,19 +26,128 @@ namespace Editor.BuildTools
         {
             unitySynchronizationContext = SynchronizationContext.Current;
             ReGenerateProjectFiles();
+            HookLoadDLL();
         }
 
         static void ReGenerateProjectFiles()
         {
             Unity.CodeEditor.CodeEditor.CurrentEditor.SyncAll();
         }
-        
-        
+
+        #region Hook Load Gameplay DLL
+
+        static void HookLoadDLL()
+        {
+            EditorApplication.playModeStateChanged -= OnEditorApplicationOnplayModeStateChanged;
+            EditorApplication.playModeStateChanged += OnEditorApplicationOnplayModeStateChanged;
+        }
+
+        private static void OnEditorApplicationOnplayModeStateChanged(PlayModeStateChange change)
+        {
+            switch (change)
+            {
+                case PlayModeStateChange.ExitingEditMode:
+                {
+                    OnExitingEditMode();
+                    break;
+                }
+                case PlayModeStateChange.ExitingPlayMode:
+                {
+                    OnExitingPlayMode();
+                    break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 退出编辑模式时处理(即将进入运行模式)
+        /// EnableDll模式时, 屏蔽掉Library的dll(通过改文件后缀方式屏蔽), 仅使用Define.CodeDir下的dll
+        /// </summary>
+        static void OnExitingEditMode()
+        {
+            BootSetting globalConfig = Resources.Load<BootSetting>("BootSetting");
+            if (!globalConfig.TestDLLInEditor)
+            {
+                return;
+            }
+
+            foreach (string dll in DllNames)
+            {
+                string dllFile = $"{Application.dataPath}/../Library/ScriptAssemblies/{dll}.dll";
+                if (File.Exists(dllFile))
+                {
+                    string dllDisableFile = $"{Application.dataPath}/../Library/ScriptAssemblies/{dll}.dll.DISABLE";
+                    if (File.Exists(dllDisableFile))
+                    {
+                        File.Delete(dllDisableFile);
+                    }
+
+                    File.Move(dllFile, dllDisableFile);
+                    Debug.Log($"[AssemblyTool] Disable Library dll {dll}.dll");
+                }
+
+                string pdbFile = $"{Application.dataPath}/../Library/ScriptAssemblies/{dll}.pdb";
+                if (File.Exists(pdbFile))
+                {
+                    string pdbDisableFile = $"{Application.dataPath}/../Library/ScriptAssemblies/{dll}.pdb.DISABLE";
+                    if (File.Exists(pdbDisableFile))
+                    {
+                        File.Delete(pdbDisableFile);
+                    }
+
+                    File.Move(pdbFile, pdbDisableFile);
+                    Debug.Log($"[AssemblyTool] Disable Library dll {dll}.pdb");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 退出运行模式时处理(即将进入编辑模式)
+        /// 还原Library里面屏蔽掉的dll(HybridCLR或者非EnableDll模式都会用到这个目录下的dll, 故需要还原)
+        /// </summary>
+        static void OnExitingPlayMode()
+        {
+            foreach (string dll in DllNames)
+            {
+                string dllDisableFile = $"{Application.dataPath}/../Library/ScriptAssemblies/{dll}.dll.DISABLE";
+                if (File.Exists(dllDisableFile))
+                {
+                    string dllFile = $"{Application.dataPath}/../Library/ScriptAssemblies/{dll}.dll";
+                    if (File.Exists(dllFile))
+                    {
+                        File.Delete(dllDisableFile);
+                    }
+                    else
+                    {
+                        File.Move(dllDisableFile, dllFile);
+                    }
+                    Debug.Log($"[AssemblyTool] Enable Library dll {dll}.dll");
+                }
+
+                string pdbDisableFile = $"{Application.dataPath}/../Library/ScriptAssemblies/{dll}.pdb.DISABLE";
+                if (File.Exists(pdbDisableFile))
+                {
+                    string pdbFile = $"{Application.dataPath}/../Library/ScriptAssemblies/{dll}.pdb";
+                    if (File.Exists(pdbFile))
+                    {
+                        File.Delete(pdbDisableFile);
+                    }
+                    else
+                    {
+                        File.Move(pdbDisableFile, pdbFile);
+                    }
+                    Debug.Log($"[AssemblyTool] Enable Library dll {dll}.pdb");
+                }
+            }
+        }
+
+        #endregion
+
         /// <summary>
         /// 菜单和快捷键编译按钮
         /// </summary>
         [MenuItem("Tools/Bliss/Compile _F6", false, 1)]
-        static void MenuItemOfCompile()
+        public static void MenuItemOfCompile()
         {
             // 强制刷新一下，防止关闭auto refresh，文件修改时间不准确
             AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);

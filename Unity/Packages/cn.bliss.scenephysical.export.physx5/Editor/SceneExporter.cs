@@ -9,7 +9,7 @@ using static MagicPhysX.NativeMethods;
 
 namespace ScenePhysicalExport
 {
-    public static class SceneExporter
+    public static partial class SceneExporter
     {
         /// <summary>
         /// 功能函数，获取 hierarchy 名字
@@ -86,7 +86,9 @@ namespace ScenePhysicalExport
             }
 
             PxRigidBody* pxRigidBody;
-            var transform = PxTransform_new();
+            var position = (PxVec3)go.transform.position;
+            var rotation = (PxQuat)go.transform.rotation;
+            var transform = PxTransform_new_5(&position, &rotation);
             if (rigidBody != null)
             {
                 pxRigidBody = (PxRigidBody*)PxPhysics_createRigidDynamic_mut(physicsContext.Physics, &transform);
@@ -112,7 +114,7 @@ namespace ScenePhysicalExport
             public PxCollection* Collection;
         }
         
-        static Dictionary<PhysicMaterial, IntPtr> _sharedMaterials = new Dictionary<PhysicMaterial, IntPtr>();
+        static Dictionary<PhysicsMaterial, IntPtr> _sharedMaterials = new Dictionary<PhysicsMaterial, IntPtr>();
         
         private static unsafe void ExportScenePhysics(string outputPath, Func<PxPhysicsContext, Scene, string> scanSceneFunc, Scene unityScene)
         {
@@ -136,6 +138,7 @@ namespace ScenePhysicalExport
             var scene =  PxPhysics_createScene_mut(physics, &sceneDesc);
             var serializationRegistry = PxSerialization_createSerializationRegistry(physics);
             var collection = phys_PxCreateCollection();
+            IntPtr pathIntPrt = default;
             try
             {
                 var sceneName = scanSceneFunc(new PxPhysicsContext()
@@ -144,11 +147,11 @@ namespace ScenePhysicalExport
                     Collection = collection,
                 }, unityScene);
                 
-                
+                string filename = outputPath + "/" + sceneName + ".xml";
+                pathIntPrt = Marshal.StringToHGlobalAnsi(filename);
                 PxSerialization_complete(collection, serializationRegistry, null ,false);
                 
-                string filename = outputPath + "/" + sceneName + ".xml";
-                var fileOutStream = PxDefaultFileOutputStream_new_alloc((byte*)Marshal.StringToHGlobalAnsi(filename));
+                var fileOutStream = PxDefaultFileOutputStream_new_alloc((byte*)pathIntPrt);
                 if (PxDefaultFileOutputStream_isValid_mut(fileOutStream))
                 {
                     uint shapeCount = PxCollection_getNbObjects(collection);
@@ -172,6 +175,7 @@ namespace ScenePhysicalExport
                 PxScene_release_mut(scene);
                 PxDefaultCpuDispatcher_release_mut(dispatcher);
                 PxPhysics_release_mut(physics);
+                Marshal.FreeHGlobal(pathIntPrt);
             }
         }
 
@@ -236,13 +240,21 @@ namespace ScenePhysicalExport
                 }
 
                 Quaternion baseRotation = Quaternion.identity;
-                if (capsuleCollider.direction == 0)
+                // if (capsuleCollider.direction == 0)
+                // {
+                //     baseRotation = Quaternion.AngleAxis(90, Vector3.forward);
+                // }
+                // else if (capsuleCollider.direction == 2)
+                // {
+                //     baseRotation = Quaternion.AngleAxis(90, Vector3.right);
+                // }
+                if (capsuleCollider.direction == 1)
                 {
                     baseRotation = Quaternion.AngleAxis(90, Vector3.forward);
                 }
                 else if (capsuleCollider.direction == 2)
                 {
-                    baseRotation = Quaternion.AngleAxis(90, Vector3.right);
+                    baseRotation = Quaternion.AngleAxis(90, Vector3.up);
                 }
                 Quaternion colliderRotation = baseRotation * goTransform.rotation;
                 
@@ -519,7 +531,7 @@ namespace ScenePhysicalExport
 
         #region Utilities
 
-        private static unsafe PxMaterial* CreateMaterial(PxPhysics* pxPhysics, PhysicMaterial material)
+        private static unsafe PxMaterial* CreateMaterial(PxPhysics* pxPhysics, PhysicsMaterial material)
         {
             if (!_sharedMaterials.TryGetValue(material, out var materialPtr))
             {

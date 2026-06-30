@@ -10,14 +10,14 @@ namespace Bliss.ViewLogic.Debugger
     [EntitySystemOf(typeof(TransformStatDebugComponent))]
     public static partial class TransformStatDebugComponentSystems
     {
-        public static void Awake(this TransformStatDebugComponent self)
+        private static void Awake(this TransformStatDebugComponent self)
         {
             self.Time = TimeInfo.Instance.ClientNow();
             self.WatchTransforms.Clear();
             self.InitRes().Coroutine();
         }
 
-        public static void Destroy(this TransformStatDebugComponent self)
+        private static void Destroy(this TransformStatDebugComponent self)
         {
             self.WatchTransforms.Clear();
         }
@@ -37,7 +37,7 @@ namespace Bliss.ViewLogic.Debugger
         }
         
         
-        public static void Update(this TransformStatDebugComponent self)
+        private static void Update(this TransformStatDebugComponent self)
         {
             if (self.UI == null)
             {

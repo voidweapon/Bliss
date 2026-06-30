@@ -5,7 +5,7 @@ namespace Bliss
 {
     public interface IMessageHandler
     {
-        ETTask Handle(Entity entity, MessageObject actorMessage);
+        ETTask Handle(Entity entity, RootAddress fromAddress, MessageObject actorMessage);
         Type GetRequestType();
         Type GetResponseType();
     }

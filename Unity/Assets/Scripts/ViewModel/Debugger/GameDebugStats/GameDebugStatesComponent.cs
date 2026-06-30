@@ -18,12 +18,11 @@ namespace Bliss.ViewModel.Debugger
         private const float HighlightDuration = 1f;
         public void Init()
         {
-            var gui = new GameObject("GameDebugStatesGUI");
-            gui.AddComponent<GameDebugStatesGUI>();
-            GameObject.DontDestroyOnLoad(gui);
-
+            var go = new GameObject();
+            go.AddComponent<TestHotUpdateMono>();
+            World.Instance.OnGUICallback += Draw;
             _gameDebugStateSetting =
-                (GameDebugStateSetting)SimpleResourcesComponent.Instance.LoadAsset<ScriptableObject>("Assets/Res/Tools/Prefab/GameDebugStateSettings.asset");
+                (GameDebugStateSetting)SimpleResourcesComponent.Instance.LoadAsset<ScriptableObject>("Assets/Res/Tools/Prefab/GameDebugStateSetting.asset");
             _gameDebugStateSetting?.Init();
             
             hightlightStyle.normal.background = Texture2D.whiteTexture;
@@ -32,10 +31,12 @@ namespace Bliss.ViewModel.Debugger
 
             labelStyle.alignment = TextAnchor.MiddleLeft;
             labelStyle.fontSize = 20;
+            
         }
         
         protected override void Destroy()
         {
+            World.Instance.OnGUICallback -= Draw;
             _debugStatGroupDrawStates.Clear();
         }
 

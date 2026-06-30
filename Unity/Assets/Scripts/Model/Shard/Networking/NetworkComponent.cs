@@ -82,6 +82,7 @@ namespace Bliss
     public struct Invoke_OnReceiveMessage
     {
         public Session Session;
+        public ActorAddress TargetAddress;
         public object Message;
     }
     

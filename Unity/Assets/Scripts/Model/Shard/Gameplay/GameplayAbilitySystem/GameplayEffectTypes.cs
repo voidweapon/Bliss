@@ -41,10 +41,13 @@ namespace Bliss.Gameplay.GameplayAbilitySystem
     /// </summary>
     public class ActiveGameplayEffectEvents
     {
+#pragma warning disable CS0067 // Event is never used
         public event OnActiveGameplayEffectRemoved_Info OnEffectRemoved;
         public event OnActiveGameplayEffectStackChange OnStackChanged;
         public event OnActiveGameplayEffectTimeChange OnTimeChanged;
         public event OnActiveGameplayEffectInhibitionChanged OnInhibitionChanged;
+#pragma warning restore CS0067 // Event is never used
+
     }
     
     public enum EGameplayTagEventType
@@ -81,7 +84,9 @@ namespace Bliss.Gameplay.GameplayAbilitySystem
         /// <summary>
         /// Delegate fired whenever any tag's count changes to or away from zero
         /// </summary>
+#pragma warning disable CS0067 // Event is never used
         private event OnGameplayEffectTagCountChanged OnAnyTagChangeDelegate;
+#pragma warning restore CS0067 // Event is never used
 
         /// <summary>
         /// Check if the count container has a gameplay tag that matches against the specified tag (expands to include parents of asset tags)

@@ -1,0 +1,89 @@
+{
+    "FileVersion": "2025.9.30",
+    "EnableAddressable": false,
+    "SupportExtensionless": true,
+    "LocationToLower": false,
+    "IncludeAssetGUID": false,
+    "ReplaceAssetPathWithAddress": false,
+    "OutputNameStyle": 0,
+    "BuildBundleType": 2,
+    "BuildPipeline": "ScriptableBuildPipeline",
+    "PackageName": "BootPackage",
+    "PackageVersion": "2026-06-28-1378",
+    "PackageNote": "6/28/2026 10:59:06 PM",
+    "AssetList": [
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/BootRes/UI/UIBoot.prefab",
+            "AssetGUID": "",
+            "AssetTags": [],
+            "BundleID": 0,
+            "DependBundleIDs": [
+                1,
+                2,
+                3,
+                4
+            ]
+        }
+    ],
+    "BundleList": [
+        {
+            "BundleName": "bootpackage_assets_res_bootres_ui.bundle",
+            "UnityCRC": 522874034,
+            "FileHash": "f1b8913b13bab58225538c606abaa6a1",
+            "FileCRC": 212523808,
+            "FileSize": 8798,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundleIDs": [
+                1,
+                2,
+                3,
+                4
+            ]
+        },
+        {
+            "BundleName": "bootpackage_share_assets_art_textures_ui.bundle",
+            "UnityCRC": 3341565404,
+            "FileHash": "559ae0d6ed9b4cabaaf8b0d80f3bca11",
+            "FileCRC": 3111636723,
+            "FileSize": 4718811,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundleIDs": []
+        },
+        {
+            "BundleName": "bootpackage_share_assets_textmesh_pro_fonts.bundle",
+            "UnityCRC": 3103315944,
+            "FileHash": "e89875d975be676f3dfd8ae3d7339b2b",
+            "FileCRC": 4032300774,
+            "FileSize": 227213,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundleIDs": []
+        },
+        {
+            "BundleName": "bootpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+            "UnityCRC": 963841245,
+            "FileHash": "517b8d7fce465e580ed77daa31b2615e",
+            "FileCRC": 894169022,
+            "FileSize": 374112,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundleIDs": [
+                2,
+                4
+            ]
+        },
+        {
+            "BundleName": "bootpackage_unityshaders.bundle",
+            "UnityCRC": 1861102254,
+            "FileHash": "0cf2105476e2f041acc6ed3c3fc6b8d9",
+            "FileCRC": 858525385,
+            "FileSize": 29388,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundleIDs": []
+        }
+    ]
+}

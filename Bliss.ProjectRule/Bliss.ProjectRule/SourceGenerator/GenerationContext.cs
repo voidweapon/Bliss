@@ -5,6 +5,8 @@ namespace Bliss.ProjectRule.SourceGenerator;
 public class GenerationContext
 {
     public string NameSpace { get; set; }
+    
+    public string SystemClassName { get; set; }
     public string ClassName { get; set; }
     
     public string MethodName { get; set; }

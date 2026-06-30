@@ -10,9 +10,8 @@ namespace Bliss
         
     }
     
-    public interface ISerializeSystem : ISystem
+    public interface ISerializeSystem : IEventSystem
     {
-        void Run(Entity entity);
     }
 
     public abstract class SerializeSystem<TEntity> : SystemObject, ISerializeSystem where TEntity : Entity, ISerialize
@@ -30,6 +29,15 @@ namespace Bliss
         public ESystemUpdateGroup GetUpdateGroup()
         {
             return ESystemUpdateGroup.None;
+        }
+        
+        public virtual int GetPriority()
+        {
+            return 0;
+        }
+        public int CompareTo(ISystem other)
+        {
+            return GetPriority() - other.GetPriority();
         }
 
         public void Run(Entity entity)

@@ -52,6 +52,11 @@ public abstract class AwakeSystem<TEntity, T> : IAwakeSystem<T> where TEntity : 
     {
         Awake((TEntity)entity, param);
     }
+
+    public virtual int GetPriority()
+    {
+        return 0;
+    }
     
     protected abstract void Awake(TEntity self, T param);
 }

@@ -1,3 +1,5 @@
+using MemoryPack;
+
 namespace Bliss
 {
     public interface IMessage
@@ -32,6 +34,23 @@ namespace Bliss
         {
             get;
             set;
+        }
+    }
+
+    [MemoryPackable]
+    [MessageOpcode(ushort.MaxValue)]
+    public partial class ResponseMessage : MessageObject, IResponse
+    {
+        public int Error { get; set; }
+        public string Message { get; set; }
+        public int RpcId { get; set; }
+        
+        private static int _sizeHint = System.Runtime.CompilerServices.Unsafe.SizeOf<int>() + System.Runtime.CompilerServices.Unsafe.SizeOf<int>();
+        
+        public override int SizeHint()
+        {
+            int sizeHint = _sizeHint;
+            return sizeHint;
         }
     }
 }

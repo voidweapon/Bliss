@@ -113,10 +113,6 @@ namespace Bliss.Gameplay.GameplayAbilitySystem
         {
             throw new NotImplementedException();
             //TODO: Create CDO
-            if (_gameplayClassDefaultObjects.TryGetValue(type.Class, out object result))
-            {
-                
-            }
         }
 
 

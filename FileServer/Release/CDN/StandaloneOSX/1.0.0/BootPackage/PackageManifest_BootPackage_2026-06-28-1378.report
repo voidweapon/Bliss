@@ -1,0 +1,192 @@
+{
+    "Summary": {
+        "YooVersion": "2.3.19",
+        "UnityVersion": "6000.3.6f1",
+        "BuildDate": "6/28/2026 10:59:11 PM",
+        "BuildSeconds": 4,
+        "BuildTarget": 2,
+        "BuildPipeline": "ScriptableBuildPipeline",
+        "BuildBundleType": 2,
+        "BuildPackageName": "BootPackage",
+        "BuildPackageVersion": "2026-06-28-1378",
+        "BuildPackageNote": "6/28/2026 10:59:06 PM",
+        "UniqueBundleName": true,
+        "EnableAddressable": false,
+        "SupportExtensionless": true,
+        "LocationToLower": false,
+        "IncludeAssetGUID": false,
+        "AutoCollectShaders": true,
+        "IgnoreRuleName": "YooAsset.Editor.NormalIgnoreRule",
+        "ClearBuildCacheFiles": false,
+        "UseAssetDependencyDB": false,
+        "EnableSharePackRule": true,
+        "SingleReferencedPackAlone": true,
+        "EncryptionServicesClassName": "YooAsset.Editor.EncryptionNone",
+        "ManifestProcessServicesClassName": "YooAsset.Editor.ManifestProcessNone",
+        "ManifestRestoreServicesClassName": "YooAsset.Editor.ManifestRestoreNone",
+        "FileNameStyle": 0,
+        "CompressOption": 2,
+        "DisableWriteTypeTree": false,
+        "IgnoreTypeTreeChanges": true,
+        "ReplaceAssetPathWithAddress": false,
+        "WriteLinkXML": true,
+        "CacheServerHost": "",
+        "CacheServerPort": 0,
+        "BuiltinShadersBundleName": "bootpackage_unityshaders.bundle",
+        "MonoScriptsBundleName": "",
+        "AssetFileTotalCount": 6,
+        "MainAssetTotalCount": 1,
+        "AllBundleTotalCount": 5,
+        "AllBundleTotalSize": 5358322,
+        "EncryptedBundleTotalCount": 0,
+        "EncryptedBundleTotalSize": 0
+    },
+    "AssetInfos": [
+        {
+            "Address": "",
+            "AssetPath": "Assets/Res/BootRes/UI/UIBoot.prefab",
+            "AssetGUID": "c34b5481986ac4d70ac3dbce16385dfe",
+            "AssetTags": [],
+            "MainBundleName": "bootpackage_assets_res_bootres_ui.bundle",
+            "MainBundleSize": 8798,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/Art/Textures/UI/Loading_01.jpg",
+                    "AssetGUID": "c2336af5e67214333a21ce55d0971fdb"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Fonts/LiberationSans.ttf",
+                    "AssetGUID": "e3265ab4bf004d28a9537516768c1c75"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset",
+                    "AssetGUID": "2e498d1c8094910479dc3e1b768306a4"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset",
+                    "AssetGUID": "8f586378b4e144a9851e7b34d9b748ee"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Shaders/TMP_SDF-Mobile.shader",
+                    "AssetGUID": "fe393ace9b354375a9cb14cdbbc28be4"
+                }
+            ],
+            "DependBundles": [
+                "bootpackage_share_assets_art_textures_ui.bundle",
+                "bootpackage_share_assets_textmesh_pro_fonts.bundle",
+                "bootpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+                "bootpackage_unityshaders.bundle"
+            ]
+        }
+    ],
+    "BundleInfos": [
+        {
+            "BundleName": "bootpackage_assets_res_bootres_ui.bundle",
+            "FileName": "f1b8913b13bab58225538c606abaa6a1.bundle",
+            "FileHash": "f1b8913b13bab58225538c606abaa6a1",
+            "FileCRC": 212523808,
+            "FileSize": 8798,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "bootpackage_share_assets_art_textures_ui.bundle",
+                "bootpackage_share_assets_textmesh_pro_fonts.bundle",
+                "bootpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+                "bootpackage_unityshaders.bundle"
+            ],
+            "ReferenceBundles": [],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Res/BootRes/UI/UIBoot.prefab",
+                    "AssetGUID": "c34b5481986ac4d70ac3dbce16385dfe"
+                }
+            ]
+        },
+        {
+            "BundleName": "bootpackage_share_assets_art_textures_ui.bundle",
+            "FileName": "559ae0d6ed9b4cabaaf8b0d80f3bca11.bundle",
+            "FileHash": "559ae0d6ed9b4cabaaf8b0d80f3bca11",
+            "FileCRC": 3111636723,
+            "FileSize": 4718811,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [
+                "bootpackage_assets_res_bootres_ui.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Art/Textures/UI/Loading_01.jpg",
+                    "AssetGUID": "c2336af5e67214333a21ce55d0971fdb"
+                }
+            ]
+        },
+        {
+            "BundleName": "bootpackage_share_assets_textmesh_pro_fonts.bundle",
+            "FileName": "e89875d975be676f3dfd8ae3d7339b2b.bundle",
+            "FileHash": "e89875d975be676f3dfd8ae3d7339b2b",
+            "FileCRC": 4032300774,
+            "FileSize": 227213,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [
+                "bootpackage_assets_res_bootres_ui.bundle",
+                "bootpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Fonts/LiberationSans.ttf",
+                    "AssetGUID": "e3265ab4bf004d28a9537516768c1c75"
+                }
+            ]
+        },
+        {
+            "BundleName": "bootpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+            "FileName": "517b8d7fce465e580ed77daa31b2615e.bundle",
+            "FileHash": "517b8d7fce465e580ed77daa31b2615e",
+            "FileCRC": 894169022,
+            "FileSize": 374112,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "bootpackage_share_assets_textmesh_pro_fonts.bundle",
+                "bootpackage_unityshaders.bundle"
+            ],
+            "ReferenceBundles": [
+                "bootpackage_assets_res_bootres_ui.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset",
+                    "AssetGUID": "2e498d1c8094910479dc3e1b768306a4"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset",
+                    "AssetGUID": "8f586378b4e144a9851e7b34d9b748ee"
+                }
+            ]
+        },
+        {
+            "BundleName": "bootpackage_unityshaders.bundle",
+            "FileName": "0cf2105476e2f041acc6ed3c3fc6b8d9.bundle",
+            "FileHash": "0cf2105476e2f041acc6ed3c3fc6b8d9",
+            "FileCRC": 858525385,
+            "FileSize": 29388,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [
+                "bootpackage_assets_res_bootres_ui.bundle",
+                "bootpackage_share_assets_textmesh_pro_resources_fonts_&_materials.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Shaders/TMP_SDF-Mobile.shader",
+                    "AssetGUID": "fe393ace9b354375a9cb14cdbbc28be4"
+                }
+            ]
+        }
+    ],
+    "IndependAssets": []
+}

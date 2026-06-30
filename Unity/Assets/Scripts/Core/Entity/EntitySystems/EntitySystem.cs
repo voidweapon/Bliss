@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DataStructures.SortedCollections;
 
 namespace Bliss
 {
@@ -35,7 +36,7 @@ namespace Bliss
                 return;
             }
 
-            List<ISystem> awakeSystems = EntitySystemManager.Instance.GetEntitySystems(entity.GetType(), typeof(IAwakeSystem));
+            SortedList<ISystem> awakeSystems = EntitySystemManager.Instance.GetEntitySystems(entity.GetType(), typeof(IAwakeSystem));
 
             if (awakeSystems == null)
             {
@@ -61,7 +62,7 @@ namespace Bliss
                 return;
             }
             
-            List<ISystem> awakeSystems = EntitySystemManager.Instance.GetEntitySystems(entity.GetType(), typeof(IAwakeSystem<TParam>));
+            SortedList<ISystem> awakeSystems = EntitySystemManager.Instance.GetEntitySystems(entity.GetType(), typeof(IAwakeSystem<TParam>));
 
             if (awakeSystems == null)
             {
@@ -85,27 +86,7 @@ namespace Bliss
 
         public void Destroy(Entity entity)
         {
-            if (entity is not IDestroy)
-            {
-                return;
-            }
-            List<ISystem> destroySystems = EntitySystemManager.Instance.GetEntitySystems(entity.GetType(), typeof(IDestroySystem));
-            if (destroySystems == null)
-            {
-                return;
-            }
-
-            foreach (var system in destroySystems)
-            {
-                var destroySystem = (IDestroySystem)system;
-                if (destroySystem == null)
-                {
-                    continue;
-                }
-                
-                destroySystem.Run(entity);
-            }
-            
+            CallEventSystem<IDestroy, IDestroySystem>(entity);
         }
 
         #endregion
@@ -113,81 +94,36 @@ namespace Bliss
         #region Serialize Call
         public void OnBeforeSerialize(Entity entity)
         {
-            if (entity is not ISerialize)
-            {
-                return;
-            }
-            
-            List<ISystem> serializeSystems = EntitySystemManager.Instance.GetEntitySystems(entity.GetType(), typeof(ISerializeSystem));
-            if (serializeSystems == null)
-            {
-                return;
-            }
-            
-            foreach (ISerializeSystem serializeSystem in serializeSystems)
-            {
-                if (serializeSystem == null)
-                {
-                    continue;
-                }
-
-                try
-                {
-                    serializeSystem.Run(entity);
-                }
-                catch (Exception e)
-                {
-                    Log.Error(e);
-                }
-            }
+            CallEventSystem<ISerialize, ISerializeSystem>(entity);
         }
 
         public void OnAfterDeserialize(Entity entity)
         {
-            if (entity is not IDeserialize)
-            {
-                return;
-            }
-            
-            List<ISystem> deserializeSystems = EntitySystemManager.Instance.GetEntitySystems(entity.GetType(), typeof(IDeserializeSystem));
-            if (deserializeSystems == null)
-            {
-                return;
-            }
-            
-            foreach (IDeserializeSystem deserializeSystem in deserializeSystems)
-            {
-                if (deserializeSystem == null)
-                {
-                    continue;
-                }
-
-                try
-                {
-                    deserializeSystem.Run(entity);
-                }
-                catch (Exception e)
-                {
-                    Log.Error(e);
-                }
-            }
+            CallEventSystem<IDeserialize, IDeserializeSystem>(entity);
         }
         #endregion
 
         public void OnMountToScene(Entity entity)
         {
-            if (entity is not IMountToScene)
+            CallEventSystem<IMountToScene, IMountToSceneSystem>(entity);
+        }
+        
+        public void CallEventSystem<TEntityConstraint, TSystem>(Entity entity)
+            where TEntityConstraint : IEntitySystemConstraint
+            where TSystem : IEventSystem
+        {
+            if (entity is not TEntityConstraint)
             {
                 return;
             }
             
-            List<ISystem> serializeSystems = EntitySystemManager.Instance.GetEntitySystems(entity.GetType(), typeof(IMountToSceneSystem));
+            SortedList<ISystem> serializeSystems = EntitySystemManager.Instance.GetEntitySystems(entity.GetType(), typeof(TSystem));
             if (serializeSystems == null)
             {
                 return;
             }
             
-            foreach (IMountToSceneSystem mountToSceneSystem in serializeSystems)
+            foreach (TSystem mountToSceneSystem in serializeSystems)
             {
                 if (mountToSceneSystem == null)
                 {

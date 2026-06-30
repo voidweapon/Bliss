@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Bliss.Base.Collections;
 using Bliss.Core;
+using DataStructures.SortedCollections;
 
 namespace Bliss
 {
@@ -32,7 +33,7 @@ namespace Bliss
         /// <param name="entityType"></param>
         /// <param name="systemCategoryType"></param>
         /// <returns></returns>
-        public List<ISystem> GetEntitySystems(Type entityType, Type systemCategoryType)
+        public SortedList<ISystem> GetEntitySystems(Type entityType, Type systemCategoryType)
         {
             return _entityTypeSystemMgr.GetEntitySystems(entityType, systemCategoryType);
         }
@@ -49,7 +50,7 @@ namespace Bliss
             /// </summary>
             private Dictionary<Type, EntitySystemCategoryMgr> _entitySystems = new Dictionary<Type, EntitySystemCategoryMgr>();
             
-            public List<ISystem> GetEntitySystems(Type entityType, Type systemCategoryType)
+            public SortedList<ISystem> GetEntitySystems(Type entityType, Type systemCategoryType)
             {
                 if (_entitySystems.TryGetValue(entityType, out EntitySystemCategoryMgr entitySystem))
                 {
@@ -86,11 +87,12 @@ namespace Bliss
             /// <summary>
             /// EntitySystem CategoryType -> EntitySystem Object
             /// </summary>
-            private readonly MultiMapList<Type, ISystem> _entitySystems = new MultiMapList<Type, ISystem>();
+            //private readonly MultiMapList<Type, ISystem> _entitySystems = new MultiMapList<Type, ISystem>();
+            private readonly MultiMapSortedList<Type, ISystem> _entitySystems = new MultiMapSortedList<Type, ISystem>();
 
             private readonly bool[] _updateInGroup = new bool[(int)ESystemUpdateGroup.Max];
             
-            public List<ISystem> GetEntitySystems(Type systemCategoryType)
+            public SortedList<ISystem> GetEntitySystems(Type systemCategoryType)
             {
                 return _entitySystems[systemCategoryType];
             }

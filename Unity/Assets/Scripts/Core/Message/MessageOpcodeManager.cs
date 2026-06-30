@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Bliss.Base.Collections;
 using Bliss.Core;
+using Bliss.Pool;
 
 namespace Bliss
 {
@@ -83,10 +84,20 @@ namespace Bliss
             _request2Response.Add(request, responseType);
         }
 
-        public Type GetRequestTypeBy(Type request)
+        public Type GetResponseTypeBy(Type request)
         {
             return _request2Response[request];
         }
+
+        public IResponse CreateResponseBy(Type request, int rpcId, int errorCode)
+        {
+            Type responseType = GetResponseTypeBy(request);
+            IResponse response = (IResponse)ObjectPool.Instance.Fetch(responseType);
+            response.RpcId = rpcId;
+            response.Error = errorCode;
+            return response;
+        }
+        
         
     }
 }

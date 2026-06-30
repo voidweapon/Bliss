@@ -1,0 +1,101 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eb50d851977f41e4b9303ebc12e96f76, type: 3}
+  m_Name: DemoScene_RuntimeLightDataAsset
+  m_EditorClassIdentifier: 
+  lightmaps:
+  - {fileID: 2800000, guid: 5ce1d1d428d40469da30515555500ceb, type: 3}
+  - {fileID: 2800000, guid: e26f0b2d89fca4b66b9eb2cc45917f42, type: 3}
+  - {fileID: 2800000, guid: c55f29dbd1ad744a1996e12adfbd1213, type: 3}
+  - {fileID: 2800000, guid: ef06e5d4f5a3e4d33bab4458b4b6d8dd, type: 3}
+  - {fileID: 2800000, guid: edc3c3ab7b9a544d2b047c4a738dab23, type: 3}
+  - {fileID: 2800000, guid: be568e56ba4534d54b042b991baa6c18, type: 3}
+  - {fileID: 2800000, guid: 64cdc4850ed3d42fa9b2d0695c2278bf, type: 3}
+  - {fileID: 2800000, guid: 60a29b371cab74cb4a6e5b049123d817, type: 3}
+  - {fileID: 2800000, guid: 817cfbfce3608412d935a5ae8fc3d95d, type: 3}
+  - {fileID: 2800000, guid: d57bc2c377e1e493fa0741d07da7e3b2, type: 3}
+  - {fileID: 2800000, guid: 3c4795ec1974e4cd4aa31f1ccbca4359, type: 3}
+  - {fileID: 2800000, guid: f50bc97e431e648d1a9b665367157817, type: 3}
+  - {fileID: 2800000, guid: 96add54f4bf4346dc8af3e5a9d03ddc4, type: 3}
+  - {fileID: 2800000, guid: 91a5f505078a440149a7998cdf9685fb, type: 3}
+  - {fileID: 2800000, guid: 9ac2cc996c4a24e8a888a152d5b6ee82, type: 3}
+  - {fileID: 2800000, guid: e54ae26f05e314597bea965723f9a993, type: 3}
+  - {fileID: 2800000, guid: e354936b7ea314ef6a4b748760585200, type: 3}
+  - {fileID: 2800000, guid: 01dbc0f7dcac34aad99fa45e63c32970, type: 3}
+  - {fileID: 2800000, guid: 7899b5e3e4d5345f79b1a509ee113465, type: 3}
+  - {fileID: 2800000, guid: 1cb9396972db14910bfcf41a8b6e85e0, type: 3}
+  - {fileID: 2800000, guid: e3f36ab3e50614df1adff93b7d55ba99, type: 3}
+  - {fileID: 2800000, guid: 80b11eb49e910487683e7d81413e06d2, type: 3}
+  - {fileID: 2800000, guid: 6d6504a20b7a044d9b7d833c6d9ef112, type: 3}
+  - {fileID: 2800000, guid: a0c0f4fbe3aef42b680d45371445b2e8, type: 3}
+  - {fileID: 2800000, guid: 951671359bfbc47e9aafc7151c3f2c6f, type: 3}
+  - {fileID: 2800000, guid: fe37dcdc3457c47be89f12dc59fce341, type: 3}
+  - {fileID: 2800000, guid: 5356cd5478ef94818885e12e817fc2b1, type: 3}
+  lightmapsDir:
+  - {fileID: 2800000, guid: 11ef6098016cb4454834f46649f11746, type: 3}
+  - {fileID: 2800000, guid: a56e724401cc64488b112d33d2801c64, type: 3}
+  - {fileID: 2800000, guid: da50518585d0e43b2988182181e676c3, type: 3}
+  - {fileID: 2800000, guid: e91a52bb1c3d64c91afd3f0f5d618291, type: 3}
+  - {fileID: 2800000, guid: b81d059046dac4b8b932954327cfd4da, type: 3}
+  - {fileID: 2800000, guid: e39c1b8445d0342b2ac3bea3f348a355, type: 3}
+  - {fileID: 2800000, guid: d3c3eab34ea494944b378ecacd9f86da, type: 3}
+  - {fileID: 2800000, guid: 6c68ce7176c9e4a2f99ca5e4bef06954, type: 3}
+  - {fileID: 2800000, guid: 17566a25412d148439fa3c90e1d26d3a, type: 3}
+  - {fileID: 2800000, guid: b0f06b3f414544e65bb07514a9972d8c, type: 3}
+  - {fileID: 2800000, guid: c735ceed1f6a746f2b98e73b48f073a1, type: 3}
+  - {fileID: 2800000, guid: e3b795429aca549ab9fe1a4e0be873e7, type: 3}
+  - {fileID: 2800000, guid: 9ae9415e3fef049a1abd9408400afac8, type: 3}
+  - {fileID: 2800000, guid: 3b1ecbee3bd82467789b150c6cf04028, type: 3}
+  - {fileID: 2800000, guid: d6bf6b19e831549aeab0ab4fcd2469a1, type: 3}
+  - {fileID: 2800000, guid: 821344250e0094ce597c5ce405522349, type: 3}
+  - {fileID: 2800000, guid: ab1108020200949d6b70dc7ee4cc10b3, type: 3}
+  - {fileID: 2800000, guid: 30db75ea0abfe4dbfb93203d7da4f56e, type: 3}
+  - {fileID: 2800000, guid: 42c713480637d403fa2de39a5864b52e, type: 3}
+  - {fileID: 2800000, guid: 6dbb5759ef601490d9ab9a315c17a7e7, type: 3}
+  - {fileID: 2800000, guid: 6435075cd31104279a7571f28eea1383, type: 3}
+  - {fileID: 2800000, guid: c6ce454e6ec834724bc1ef509cadd621, type: 3}
+  - {fileID: 2800000, guid: 8a47aeb6d471e4023a0b6f63bb771a9a, type: 3}
+  - {fileID: 2800000, guid: 0e2951ef4ccef4fa68a95ede8be7d550, type: 3}
+  - {fileID: 2800000, guid: 60667dc8c906b45b7849215d825a819a, type: 3}
+  - {fileID: 2800000, guid: 9c6fd44321c4740d8b859afd826fb504, type: 3}
+  - {fileID: 2800000, guid: 8421018df499e46a48797e8d091a72a6, type: 3}
+  shadowMasks:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  lightmapsMode: 1
+  lightProbesAsset: {fileID: 11400000, guid: 6c293ac8c4bf743c098deccab6360af0, type: 2}
+  hasRealtimeLights: 1

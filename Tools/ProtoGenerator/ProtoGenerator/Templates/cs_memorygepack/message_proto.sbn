@@ -16,7 +16,7 @@ using Bliss.Pool;
         {{~ for proto_property in proto_class.properties ~}}
         {{gen_comment proto_property.comment}}
         [MemoryPackOrder({{proto_property.order}})]
-        public {{proto_property.property_type}} {{proto_property.name}} { get; set; }
+        {{define_property proto_property}}
         {{~end~}}
         
         public static {{proto_class.class_name}} Create(bool isFromPool = false)
@@ -42,7 +42,7 @@ using Bliss.Pool;
             ObjectPool.Instance.Recycle(this);
         }
        
-        private const int _sizeHint = {{gen_size_hint proto_class}};
+        private static int _sizeHint = {{gen_size_hint proto_class}};
         
         partial void CustomSizeHint(ref int sizeHint);
         

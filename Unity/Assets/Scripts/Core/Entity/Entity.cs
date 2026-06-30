@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Bliss.Base;
 using Bliss.Id;
 using Bliss.Pool;
 using MemoryPack;
@@ -174,12 +175,16 @@ namespace Bliss
         #endregion
 
         #region Entity Tree
+        /// <summary>
+        /// key: Entity Id
+        /// </summary>
 #if DOTNET
         [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
 #endif
         protected SortedDictionary<long, Entity> _children;
         /// <summary>
         /// 孩子节点
+        /// key: Entity Id
         /// </summary>
 #if DOTNET
         [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
@@ -238,13 +243,28 @@ namespace Bliss
             return entity;
         }
 
-        public T AddChild<T>(bool isFromPool = false) where T : Entity
+        
+        public Entity AddChild(Type type, bool isFromPool = false) 
         {
-            T entity = (T)Entity.Create(typeof(T), isFromPool);
+            Entity entity = Entity.Create(type, isFromPool);
             entity.Id = Bliss.Id.IdGenerator.Instance.GenerateId();
             entity.Parent = this;
             GetEntitySystem().Awake(entity);
             return entity;
+        }
+        
+        public Entity AddChildWithId(Type type, long id, bool isFromPool = false) 
+        {
+            Entity entity = Entity.Create(type, isFromPool);
+            entity.Id = id;
+            entity.Parent = this;
+            GetEntitySystem().Awake(entity);
+            return entity;
+        }
+        
+        public T AddChild<T>(bool isFromPool = false) where T : Entity
+        {
+            return (T)AddChild(typeof(T), isFromPool);
         }
         
         public T AddChild<T, TArg>(TArg arg, bool isFromPool = false) where T : Entity
@@ -258,11 +278,7 @@ namespace Bliss
         
         public T AddChildWithId<T>(long id, bool isFromPool = false) where T : Entity
         {
-            T entity = (T)Entity.Create(typeof(T), isFromPool);
-            entity.Id = id;
-            entity.Parent = this;
-            GetEntitySystem().Awake(entity);
-            return entity;
+            return (T)AddChildWithId(typeof(T), id, isFromPool);
         }
         
         public T AddChildWithId<T, TArg>(long id, TArg arg, bool isFromPool = false) where T : Entity
@@ -274,6 +290,12 @@ namespace Bliss
             return entity;
         }
 
+        /// <summary>
+        /// 获取孩子节点
+        /// </summary>
+        /// <param name="id">Entity Id</param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         public T GetChild<T>(long id) where T : Entity
         {
             if (_children == null)
@@ -446,17 +468,22 @@ namespace Bliss
             component.SetComponentParent(this);
             return component;
         }
-
-        public TComponent AddComponent<TComponent>(bool isFromPool = false) where TComponent : Entity
+        
+        public Entity AddComponent(Type componentType, bool isFromPool = false)
         {
-            Type componentType = typeof(TComponent);
             EarlyCheckDuplicateComponents(componentType);
             
             Entity component = Create(componentType, isFromPool);
             component.Id = Id;
             component.SetComponentParent(this);
             GetEntitySystem().Awake(component);
-            return (TComponent)component;
+            return component;
+        }
+
+        public TComponent AddComponent<TComponent>(bool isFromPool = false) where TComponent : Entity
+        {
+            Type componentType = typeof(TComponent);
+            return (TComponent)AddComponent(componentType, isFromPool);
         }
         
         public TComponent AddComponent<TComponent, TParam>(TParam param, bool isFromPool = false) where TComponent : Entity
@@ -762,7 +789,7 @@ namespace Bliss
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private EntitySystem GetEntitySystem()
+        protected EntitySystem GetEntitySystem()
         {
             return LogicScene.Root.EntitySystem;
         }

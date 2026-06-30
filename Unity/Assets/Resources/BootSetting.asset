@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca6cf609af894eb7b659f8b24ac2c603, type: 3}
+  m_Name: BootSetting
+  m_EditorClassIdentifier: Bliss.Unity::Bliss.BootSetting
+  TargetFPS: 60
+  PlayMode: 2
+  AppVersion: 1.0.0
+  ResDefaultHostServer: http://127.0.0.1:8091
+  ResFallbackHostServer: http://127.0.0.1:8091
+  AutoSimulatePhysics: 1
+  AutoSyncPhysicalTransform: 1
+  TestABInEditor: 1
+  TestDLLInEditor: 0

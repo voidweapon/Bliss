@@ -5,6 +5,11 @@ using ET;
 
 namespace Bliss
 {
+    /// <summary>
+    /// 发送给Scene的Session上的消息
+    /// 和<see cref="SessionMessageHandlerAttribute"/>一起工作
+    /// </summary>
+    /// <typeparam name="TMessage"></typeparam>
     public abstract class SessionMessageHandler<TMessage> : ISessionMessageHandler where TMessage : MessageObject
     {
         public void Handle(Session session, object message)
@@ -49,6 +54,10 @@ namespace Bliss
     }
     
     
+    /// <summary>
+    /// 发送给Scene的Session上的消息,带有返回值
+    /// 和<see cref="SessionMessageHandlerAttribute"/>一起工作
+    /// </summary>
     public  abstract class SessionMessageHandler<TRequest, TResponse> : ISessionMessageHandler 
         where TRequest : MessageObject, IRequest
         where TResponse : MessageObject, IResponse

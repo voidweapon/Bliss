@@ -3,6 +3,8 @@
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
         <RootNamespace>Bliss</RootNamespace>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <Nullable>disable</Nullable>
     </PropertyGroup>
 
     <PropertyGroup>
@@ -21,13 +23,15 @@
         <OutputPath>..\..\Bin\</OutputPath>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <Optimize>true</Optimize>
-        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <NoWarn>0169,0649,3021,8981,CS9193,CS9192</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
         <Compile Include="../../Unity/Assets/Scripts/Logic/Shard/**/*.cs">
             <Link>Shard/%(RecursiveDir)%(FileName)%(Extension)</Link>
+        </Compile>
+        <Compile Update="Server\Demo\Map\Bullet\GameplayEventHandler_ShootBullet_Server.cs">
+          <Link>Shard\Demo\Bullet\GameplayEventHandler_ShootBullet_Server.cs</Link>
         </Compile>
     </ItemGroup>
 

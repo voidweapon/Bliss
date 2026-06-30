@@ -1,4 +1,5 @@
 using System;
+using Bliss.Core;
 
 namespace Bliss
 {
@@ -11,10 +12,11 @@ namespace Bliss
     {
         
     }
-
     
     public abstract class UpdateSystem<TEntity> : SystemObject, IUpdateSystem where TEntity : Entity, IUpdate
     {
+        public virtual int Priority { get; protected set; } = 0;
+        
         public Type GetEntityType()
         {
             return typeof(TEntity);
@@ -28,6 +30,15 @@ namespace Bliss
         public ESystemUpdateGroup GetUpdateGroup()
         {
             return ESystemUpdateGroup.Update;
+        }
+        
+        public virtual int GetPriority()
+        {
+            return 0;
+        }
+        public int CompareTo(ISystem other)
+        {
+            return GetPriority() - other.GetPriority();
         }
 
         public void Run(Entity entity)

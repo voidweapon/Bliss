@@ -1,0 +1,18 @@
+<module>
+
+    <enum name="ETargetType">
+        <var name="Position"/>
+        <var name="Direction"/>
+        <var name="Entity"/>
+        <var name="PositionOrEntity"/>
+    </enum>
+    
+    <bean name="MoverStageCfg">
+        <var name="TargetType" type="ETargetType"/>
+        <var name="Duration" type="float"/>
+    </bean>
+    
+    <bean name="StraightLineMoverStageCfg" parent="MoverStageCfg">
+      <var name="Speed" type="float"/>
+    </bean>
+</module>

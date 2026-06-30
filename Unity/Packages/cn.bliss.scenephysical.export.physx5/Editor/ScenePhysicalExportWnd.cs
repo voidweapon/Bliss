@@ -14,7 +14,7 @@ namespace ScenePhysicalExport.Physx
         {
             string outputPath = string.Empty;
             outputPath = EditorUtility.SaveFolderPanel("Select Folder To Save", outputPath, "");
-            bool result = SceneExporter.ExportCurrentScene(EditorSceneManager.GetActiveScene(), outputPath);
+            bool result = SceneExporter.ExportScenePhysicsToMemoryPack(EditorSceneManager.GetActiveScene(), outputPath);
             if(result)
             {
                 EditorUtility.DisplayDialog("Success", "Export Scene  Success", "OK");

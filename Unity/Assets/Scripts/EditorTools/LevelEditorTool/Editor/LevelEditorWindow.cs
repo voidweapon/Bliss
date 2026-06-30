@@ -20,11 +20,11 @@ namespace Bliss.EditorTool.LevelEditorTool
         {
             var window = GetWindow<LevelEditorWindow>();
             
-            window.OnClose -= window.ExitEditorModelInner;
-            window.OnClose += window.ExitEditorModelInner;
+            window.OnClose -= window.ForceExitEditorModelInner;
+            window.OnClose += window.ForceExitEditorModelInner;
             
-            EditorApplication.quitting -= window.ExitEditorModelInner;
-            EditorApplication.quitting += window.ExitEditorModelInner;
+            EditorApplication.quitting -= window.ForceExitEditorModelInner;
+            EditorApplication.quitting += window.ForceExitEditorModelInner;
             
             window.Show();
         }
@@ -32,6 +32,7 @@ namespace Bliss.EditorTool.LevelEditorTool
         private bool _inEditorModel;
         private Scene _editorScene;
         private Scene _currentScene;
+        private LevelEditorManager  _levelEditorManager;
         
         [DisableIf(nameof(_inEditorModel))]
         [Button("进入编辑模式", ButtonSizes.Large)]
@@ -39,6 +40,7 @@ namespace Bliss.EditorTool.LevelEditorTool
         {
             var currentScene = EditorSceneManager.GetActiveScene();
             _currentScene = currentScene;
+            ClearSceneDirtyFlag(currentScene);
             _editorScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
             _editorScene.name = $"{currentScene.name}_Setting(Editing)";
             _inEditorModel = true;
@@ -50,8 +52,12 @@ namespace Bliss.EditorTool.LevelEditorTool
             ClearNetworkIdentityGenerateInfo();
             
             EditorSceneManager.sceneDirtied -= EditorSceneManagerOnSceneDirtied;
-            EditorSceneManager.sceneDirtied += EditorSceneManagerOnSceneDirtied;
             ObjectChangeEvents.changesPublished -= ObjectChangeEventsOnChangesPublished;
+
+            _levelEditorManager = new LevelEditorManager();
+            _levelEditorManager.Init();
+            
+            EditorSceneManager.sceneDirtied += EditorSceneManagerOnSceneDirtied;
             ObjectChangeEvents.changesPublished += ObjectChangeEventsOnChangesPublished;
         }
         
@@ -63,14 +69,27 @@ namespace Bliss.EditorTool.LevelEditorTool
             ExitEditorModelInner();
         }
 
-        private void ExitEditorModelInner()
+        private void ForceExitEditorModelInner()
+        {
+            ExitEditorModelInner(true);
+        }
+        
+        private void ExitEditorModelInner(bool forceExit = false)
         {
             if(!_inEditorModel) return;
 
-            if (!EditorUtility.DisplayDialog("编辑模式", "是否退出编辑模式", "退出", "取消"))
+            if (!forceExit && !EditorUtility.DisplayDialog("编辑模式", "是否退出编辑模式", "退出", "取消"))
             {
                 return;
             }
+
+            if (_levelEditorManager != null)
+            {
+                _levelEditorManager.ExportSceneSetting(_editorScene, _currentScene.name);
+            }
+            
+            _levelEditorManager?.Dispose();
+            _levelEditorManager = null;
             
             EditorSceneManager.sceneDirtied -= EditorSceneManagerOnSceneDirtied;
             ObjectChangeEvents.changesPublished -= ObjectChangeEventsOnChangesPublished;
@@ -84,29 +103,40 @@ namespace Bliss.EditorTool.LevelEditorTool
             
             SceneVisibilityManager.instance.EnableAllPicking();
         }
-
-        [EnableIf(nameof(_inEditorModel))]
-        [Button("导出场景配置", ButtonSizes.Large)]
-        private void ExportSceneSetting()
-        {
-            string filePath = EditorUtility.SaveFilePanel("Scene Settings", LevelEditorDefines.OutputFolder, $"{_currentScene.name}_setting","json");
-            if (string.IsNullOrEmpty(filePath))
-            {
-                return;
-            }
-            Debug.Log(filePath);
-        }
-
+        
         [EnableIf(nameof(_inEditorModel))]
         [Button("导入场景配置", ButtonSizes.Large)]
         private void ImportSceneSetting()
         {
-            string filePath = EditorUtility.OpenFilePanel("Scene Settings", LevelEditorDefines.OutputFolder, "");
+            string filePath = EditorUtility.OpenFilePanel("Scene Settings", LevelEditorDefines.SceneSettingFolder, "");
             if (string.IsNullOrEmpty(filePath))
             {
                 return;
             }
             Debug.Log(filePath);
+            var sceneActors = _levelEditorManager.LoadSceneSetting(_editorScene, _currentScene.name);
+            foreach (var sceneActor in sceneActors)
+            {
+                TrySetActorNetworkIdentify(_editorScene, sceneActor.gameObject.GetInstanceID(), out var _);
+            }
+
+        }
+        
+        [EnableIf(nameof(_inEditorModel))]
+        [Button("导出场景配置", ButtonSizes.Large)]
+        private void ExportSceneSetting()
+        {
+            string filePath = EditorUtility.SaveFilePanel("Scene Settings", LevelEditorDefines.SceneSettingFolder, $"{_currentScene.name}_setting","json");
+            if (string.IsNullOrEmpty(filePath))
+            {
+                return;
+            }
+            Debug.Log(filePath);
+            
+            if (_levelEditorManager != null)
+            {
+                _levelEditorManager.ExportSceneSetting(_editorScene, _currentScene.name);
+            }
         }
         
         /// <summary>
@@ -119,6 +149,7 @@ namespace Bliss.EditorTool.LevelEditorTool
             {
                 return;
             }
+            
             NativeList<int> moveObjects = new NativeList<int>(1, Allocator.Temp);
             foreach (var rootGameObject in scene.GetRootGameObjects())
             {
@@ -134,6 +165,22 @@ namespace Bliss.EditorTool.LevelEditorTool
             moveObjectAry.Dispose();
             moveObjects.Dispose();
 
+            // var rootGameObjects = scene.GetRootGameObjects();
+            // for (int i = rootGameObjects.Length - 1; i >= 0; i--)
+            // {
+            //     var rootGameObject =  rootGameObjects[i];
+            //     if (!rootGameObject.hideFlags.HasFlag(HideFlags.NotEditable))
+            //     {
+            //         EditorSceneManager.MoveGameObjectToScene(rootGameObject, _editorScene);
+            //     }
+            // }
+
+            ClearSceneDirtyFlag(scene);
+            ClearSceneDirtyFlag(_editorScene);
+        }
+
+        private static void ClearSceneDirtyFlag(Scene scene)
+        {
             var clearSceneDirtyMethod =  typeof(EditorSceneManager).GetMethod("ClearSceneDirtiness", BindingFlags.Static | BindingFlags.NonPublic);
             if (clearSceneDirtyMethod != null)
             {
@@ -199,6 +246,7 @@ namespace Bliss.EditorTool.LevelEditorTool
                         continue;
                 }
             }
+            ClearSceneDirtyFlag(_editorScene);
         }
 
         private long _maxNetworkIdentity;
@@ -219,7 +267,7 @@ namespace Bliss.EditorTool.LevelEditorTool
                 return;
             }
             
-            var actor = go.GetComponent<LevelActor>();
+            var actor = go.GetComponent<AbstractLevelEditorActor>();
             if (actor == null)
             {
                 if (_dicInstanceId2NetworkIdentity.ContainsKey(instanceId))
@@ -277,7 +325,7 @@ namespace Bliss.EditorTool.LevelEditorTool
         {
             if (_spareNetworkIdentityQueue.Count == 0)
             {
-                long id = _maxNetworkIdentity++;
+                long id = ++_maxNetworkIdentity;
                 return id;
             }
 

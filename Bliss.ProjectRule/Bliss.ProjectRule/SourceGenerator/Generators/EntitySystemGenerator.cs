@@ -17,6 +17,9 @@ public class EntitySystemGenerator : ISourceGenerator
 {
     private static readonly string EntitySystemOfAttributeFullName = typeof(EntitySystemOfAttribute).FullName;
     private static readonly string EntitySystemOfAttributeName = nameof(EntitySystemOfAttribute);
+    
+    private static readonly string SystemPriorityAttributeFullName = typeof(SystemPriorityAttribute).FullName;
+    private static readonly string SystemPriorityAttributeName = nameof(SystemPriorityAttribute);
 
     public void Initialize(GeneratorInitializationContext context)
     {
@@ -65,6 +68,22 @@ public class EntitySystemGenerator : ISourceGenerator
 
         var entityClassName = namedTypeSymbol.Name;
         var relevantInterfaces = namedTypeSymbol.GetInterfacesSubOf(nameof(IEntitySystemConstraint));
+        var entitySystemPriorityAttributeDataList = namedTypeSymbol.GetAttribute(SystemPriorityAttributeFullName, true);
+        Dictionary<INamedTypeSymbol, int> dicEntitySystemPriority = new();
+        foreach (var entitySystemPriorityAttributeData in entitySystemPriorityAttributeDataList)
+        {
+            if (entitySystemPriorityAttributeData.ConstructorArguments.Length != 2)
+            {
+                continue;
+            }
+            if (entitySystemPriorityAttributeData.ConstructorArguments[0].Value is not INamedTypeSymbol attributeTypeSymbol
+                || entitySystemPriorityAttributeData.ConstructorArguments[1].Value is not int priority)
+            {
+                continue;
+            }
+
+            dicEntitySystemPriority[attributeTypeSymbol] = priority;
+        }
         
         var defEntitySystems = new List<DefEntitySystem>();
         foreach (var iEntitySystemSymbol in relevantInterfaces)
@@ -74,7 +93,7 @@ public class EntitySystemGenerator : ISourceGenerator
             defEntitySystem.method_name = iEntitySystemSymbol.Name;
             if (defEntitySystem.method_name.StartsWith("I"))
             {
-                defEntitySystem.method_name  =  defEntitySystem.method_name.Substring(1);   
+                defEntitySystem.method_name = defEntitySystem.method_name.Substring(1);
             }
 
             defEntitySystem.generic_types = new List<string>();
@@ -82,6 +101,12 @@ public class EntitySystemGenerator : ISourceGenerator
             iEntitySystemSymbol.GetTypeArgumentFullNames(defEntitySystem.generic_types);
 
             defEntitySystem.return_type = string.Empty;
+
+            int priority = 0;
+            if (dicEntitySystemPriority.TryGetValue(iEntitySystemSymbol, out priority))
+            {
+                defEntitySystem.system_priority  = priority;
+            }
             
             defEntitySystems.Add(defEntitySystem);
         }
@@ -91,6 +116,7 @@ public class EntitySystemGenerator : ISourceGenerator
         var generationContext = new EntitySystemsGenerationContext()
         {
             NameSpace = namespaceName ?? string.Empty,
+            SystemClassName = className,
             ClassName = entityClassName,
             defEntitySystems = defEntitySystems,
         };

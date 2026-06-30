@@ -9,7 +9,7 @@ namespace Bliss.ViewLogic.Debugger
     [EntitySystemOf(typeof(NetStatDebugComponent))]
     public static partial class NetStatDebugComponentSystems
     {
-        public static void Awake(this NetStatDebugComponent self)
+        private static void Awake(this NetStatDebugComponent self)
         {
             var mainScene = self.Scene<LogicScene>().Parent as LogicScene;
             var viewGlobal =  mainScene.GetComponent<ViewGlobalComponent>();
@@ -21,7 +21,7 @@ namespace Bliss.ViewLogic.Debugger
             self.TextJitter = netStatUI.Find("Stat_Table/Text_V_Jitter").GetComponent<TextMeshProUGUI>();
             self.Graphic_Jitter = netStatUI.Find("JitterDiagram").GetComponent<FixMax_DataUIGraphic>();
         }
-        public static void Destroy(this NetStatDebugComponent self)
+        private static void Destroy(this NetStatDebugComponent self)
         {
             self.TextPing = null;
             self.TextMiss = null;
@@ -30,7 +30,7 @@ namespace Bliss.ViewLogic.Debugger
             self.Graphic_Jitter = null;
         }
         
-        public static void Update(this NetStatDebugComponent self)
+        private static void Update(this NetStatDebugComponent self)
         {
             var session = self.GetSceneComponent<SessionComponent>()?.Session;
             if (session == null)

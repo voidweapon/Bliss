@@ -123,7 +123,7 @@ public class EntitySystemOfAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            if (methodSymbol.DeclaredAccessibility != Accessibility.Public
+            if (methodSymbol.DeclaredAccessibility != Accessibility.Private
                 || !methodSymbol.IsStatic
                 || !methodSymbol.ReturnsVoid)
             {
@@ -134,7 +134,7 @@ public class EntitySystemOfAnalyzer : DiagnosticAnalyzer
             methodSymbol.GetParamFullNames(paramNames);
             string paramTypes = string.Join(", ", paramNames);
             
-            candidateDeclaredMethod.Add($"public static void {methodSymbol.Name}({paramTypes})");
+            candidateDeclaredMethod.Add($"private static void {methodSymbol.Name}({paramTypes})");
         }
 
         List<string> typeArgumentNames = new List<string>();
@@ -148,7 +148,7 @@ public class EntitySystemOfAnalyzer : DiagnosticAnalyzer
             iEntitySystemSymbol.GetTypeArgumentFullNames(typeArgumentNames);
             string paramTypes = string.Join(", ", typeArgumentNames);
             
-            string methodSignature = $"public static void {methodName}({paramTypes})";
+            string methodSignature = $"private static void {methodName}({paramTypes})";
 
             if (!candidateDeclaredMethod.Contains(methodSignature))
             {

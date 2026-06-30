@@ -7,6 +7,7 @@ namespace Bliss
     {
         public static void Start()
         {
+            Log.Info($"[HybridCLR]Loading {nameof(Entry)}  {typeof(Entry).Assembly.Location}");
             StartAsync().Coroutine();
         }
 
@@ -17,6 +18,7 @@ namespace Bliss
 #endif
             MemoryPackSerializerRegister.Init();
             World.Instance.AddSingleton<MessageOpcodeManager>();
+            World.Instance.AddSingleton<LogMsg>();
             
             //创建支持reload的 singleton
             TypeManager.Instance.CreateAutoSingletonManager();
@@ -26,6 +28,11 @@ namespace Bliss
     }
 
     public struct Event_InitProcessEntry
+    {
+        
+    }
+    
+    public struct Event_InitProcessEntry_Demo
     {
         
     }

@@ -10,7 +10,7 @@ namespace Bliss.ViewLogic.Tests
     {
         protected override async ETTask Run(LogicScene clienScene, Event_AfterCreateSceneActor eventInfo)
         {
-            var actor = eventInfo.Actor;
+            var actor = (Entity)eventInfo.Actor;
             var resourcesLoader = clienScene.GetComponent<ResourcesLoaderComponent>();
             if (resourcesLoader == null)
             {
@@ -22,7 +22,7 @@ namespace Bliss.ViewLogic.Tests
             {
                 return;
             }
-            
+
             var viewGo = UnityEngine.Object.Instantiate(prefab);
             var logicTransform = actor.GetComponent<TransformComponent>();
             viewGo.transform.position = logicTransform.Transform.Location;
@@ -35,7 +35,7 @@ namespace Bliss.ViewLogic.Tests
                     IsFromPool = false
                 });
             
-            var netRole = actor.GetComponent<NetRoleComponent>().LocalNetRole;
+            var netRole = actor.GetComponent<NetRoleComponent>()?.LocalNetRole ?? ENetRole.Authority;
 
             viewGo.name = $"{viewGo.name} ({actor.InstanceId}) ({Enum.GetName(typeof(ENetRole), netRole)})";
 

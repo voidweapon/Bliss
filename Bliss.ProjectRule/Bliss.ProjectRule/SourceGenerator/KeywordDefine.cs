@@ -3,6 +3,7 @@ namespace Bliss.ProjectRule.SourceGenerator;
 public static class KeywordDefine
 {
     public static readonly string Namespace = "__namespace__";
+    public static readonly string SystemClassName = "__system_class_name__";
     public static readonly string ClassName = "__class_name__";
     public static readonly string EntitySystems = "__entity_systems__";
     

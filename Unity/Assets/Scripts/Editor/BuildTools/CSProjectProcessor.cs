@@ -2,7 +2,7 @@ using System.IO;
 using System.Xml;
 using UnityEditor;
 
-namespace Editor.BuildTools
+namespace Bliss.BuildTools
 {
     public class CSProjectProcessor: AssetPostprocessor
     {
