@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Bliss.Base.Collections;
 using Bliss.CharacterControllers;
 using Unity.Mathematics;
 
@@ -11,12 +12,21 @@ namespace Bliss.CharacterMovement
         NavWalking,
         Falling,
         Flying,
-        Swimming
+        Swimming,
+        Custom,
+        Max,
     }
     
     public class CharacterMovementComponent : Entity, IAwake, IDestroy
     {
         public EMovementMode MovementMode;
+        public EMovementMode GroundMovementMode; 
+        public EMovementMode CustomMovementMode;
+        
+        
+        public int GroundShift;
+        public int CustomModeThr;
+        public int GroundMask;
 
         public float3 Gravity = new float3(0, -30f, 0f);
         public float MaxStableMoveSpeed = 10f;
@@ -50,13 +60,23 @@ namespace Bliss.CharacterMovement
         public KinematicCharacterComponent KinematicCharacterCmp;
         public CharacterRuntimeData RuntimeDataRef;
         public ICharacterMovementController MovementController;
+        public TransformComponent TransformCmp;
 
-        #region Network Movement
+        #region Network Movement 
+        public bool bReplicateMovement;
+
         public NetworkPredictionData_Client_CharacterMovement ClientData;
         public NetworkPredictionData_Server_CharacterMovement ServerData;
+
+        public CharacterNetworkMoveDataContainer NetworkMoveDataContainer =  new CharacterNetworkMoveDataContainer();
+
+        public CharacterRepMovement ReplicatedMovement;
         
-        public ENetRole  NetRole;
+        public ENetRole  LocalNetRole;
         public ENetRole  RemoteNetRole;
+
+        public SavedMove_Character CurrentMove;
+        public SavedMove_Character OldMove;
         
         public bool IsNetworkSmoothingComplete;
         public ENetworkSmoothingMode  NetworkSmoothingMode;
@@ -66,8 +86,22 @@ namespace Bliss.CharacterMovement
         public long ServerTimeStampSyncTimer = 0;
         public bool EnablePredication;
         
+        public float MinTimeBetweenTimeStampResets;
+        public float LastTimeStampResetServerTime;
+        
+        
+        public float NetworkSimulatedSmoothLocationTime;
+        public float NetworkSimulatedSmoothRotationTime;
+        /// <summary>
+        /// Maximum distance character is allowed to lag behind server location when interpolating between updates.
+        /// </summary>
         public float NetworkMaxSmoothUpdateDistance = 2.56f;
+        /// <summary>
+        /// Maximum distance beyond which character is teleported to the new server location without any smoothing.
+        /// </summary>
         public float NetworkNoSmoothUpdateDistance = 3.84f;
+        public float ListenServerNetworkSimulatedSmoothLocationTime;
+        public float ListenServerNetworkSimulatedSmoothRotationTime;
         #endregion
     }
 }

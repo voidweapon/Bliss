@@ -39,11 +39,22 @@ namespace Bliss
         public long ServerMinusClientTime { private get; set; }
 
         public long FrameTime { get; private set; }
+
+        private long StartTicks;
+        public long RealTimeSecondSinceStartup  { get; private set; }
+        
+
+        public void Init()
+        {
+            StartTicks = DateTime.UtcNow.Ticks;
+        }
+        
         
         public void Update()
         {
             // 赋值long型是原子操作，线程安全
             this.FrameTime = this.ClientNow();
+            RealTimeSecondSinceStartup = (DateTime.UtcNow.Ticks - StartTicks) / TimeSpan.TicksPerSecond;
         }
         
         /// <summary> 

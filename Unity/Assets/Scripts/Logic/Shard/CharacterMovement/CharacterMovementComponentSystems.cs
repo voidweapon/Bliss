@@ -12,39 +12,61 @@ namespace Bliss.CharacterMovement
         {
             self.MovementMode = EMovementMode.None;
 
+            self.bReplicateMovement = true;
             self.LogicTimeStamp = 0;
             self.CurrentJumpCount = 0;
+            
+            self.TransformCmp = self.Parent.GetComponent<TransformComponent>();
             
             var movementController = new CharacterMovementController();
             movementController.MovementCmp = self;
             self.MovementController = movementController;
 
             
-            self.NetRole = ENetRole.Authority;
+            self.LocalNetRole = ENetRole.Authority;
             self.RemoteNetRole = ENetRole.Authority;
             var netRoleCmp = self.Parent.GetComponent<NetRoleComponent>();
             if (netRoleCmp != null)
             {
-                self.NetRole = netRoleCmp.LocalNetRole;
+                self.LocalNetRole = netRoleCmp.LocalNetRole;
                 self.RemoteNetRole = netRoleCmp.RemoteNetRole;
             }
+            
+            self.GroundShift = math.ceillog2((int)EMovementMode.Max);
+            self.CustomModeThr = 2 * (1 << self.GroundShift);
+            self.GroundMask = (1 << self.GroundShift) - 1;
+
+            // This should be greater than tolerated player timeout * 2.
+            self.MinTimeBetweenTimeStampResets = 4 * 60f;
+            self.LastTimeStampResetServerTime = 0f;
+            
+            self.NetworkSimulatedSmoothLocationTime = 0.100f;
+            self.NetworkSimulatedSmoothRotationTime = 0.050f;
+            self.ListenServerNetworkSimulatedSmoothLocationTime = 0.040f;
+            self.ListenServerNetworkSimulatedSmoothRotationTime = 0.033f;
+            self.NetworkMaxSmoothUpdateDistance = 2.56f;
+            self.NetworkNoSmoothUpdateDistance = 3.84f;
+
+            self.NetworkMoveDataContainer.Clear();
         }
         private static void Destroy(this CharacterMovementComponent self)
         {
+            self.bReplicateMovement = false;
             self.MovementController = null;
+            self.NetworkMoveDataContainer.Clear();
         }
 
         public static void LogicUpdate(this CharacterMovementComponent self, long deltaTimeMS, float deltaTime)
         {
             self.LogicTimeStamp += deltaTimeMS;
             
-            if(self.NetRole == ENetRole.SimulatedProxy)
+            if(self.LocalNetRole == ENetRole.SimulatedProxy)
             {
-                self.SimulateUpdate();
+                self.SimulateUpdate(deltaTime);
             }
-            else if(self.NetRole >= ENetRole.AutonomousProxy)
+            else if(self.LocalNetRole >= ENetRole.AutonomousProxy)
             {
-                self.AuthorityUpdate();
+                self.PerformUpdate(deltaTime);
             }
         }
         
@@ -112,18 +134,298 @@ namespace Bliss.CharacterMovement
         }
         #endregion
         
-        #region Network Movement
+        #region Network Movement Client
 
-        private static void SimulateUpdate(this CharacterMovementComponent self)
+        private static void SimulateUpdate(this CharacterMovementComponent self, float deltaTime)
+        {
+            
+        }
+
+        private static void PerformUpdate(this CharacterMovementComponent self, float deltaTime)
+        {
+            if (self.LocalNetRole == ENetRole.AutonomousProxy)
+            {
+                var clientData = self.GetPredictionData_Client_CharacterMovement();
+                if (clientData != null && clientData.bUpdatePosition)
+                {
+                    self.ClientUpdatePositionAfterServerUpdate(deltaTime);
+                }
+
+                //TODO: Check Character is Controlled by Local Player
+                bool bShouldPerformControlledCharMove = true;
+
+                if (bShouldPerformControlledCharMove)
+                {
+                    self.ControlledCharacterMove(deltaTime);
+                }
+            }
+        }
+        
+        private static void ControlledCharacterMove(this CharacterMovementComponent self, float deltaTime)
+        {
+            if (self.LocalNetRole == ENetRole.Authority)
+            {
+                self.PerformMovement(deltaTime);
+            }
+            else if (self.LocalNetRole == ENetRole.AutonomousProxy)
+            {
+                self.ReplicateMoveToServer(deltaTime);
+            }
+        }
+
+        private static void ClientUpdatePositionAfterServerUpdate(this CharacterMovementComponent self, float deltaTime)
         {
             
         }
         
-        private static void AuthorityUpdate(this CharacterMovementComponent self)
+        private static void PerformMovement(this CharacterMovementComponent self, float deltaTime)
         {
             
         }
-        #endregion 
+
+        private static void ReplicateMoveToServer(this CharacterMovementComponent self, float deltaTime)
+        {
+            var clientData = self.GetPredictionData_Client_CharacterMovement();
+            if (clientData == null)
+            {
+                return;
+            }
+            
+            deltaTime = clientData.UpdateTimeStampAndDeltaTime(deltaTime, self.MinTimeBetweenTimeStampResets);
+            
+            
+
+        }
+
+        public static void BeforeUpdateCharacterMovement(this CharacterMovementComponent self, float deltaTime)
+        { 
+            if (self.LocalNetRole == ENetRole.AutonomousProxy)
+            {
+                var clientData = self.GetPredictionData_Client_CharacterMovement();
+                if (clientData == null)
+                {
+                    return;
+                }
+            
+                deltaTime = clientData.UpdateTimeStampAndDeltaTime(self.LogicTimeStamp, self.MinTimeBetweenTimeStampResets);
+            
+                // Find the oldest (unacknowledged) important move (OldMove).
+                // Don't include the last move because it may be combined with the next new move.
+                // A saved move is interesting if it differs significantly from the last acknowledged move
+                SavedMove_Character oldMove = null;
+                if (clientData.LastAckedMove != null)
+                {
+                    int NumSavedMoves = clientData.SavedMoves.Count;
+                    for (int i = 0; i < NumSavedMoves - 1; i++)
+                    {
+                        var currentMove = clientData.SavedMoves[i];
+                        if (currentMove.IsImportantMove(clientData.LastAckedMove))
+                        {
+                            oldMove = currentMove;
+                            break;
+                        }
+                    }
+                }
+                self.OldMove = oldMove;
+            
+                // Get a SavedMove object to store the movement in.
+                var newMove = clientData.CreateSavedMove();
+                if (newMove == null)
+                {
+                    return;
+                }
+                
+                newMove.SetMoveFor(
+                    self,
+                    self.PackNetworkMovementMode(),
+                    self.GetMaxSpeed(),
+                    deltaTime,
+                    0, self.RoundAcceleration(0),
+                    clientData);
+                
+                // see if the two moves could be combined
+                if (clientData.PendingMove != null && clientData.PendingMove.CanCombineWith(newMove, self, clientData.MaxMoveDeltaTime))
+                {
+                    //TODO: Only combine and move back to the start location if we don't move back in to a spot that would make us collide with something new.
+
+                
+                    newMove.CombineWith(clientData.PendingMove, self, float3.zero);
+
+
+                    newMove.SetInitialPosition(self);
+
+                    if (clientData.SavedMoves.Count > 0 && clientData.SavedMoves[clientData.SavedMoves.Count - 1] == clientData.PendingMove)
+                    {
+                        clientData.FreeMove(clientData.PendingMove);
+                    }
+                    clientData.PendingMove = null;
+                }
+
+                self.CurrentMove = newMove;
+            }
+        }
+        
+        public static void EndUpdateCharacterMovement(this CharacterMovementComponent self, float deltaTime)
+        {
+            if (self.LocalNetRole == ENetRole.AutonomousProxy)
+            {
+                var clientData = self.GetPredictionData_Client_CharacterMovement();
+                if (clientData == null)
+                {
+                    return;
+                }
+
+                var oldMove = self.OldMove;
+                var newMove = self.CurrentMove;
+
+                if (newMove == null)
+                {
+                    return;
+                }
+                self.OldMove = null;
+                self.CurrentMove = null;
+                
+                newMove.PostUpdate(self, self.PackNetworkMovementMode());
+
+                if (self.bReplicateMovement)
+                {
+                    clientData.SavedMoves.Add(newMove, out _);
+
+                    bool bCanDelayMove = self.CanDelaySendingMove(newMove);
+                    if (bCanDelayMove && clientData.PendingMove == null)
+                    {
+                        float netMoveDeltaSeconds = math.clamp(self.GetClientNetSendDeltaTime(),  1f/120f, 1f/5f);
+                        float secondsSinceLastMoveSent = TimeInfo.Instance.RealTimeSecondSinceStartup - clientData.ClientUpdateRealTime;
+                        
+                        if (secondsSinceLastMoveSent < netMoveDeltaSeconds)
+                        {
+                            // Delay sending this move.
+                            clientData.PendingMove = newMove;
+                            return;
+                        }
+                    }
+                    
+                    clientData.ClientUpdateRealTime =  TimeInfo.Instance.RealTimeSecondSinceStartup;
+                    
+                    bool bSendServerMove = true;
+
+                    // Send move to server if this character is replicating movement
+                    if (bSendServerMove)
+                    {
+                        self.CallServerMove(newMove, clientData.PendingMove, oldMove);
+                    }
+                }
+
+                clientData.PendingMove = null;
+            }
+        }
+
+        public static void CallServerMove(this CharacterMovementComponent self,
+            SavedMove_Character newMove,
+            SavedMove_Character pendingMove,
+            SavedMove_Character oldMove)
+        { 
+            if (newMove == null) return;
+            
+            self.NetworkMoveDataContainer.ClientFillNetworkMoveData(newMove, pendingMove, oldMove);
+
+            using var msg = self.NetworkMoveDataContainer.ToMessage(self.Parent.Id, true);
+            
+            //Send To Server
+#if Client
+            var session = MapHelper.GetPlayerSession(self.Scene());
+            session.Send(msg);     
+#endif
+        }
+        
+        
+        
+        private static NetworkPredictionData_Client_CharacterMovement GetPredictionData_Client_CharacterMovement(this CharacterMovementComponent self)
+        {
+            if (self.ClientData == null)
+            {
+                self.ClientData = new NetworkPredictionData_Client_CharacterMovement(ENetMode.NM_Client,
+                    self.NetworkMaxSmoothUpdateDistance,
+                    self.NetworkNoSmoothUpdateDistance,
+                    self.ListenServerNetworkSimulatedSmoothLocationTime,
+                    self.NetworkSimulatedSmoothLocationTime,
+                    self.ListenServerNetworkSimulatedSmoothRotationTime,
+                    self.NetworkSimulatedSmoothRotationTime);
+            }
+            return self.ClientData;
+        }
+        
+        public static byte PackNetworkMovementMode(this CharacterMovementComponent self)
+        {
+            if (self.MovementMode != EMovementMode.Custom)
+            {
+                byte GroundMoveBit = self.GroundMovementMode == EMovementMode.Walking ? (byte)0 : (byte)1;
+                return (byte)((byte)self.MovementMode | (byte)(GroundMoveBit << self.GroundShift));
+            }
+            else
+            {
+                return (byte)(self.CustomMovementMode + self.CustomModeThr);
+            }
+        }
+        
+        public  static bool CanDelaySendingMove(this CharacterMovementComponent self, SavedMove_Character newMove)
+        {
+            // Don't delay moves that change movement mode over the course of the move.
+            if (newMove.StartPackedMovementMode != newMove.EndPackedMovementMode) 
+            {
+                return false;
+            }
+
+            // If we know we don't want to combine this move, reduce latency and avoid misprediction by flushing immediately.
+            if (newMove.bForceNoCombine)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        public static float GetClientNetSendDeltaTime(this CharacterMovementComponent self)
+        {
+            var netMoveDelta = GameNetworkManager.Instance.ClientNetSendMoveDeltaTime;
+            return netMoveDelta;
+        }
+        
+        public static float GetMaxSpeed(this CharacterMovementComponent self)
+        {
+            switch (self.MovementMode)
+            {
+                case EMovementMode.Walking:
+                case EMovementMode.NavWalking:
+                    return self.MaxStableMoveSpeed;
+                case EMovementMode.Falling:
+                    return self.MaxAirMoveSpeed;
+                default:
+                    return self.MaxStableMoveSpeed;
+
+            }
+        }
+        
+        public static float3 RoundAcceleration(this CharacterMovementComponent self, float3 inAccel)
+        {
+            return mathEx.QuantizeVector(inAccel, 10);
+        }
+        #endregion
+        
+        #region Network Movement Server
+
+        public static void ServerMove_ServerReceive(this CharacterMovementComponent self, C2M_CharacterMoveData message)
+        {
+            self.NetworkMoveDataContainer.Serialize(message);
+            self.ServerMove_HandleMoveData(self.NetworkMoveDataContainer);
+        }
+
+        private static void ServerMove_HandleMoveData(this CharacterMovementComponent self, CharacterNetworkMoveDataContainer moveDataContainer)
+        {
+            
+        }
+
+        #endregion
     }
     
     public class CharacterMovementController : ICharacterMovementController
@@ -298,7 +600,7 @@ namespace Bliss.CharacterMovement
 
         public void BeforeCharacterUpdate(float deltaTime)
         {
-            
+            MovementCmp.BeforeUpdateCharacterMovement(deltaTime);
         }
 
         public void PostGroundingUpdate(float deltaTime)
@@ -346,6 +648,8 @@ namespace Bliss.CharacterMovement
                 // Keep track of time since we were last able to jump (for grace period)
                 runtimeData.TimeSinceLastInJumpableEnvironment += deltaTime;
             }
+            
+            MovementCmp.EndUpdateCharacterMovement(deltaTime);
         }
 
         public bool IsColliderValidForCollisions(GameplayCollider coll)

@@ -160,3 +160,23 @@ message M2C_DestroyEntities : IMessage
   repeated int64 EntityIds = 2;
 }
 
+message C2M_CharacterMoveData : ILocationMessage response : Bliss.ResponseMessage
+{
+  int32 RpcId = 1;
+  
+  repeated CharacterNetworkMoveData MoveData = 2;
+  bool bDisableCombinedScopedMove = 3;
+  bool bIsDualHybridRootMotionMove = 4;
+}
+
+message M2C_AckGoodCharacterMoveData : IMessage
+{
+  int64 ActorId = 1;
+  float TimeStamp = 2;
+}
+
+message M2C_CharacterMovementRepData : IMessage
+{
+  int64 ActorId = 1;
+  CharacterRepMovement ReplicatedMovement = 2;
+}

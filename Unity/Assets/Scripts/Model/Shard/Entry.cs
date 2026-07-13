@@ -19,6 +19,7 @@ namespace Bliss
             MemoryPackSerializerRegister.Init();
             World.Instance.AddSingleton<MessageOpcodeManager>();
             World.Instance.AddSingleton<LogMsg>();
+            World.Instance.AddSingleton<GameNetworkManager>();
             
             //创建支持reload的 singleton
             TypeManager.Instance.CreateAutoSingletonManager();

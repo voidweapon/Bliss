@@ -22,6 +22,43 @@ namespace Bliss
             
             return unit;
         }
+        
+        /// <summary>
+        ///补全Unit组件
+        /// </summary>
+        /// <param name="root"></param>
+        /// <param name="minimalUnit"></param>
+        /// <param name="isReplicate"></param>
+        /// <param name="isLoadViewModel"></param>
+        /// <returns></returns>
+        public static Unit CreateUnit(LogicScene root, Unit minimalUnit,
+            bool isReplicate,
+            bool isLoadViewModel = true)
+        {
+            minimalUnit.AddComponent<ObjectWait>();
+#if Client
+            minimalUnit.AddComponent<SmoothTransformComponent, SmoothTransformComponentInitParam>( new SmoothTransformComponentInitParam(ENetworkSmoothingMode.Linear));
+#endif
+            if (isReplicate)
+            {   
+                minimalUnit.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.OrderedMessage);
+            }
+
+            Log.Info($"Start Load Unit View Node");
+            var unitConfig = minimalUnit.GetUnitConfig();
+            EventSystem.Instance.Push(root.Scene(), new Event_AfterCreateSceneActor()
+            {
+                Actor = minimalUnit,
+                ViewAssetPath = unitConfig.ModelPath,
+                LoadViewModel = isLoadViewModel,
+            });
+            Log.Info($"End Load Unit View Node");
+            
+            Log.Info($"Start Init UnitCharacterController");
+            minimalUnit.AddComponent<CharacterController>();
+            return minimalUnit;
+        }
+        
         public static Unit CreateUnit(LogicScene root, 
             int unitConfigId, long unitId, 
             ENetRole localRole, ENetRole remoteRole, 
@@ -30,31 +67,7 @@ namespace Bliss
             bool isLoadViewModel = true)
         {
             Unit unit = CreateMinimalUnit(root, unitConfigId, unitId, localRole, remoteRole, position, rotation);
-            unit.AddComponent<ObjectWait>();
-#if Client
-            unit.AddComponent<SmoothTransformComponent, SmoothTransformComponentInitParam>( new SmoothTransformComponentInitParam(ENetworkSmoothingMode.Linear));
-#endif
-            if (isReplicate)
-            {   
-                unit.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.OrderedMessage);
-            }
-
-            Log.Info($"Start Load Unit View Node");
-            var unitConfig = unit.GetUnitConfig();
-            EventSystem.Instance.Push(root.Scene(), new Event_AfterCreateSceneActor()
-            {
-                Actor = unit,
-                ViewAssetPath = unitConfig.ModelPath,
-                LoadViewModel = isLoadViewModel,
-            });
-            Log.Info($"End Load Unit View Node");
-            
-            
-            Log.Info($"Start Init UnitCharacterController");
-            unit.AddComponent<CharacterController>();
-
-
-            return unit;
+            return CreateUnit(root, unit, isReplicate, isLoadViewModel);
         }
 
         public static Unit CreateUnit(this DTOUnitInfo unitInfo, LogicScene root)

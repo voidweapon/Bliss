@@ -14,15 +14,31 @@ namespace Bliss.Mathematics
         public static readonly float3 Backward = new float3(0, 0, -1);
         public static readonly float3 Right = new float3(1, 0, 0);
         public static readonly float3 Left = new float3(-1, 0, 0);
+        
+        public static bool IsZero(this float3 self)
+        {
+            return math.abs(self.x) == 0 && math.abs(self.y) == 0 && math.abs(self.z) == 0;
+        }
 
         public static bool IsNearlyZero(this float3 self, float tolerance = float.Epsilon)
         {
             return math.abs(self.x) <= tolerance && math.abs(self.y) <= tolerance && math.abs(self.z) <= tolerance;
         }
+
+        public static bool Coincident(this float3 self, float3 other, float tolerance = float.Epsilon)
+        {
+            float normalDot = math.dot(math.normalizesafe(self), math.normalizesafe(other));
+            return normalDot >= tolerance;
+        }
         
         public static bool IsNearlyZero(this float self, float tolerance = float.Epsilon)
         {
             return math.abs(self) <= tolerance;
+        }
+        
+        public static bool IsNearlyEqual(this float self, float other, float tolerance = float.Epsilon)
+        {
+            return math.abs(self - other) <= tolerance;
         }
 
         public static float angle(float3 from, float3 to)
@@ -113,5 +129,26 @@ namespace Bliss.Mathematics
             if (t > 1f) return p2;
             return p1 + t * p1p2;
         }
+
+
+        #region QuantizeVector
+
+        public static float3 QuantizeVector(float3 vector, int scale)
+        {
+            long scaledX = (long)(vector.x * scale);
+            long scaledY = (long)(vector.y * scale);
+            long scaledZ = (long)(vector.z * scale);
+            int roundX = RoundToInt(scaledX);
+            int roundY = RoundToInt(scaledY);
+            int roundZ = RoundToInt(scaledZ);
+            return new float3(roundX, roundY, roundZ) / scale;
+        }
+
+        public static int RoundToInt(float value)
+        {
+            return (int)(value + math.sin(value) * 0.5f);
+        }
+
+        #endregion
     }
 }

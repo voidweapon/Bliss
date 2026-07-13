@@ -49,6 +49,7 @@ public class MessageHandler_M2M_UnitTransferRequest : MessageHandler<LogicScene,
 
         await MapTransferHelper.FinishTransferUnit(entity, request.FromAddress);
         
+        UnitHelper.CreateUnit(gameplayWorld, (Unit)entity, true);
         //全量状态同步
         entity.AddComponent<RemoteGhost>();
         

@@ -42,6 +42,7 @@ namespace Bliss.BootProcess
             };
             World.Instance.AddSingleton(options);
             
+            TimeInfo.Instance.Init();
             World.Instance.AddSingleton<RootManager>();
             World.Instance.AddSingleton<SimpleResourcesComponent>();
 
@@ -50,6 +51,14 @@ namespace Bliss.BootProcess
             bool hostBootInitResult = await SimpleResourcesComponent.Instance.CreatePackageAsync(GetPlayModel(GlobalDefine.BootSetting.PlayMode) ,_bootPackageName, false);
             if (!hostBootInitResult)
             {
+                // 先销毁旧的Package
+                if (YooAssets.ContainsPackage(_bootPackageName))
+                {
+                    var oldPackage = YooAssets.GetPackage(_bootPackageName);
+                    var destroyOldPackage = oldPackage.DestroyAsync();
+                    await destroyOldPackage.Task;
+                    YooAssets.RemovePackage(_bootPackageName);
+                }
                 await SimpleResourcesComponent.Instance.CreatePackageAsync(boolPackagePalayMode ,_bootPackageName, false);
             }
             

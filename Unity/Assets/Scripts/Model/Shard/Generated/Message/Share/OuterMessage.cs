@@ -1034,6 +1034,147 @@ namespace Bliss
     }
     
     
+    [MemoryPackable]
+    [MessageOpcode(OuterMessageOpcode.C2M_CharacterMoveData)]
+    [MessageResponse("Bliss.ResponseMessage")]
+    public partial class C2M_CharacterMoveData : MessageObject, ILocationMessage 
+    {
+        
+        [MemoryPackOrder(1)]
+        public int RpcId { get; set; }
+        
+        [MemoryPackOrder(2)]
+        public List<CharacterNetworkMoveData> MoveData { get; set; } = new List<CharacterNetworkMoveData>();
+        
+        [MemoryPackOrder(3)]
+        public bool bDisableCombinedScopedMove { get; set; }
+        
+        [MemoryPackOrder(4)]
+        public bool bIsDualHybridRootMotionMove { get; set; }
+        
+        public static C2M_CharacterMoveData Create(bool isFromPool = false)
+        {
+            return ObjectPool.Instance.Fetch(typeof(C2M_CharacterMoveData), isFromPool) as C2M_CharacterMoveData;
+        }
+        
+        partial void CustomDispose();
+        
+        public override void Dispose()
+        {
+            if (!this.IsFromPool)
+            {
+                return;
+            }
+        
+            this.RpcId = default;
+            this.MoveData?.Clear();
+            this.bDisableCombinedScopedMove = default;
+            this.bIsDualHybridRootMotionMove = default;
+                
+            ObjectPool.Instance.Recycle(this);
+        }
+       
+        private static int _sizeHint = System.Runtime.CompilerServices.Unsafe.SizeOf<int>() + System.Runtime.CompilerServices.Unsafe.SizeOf<bool>() + System.Runtime.CompilerServices.Unsafe.SizeOf<bool>();
+        
+        partial void CustomSizeHint(ref int sizeHint);
+        
+        public override int SizeHint()
+        {
+            int sizeHint = _sizeHint;
+            CustomSizeHint(ref sizeHint);
+            return sizeHint;
+        }
+    }
+    
+    
+    [MemoryPackable]
+    [MessageOpcode(OuterMessageOpcode.M2C_AckGoodCharacterMoveData)]
+    public partial class M2C_AckGoodCharacterMoveData : MessageObject, IMessage 
+    {
+        
+        [MemoryPackOrder(1)]
+        public long ActorId { get; set; }
+        
+        [MemoryPackOrder(2)]
+        public float TimeStamp { get; set; }
+        
+        public static M2C_AckGoodCharacterMoveData Create(bool isFromPool = false)
+        {
+            return ObjectPool.Instance.Fetch(typeof(M2C_AckGoodCharacterMoveData), isFromPool) as M2C_AckGoodCharacterMoveData;
+        }
+        
+        partial void CustomDispose();
+        
+        public override void Dispose()
+        {
+            if (!this.IsFromPool)
+            {
+                return;
+            }
+        
+            this.ActorId = default;
+            this.TimeStamp = default;
+                
+            ObjectPool.Instance.Recycle(this);
+        }
+       
+        private static int _sizeHint = System.Runtime.CompilerServices.Unsafe.SizeOf<long>() + System.Runtime.CompilerServices.Unsafe.SizeOf<float>();
+        
+        partial void CustomSizeHint(ref int sizeHint);
+        
+        public override int SizeHint()
+        {
+            int sizeHint = _sizeHint;
+            CustomSizeHint(ref sizeHint);
+            return sizeHint;
+        }
+    }
+    
+    
+    [MemoryPackable]
+    [MessageOpcode(OuterMessageOpcode.M2C_CharacterMovementRepData)]
+    public partial class M2C_CharacterMovementRepData : MessageObject, IMessage 
+    {
+        
+        [MemoryPackOrder(1)]
+        public long ActorId { get; set; }
+        
+        [MemoryPackOrder(2)]
+        public CharacterRepMovement ReplicatedMovement { get; set; }
+        
+        public static M2C_CharacterMovementRepData Create(bool isFromPool = false)
+        {
+            return ObjectPool.Instance.Fetch(typeof(M2C_CharacterMovementRepData), isFromPool) as M2C_CharacterMovementRepData;
+        }
+        
+        partial void CustomDispose();
+        
+        public override void Dispose()
+        {
+            if (!this.IsFromPool)
+            {
+                return;
+            }
+        
+            this.ActorId = default;
+            this.ReplicatedMovement = default;
+                
+            ObjectPool.Instance.Recycle(this);
+        }
+       
+        private static int _sizeHint = System.Runtime.CompilerServices.Unsafe.SizeOf<long>() + System.Runtime.CompilerServices.Unsafe.SizeOf<CharacterRepMovement>();
+        
+        partial void CustomSizeHint(ref int sizeHint);
+        
+        public override int SizeHint()
+        {
+            int sizeHint = _sizeHint;
+            CustomSizeHint(ref sizeHint);
+            return sizeHint;
+        }
+    }
+    
+    
     public static partial  class OuterMessageOpcode
     {
         public const ushort PingMessage = 1000;
@@ -1057,5 +1198,8 @@ namespace Bliss
         public const ushort M2C_CreateBullets = 1018;
         public const ushort M2C_CreateSceneActors = 1019;
         public const ushort M2C_DestroyEntities = 1020;
+        public const ushort C2M_CharacterMoveData = 1021;
+        public const ushort M2C_AckGoodCharacterMoveData = 1022;
+        public const ushort M2C_CharacterMovementRepData = 1023;
     }
 }

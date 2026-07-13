@@ -32,11 +32,11 @@ namespace Bliss
 
         public int TransformSyncTestMode;
 
-        public SavedMove_Character? PendingMove;
+        public SavedMove_Character_PeriodicMotionComponent? PendingMove;
         
-        public SavedMove_Character NewMove;
+        public SavedMove_Character_PeriodicMotionComponent NewMove;
 
-        public NetworkPredictionData_Client_CharacterMovement ClientCharacterMovementData;
+        public NetworkPredictionData_Client_PeriodicMotionComponent ClientCharacterMovement2Data;
         public bool IsNetworkSmoothingComplete;
         public ENetworkSmoothingMode  NetworkSmoothingMode;
         public long ServerLastTransformUpdateTimeStamp;

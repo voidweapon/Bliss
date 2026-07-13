@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: BootSetting
   m_EditorClassIdentifier: Bliss.Unity::Bliss.BootSetting
   TargetFPS: 60
-  PlayMode: 2
+  PlayMode: 0
   AppVersion: 1.0.0
   ResDefaultHostServer: http://127.0.0.1:8091
   ResFallbackHostServer: http://127.0.0.1:8091

@@ -76,6 +76,7 @@ namespace Bliss.Base.Collections
             }
 
             T item = array[head];
+            array[head] =  default(T);
             head = (head + 1) % capacity;
             count--;
             return item;
@@ -89,9 +90,72 @@ namespace Bliss.Base.Collections
             }
 
             T item = array[tail];
-            tail = (tail - 1) % capacity;
+            array[tail] = default(T);
+            tail = (tail - 1 + capacity) % capacity;
             count--;
             return item;
+        }
+        
+        public T RemoveAt(int index)
+        {
+            if (index < 0 || index >= count)
+            {
+                throw new IndexOutOfRangeException("Index out of range!");
+            }
+            
+            if (count == 0)
+            {
+                return default(T);
+            }
+            
+            int realIndex = (head + index) % capacity;
+            T item = array[realIndex];
+            array[realIndex] = default(T);
+            if (index == 0)
+            {
+                head = (head + 1) % capacity;
+            }
+            else if (index == count - 1)
+            {
+                tail = (tail - 1 + capacity) % capacity;
+            }
+            else
+            {
+                for (int i = index; i < count - 1; i++)
+                {
+                    array[(head + i) % capacity] = array[(head + i + 1) % capacity];
+                } 
+                array[tail] = default(T);
+                tail = (tail - 1 + capacity) % capacity;
+            }
+            count--;
+            return item;
+        }
+
+        public void RemoveRange(int start, int length)
+        {
+            if (start < 0 || start >= count || length < 0 || start + length > count)
+            {
+                throw new IndexOutOfRangeException("Index out of range!");
+            }
+            
+            if(length == 0) return;
+
+            int realStartIndex = (head + start) % capacity;
+            int realEndIndex = (head + start + length) % capacity;
+            int index = 0;
+            
+            for (int i = start + length; i < count; i++)
+            {
+                array[(realStartIndex + index)% capacity] =  array[(realEndIndex + index) % capacity];
+                index++;
+            }
+
+            for (int i = 0; i < count - length; i++)
+            {
+                array[(tail - i + capacity) % capacity] = default(T);
+            }
+            count -= length;
         }
 
         public T Get(int index)

@@ -11,24 +11,10 @@ namespace Bliss
         {
             Log.Info($"进入地图 M2C_ChangeMap ");
 
-            LogicScene gameplayWorld = clientScene.GetChild<LogicScene>(1);
+            LogicScene gameplayWorld = clientScene.GetComponent<CurrentSceneComponent>()?.GameplayWorld;
             if (message.IsLogin)
             {
-                gameplayWorld = LogicSceneFactoryCore.CreateLogicScene(clientScene, 1, IdGenerator.Instance.GenerateInstanceId(), ELogicSceneType.GameplayWorld, "GameplayWorld");
-                gameplayWorld.AddComponent<UnitManager>();
-                gameplayWorld.AddComponent<BulletManager>();
-                gameplayWorld.AddComponent<SceneActorManager>();
-                gameplayWorld.AddComponent<KinematicMoverManager, KinematicMoverManagerSettings>(new KinematicMoverManagerSettings()
-                {
-                    AutoSimulation = true,
-                    Interpolate = true,
-                    InterpolateMotor = true,
-                    InterpolateMover = true,
-                });
-                await EventSystem.Instance.PushAsync(gameplayWorld, new Event_AfterCreateGameplayWorld());
-                
-                var currentSceneCmp = clientScene.AddComponent<CurrentSceneComponent>();
-                currentSceneCmp.GameplayWorld = gameplayWorld;
+                gameplayWorld = await MapHelper.CreateGameplayWorld(clientScene);
             }
             
             await MapHelper.ChangeMap(clientScene, gameplayWorld, message.LevelConfigId, message.LevelId);

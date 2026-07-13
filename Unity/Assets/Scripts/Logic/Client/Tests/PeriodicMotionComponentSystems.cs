@@ -46,9 +46,9 @@ namespace Bliss
             self.StartPosition = self.Parent.GetComponent<TransformComponent>().Transform.Location;
             self.NetRole = self.Parent.GetComponent<NetRoleComponent>().LocalNetRole;
             self.RemoteNetRole = self.Parent.GetComponent<NetRoleComponent>().RemoteNetRole;
-            self.ClientCharacterMovementData = new NetworkPredictionData_Client_CharacterMovement();
-            self.ClientCharacterMovementData.MaxSmoothNetUpdateDist = self.NetworkMaxSmoothUpdateDistance;
-            self.ClientCharacterMovementData.NoSmoothNetUpdateDist = self.NetworkNoSmoothUpdateDistance;
+            self.ClientCharacterMovement2Data = new NetworkPredictionData_Client_PeriodicMotionComponent();
+            self.ClientCharacterMovement2Data.MaxSmoothNetUpdateDist = self.NetworkMaxSmoothUpdateDistance;
+            self.ClientCharacterMovement2Data.NoSmoothNetUpdateDist = self.NetworkNoSmoothUpdateDistance;
             self.NetworkSmoothingMode = ENetworkSmoothingMode.Linear;
 
             self.IsNetworkSmoothingComplete = true;
@@ -70,11 +70,11 @@ namespace Bliss
             {
                 GameDebugStates.Instance.SetDebugStat("TsmSync", nameof(self.NetworkSmoothingMode), self.NetworkSmoothingMode, new float4(0,0,0,1));
                 GameDebugStates.Instance.SetDebugStat("TsmSync", nameof(self.SyncInterval), self.SyncInterval, new float4(0,0,0,1));
-                GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client_CharacterMovement, long>("TsmSync", self.ClientCharacterMovementData, nameof(NetworkPredictionData_Client_CharacterMovement.SmoothingClientTimeStamp), new float4(0,0,0,1));
-                GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client_CharacterMovement, long>("TsmSync", self.ClientCharacterMovementData, nameof(NetworkPredictionData_Client_CharacterMovement.SmoothingServerTimeStamp), new float4(0,0,0,1));
-                GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client_CharacterMovement, long>("TsmSync", self.ClientCharacterMovementData, nameof(NetworkPredictionData_Client_CharacterMovement.LastCorrectionTime), new float4(0,0,0,1));
-                GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client_CharacterMovement, long>("TsmSync", self.ClientCharacterMovementData, nameof(NetworkPredictionData_Client_CharacterMovement.LastCorrectionDelta), new float4(0,0,0,1));
-                GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client_CharacterMovement, float3>("TsmSync", self.ClientCharacterMovementData, nameof(NetworkPredictionData_Client_CharacterMovement.MeshTranslationOffset), new float4(0,0,0,1));
+                GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client_PeriodicMotionComponent, long>("TsmSync", self.ClientCharacterMovement2Data, nameof(NetworkPredictionData_Client_PeriodicMotionComponent.SmoothingClientTimeStamp), new float4(0,0,0,1));
+                GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client_PeriodicMotionComponent, long>("TsmSync", self.ClientCharacterMovement2Data, nameof(NetworkPredictionData_Client_PeriodicMotionComponent.SmoothingServerTimeStamp), new float4(0,0,0,1));
+                GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client_PeriodicMotionComponent, long>("TsmSync", self.ClientCharacterMovement2Data, nameof(NetworkPredictionData_Client_PeriodicMotionComponent.LastCorrectionTime), new float4(0,0,0,1));
+                GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client_PeriodicMotionComponent, long>("TsmSync", self.ClientCharacterMovement2Data, nameof(NetworkPredictionData_Client_PeriodicMotionComponent.LastCorrectionDelta), new float4(0,0,0,1));
+                GameDebugStates.Instance.AddDebugStat<NetworkPredictionData_Client_PeriodicMotionComponent, float3>("TsmSync", self.ClientCharacterMovement2Data, nameof(NetworkPredictionData_Client_PeriodicMotionComponent.MeshTranslationOffset), new float4(0,0,0,1));
                 GameDebugStates.Instance.AddDebugStat<PeriodicMotionComponent, float3>("TsmSync", self, nameof(PeriodicMotionComponent.CurrentAngularVelocity), new float4(0,0,0,1));
                 GameDebugStates.Instance.AddDebugStat<PeriodicMotionComponent, bool>("TsmSync", self, nameof(PeriodicMotionComponent.IsNetworkSmoothingComplete), new float4(0,0,0,1), true);
                 GameDebugStates.Instance.AddDebugStat<PeriodicMotionComponent, long>("TsmSync", self, nameof(PeriodicMotionComponent.ReplicatedServerLastTransformUpdateTimeStamp), new float4(0,0,0,1));
@@ -273,7 +273,7 @@ namespace Bliss
         private static void OnBeforeSimulate_1(this PeriodicMotionComponent self, long now)
         {
             long dtMS = now - self.OnewayTimer;
-            self.NewMove = new SavedMove_Character();
+            self.NewMove = new SavedMove_Character_PeriodicMotionComponent();
             self.NewMove.InitSaveMove(now, dtMS, self);
         }
         
@@ -307,7 +307,7 @@ namespace Bliss
             self.PendingMove = null;
         }
 
-        public static void InitSaveMove(ref this SavedMove_Character self, 
+        public static void InitSaveMove(ref this SavedMove_Character_PeriodicMotionComponent self, 
             long nowTimeMS,
             long deltaTimeMS,
             PeriodicMotionComponent mover)
@@ -325,7 +325,7 @@ namespace Bliss
             self.StartMoveMode = !mover.InMode2 ? 0 : 1;
         }
 
-        public static void PostInitSaveMove(ref this SavedMove_Character self, PeriodicMotionComponent mover)
+        public static void PostInitSaveMove(ref this SavedMove_Character_PeriodicMotionComponent self, PeriodicMotionComponent mover)
         {
             var transformCmp = mover.Parent.GetComponent<TransformComponent>();
             self.EndPosition = transformCmp.Transform.Location;
@@ -435,10 +435,10 @@ namespace Bliss
                 {
                     // Same mesh with different rotation?
                     quaternion newRotation = transformCmp.Transform.Rotation;
-                    if (!newRotation.Equals(savedRotation, 1e-6f) && self.ClientCharacterMovementData != null)
+                    if (!newRotation.Equals(savedRotation, 1e-6f) && self.ClientCharacterMovement2Data != null)
                     {
                         // Smoothing should lerp toward this new rotation target, otherwise it will just try to go back toward the old rotation.
-                        self.ClientCharacterMovementData.MeshRotationTarget = newRotation;
+                        self.ClientCharacterMovement2Data.MeshRotationTarget = newRotation;
                         transformCmp.SynViewRelativeTranslationAndRotation(saveViewRelativeLocation, savedViewRelativeRotation);
                     }
                 }
@@ -461,7 +461,7 @@ namespace Bliss
             {
                 //我不认为在UpdateComponent的Rotation上直接插值的Linear模式，直接用UpdateComponent的Rotation这个插值中间值是对的，
                 //预测的目的是赶上对端，那么Linear模式下，要么用在MeshRotationTarget的基础上更新Rotation然后更新MeshRotationTarget
-                oldRotation = self.ClientCharacterMovementData.MeshRotationTarget;
+                oldRotation = self.ClientCharacterMovement2Data.MeshRotationTarget;
             }
             
             var deltaRotation = quaternion.EulerZXY(self.CurrentAngularVelocity * dt);
@@ -473,7 +473,7 @@ namespace Bliss
             float3 oldPosition, quaternion oldRotation,
             float3 newPosition, quaternion newRotation)
         {
-            if (self.ClientCharacterMovementData == null)
+            if (self.ClientCharacterMovement2Data == null)
             {
                 return;
             }
@@ -490,31 +490,31 @@ namespace Bliss
 
             float3 newToOldVector = (oldPosition - newPosition);
             float dist = math.lengthsq(newToOldVector);
-            if (dist > math.square(self.ClientCharacterMovementData.MaxSmoothNetUpdateDist))
+            if (dist > math.square(self.ClientCharacterMovement2Data.MaxSmoothNetUpdateDist))
             {
-                if (dist > math.square(self.ClientCharacterMovementData.NoSmoothNetUpdateDist))
+                if (dist > math.square(self.ClientCharacterMovement2Data.NoSmoothNetUpdateDist))
                 {
-                    self.ClientCharacterMovementData.MeshTranslationOffset = float3.zero;
+                    self.ClientCharacterMovement2Data.MeshTranslationOffset = float3.zero;
                 }
                 else
                 {
-                    self.ClientCharacterMovementData.MeshTranslationOffset += math.normalizesafe(newToOldVector) * self.ClientCharacterMovementData.MaxSmoothNetUpdateDist;
+                    self.ClientCharacterMovement2Data.MeshTranslationOffset += math.normalizesafe(newToOldVector) * self.ClientCharacterMovement2Data.MaxSmoothNetUpdateDist;
                 }
             }
             else
             {
-                self.ClientCharacterMovementData.MeshTranslationOffset += newToOldVector;
+                self.ClientCharacterMovement2Data.MeshTranslationOffset += newToOldVector;
             }
             
 
             if (self.NetworkSmoothingMode == ENetworkSmoothingMode.Linear)
             {
-                self.ClientCharacterMovementData.OriginalMeshTranslationOffset = self.ClientCharacterMovementData.MeshTranslationOffset;
+                self.ClientCharacterMovement2Data.OriginalMeshTranslationOffset = self.ClientCharacterMovement2Data.MeshTranslationOffset;
                 
                 // Remember the current and target rotation, we're going to lerp between them
-                self.ClientCharacterMovementData.OriginalMeshRotationOffset = oldRotation;
-                self.ClientCharacterMovementData.MeshRotationOffset = oldRotation;
-                self.ClientCharacterMovementData.MeshRotationTarget = newRotation;
+                self.ClientCharacterMovement2Data.OriginalMeshRotationOffset = oldRotation;
+                self.ClientCharacterMovement2Data.MeshRotationOffset = oldRotation;
+                self.ClientCharacterMovement2Data.MeshRotationTarget = newRotation;
                 
                 if (!oldPosition.Equals(newPosition))
                 {
@@ -526,8 +526,8 @@ namespace Bliss
             {
                 // Calc rotation needed to keep current world rotation after UpdatedComponent moves.
                 // Take difference between where we were rotated before, and where we're going
-                self.ClientCharacterMovementData.MeshRotationOffset = math.mul(math.mul(math.inverse(newRotation), oldRotation), self.ClientCharacterMovementData.MeshRotationOffset);
-                self.ClientCharacterMovementData.MeshRotationTarget = quaternion.identity;
+                self.ClientCharacterMovement2Data.MeshRotationOffset = math.mul(math.mul(math.inverse(newRotation), oldRotation), self.ClientCharacterMovement2Data.MeshRotationOffset);
+                self.ClientCharacterMovement2Data.MeshRotationTarget = quaternion.identity;
                 
                 using var _ = ScopedPreventViewMove.Create(transformCmp);
                 transformCmp.SetPositionAndRotation(newPosition, newRotation);
@@ -535,40 +535,40 @@ namespace Bliss
             
             //////////////////////////////////////////////////////////////////////////
             // Update smoothing timestamps
-            if (self.ClientCharacterMovementData.SmoothingClientTimeStamp > self.ClientCharacterMovementData.SmoothingServerTimeStamp)
+            if (self.ClientCharacterMovement2Data.SmoothingClientTimeStamp > self.ClientCharacterMovement2Data.SmoothingServerTimeStamp)
             {
-                var oldClientTimeStamp = self.ClientCharacterMovementData.SmoothingClientTimeStamp;
-                self.ClientCharacterMovementData.SmoothingClientTimeStamp = (self.ClientCharacterMovementData.SmoothingServerTimeStamp + oldClientTimeStamp) / 2;
+                var oldClientTimeStamp = self.ClientCharacterMovement2Data.SmoothingClientTimeStamp;
+                self.ClientCharacterMovement2Data.SmoothingClientTimeStamp = (self.ClientCharacterMovement2Data.SmoothingServerTimeStamp + oldClientTimeStamp) / 2;
                 //Log.Info($"SmoothCorrection: Pull back client from ClientTimeStamp {oldClientTimeStamp} to {self.ClientData.SmoothingServerTimeStamp}, ServerTimeStamp {self.ClientData.SmoothingServerTimeStamp}");
             }
             
-            var oldServerTimeStamp = self.ClientCharacterMovementData.SmoothingServerTimeStamp;
+            var oldServerTimeStamp = self.ClientCharacterMovement2Data.SmoothingServerTimeStamp;
             if (self.NetRole == ENetRole.SimulatedProxy)
             {
                 self.ServerLastTransformUpdateTimeStamp = self.ReplicatedServerLastTransformUpdateTimeStamp;
             }
-            self.ClientCharacterMovementData.SmoothingServerTimeStamp = self.ServerLastTransformUpdateTimeStamp;
+            self.ClientCharacterMovement2Data.SmoothingServerTimeStamp = self.ServerLastTransformUpdateTimeStamp;
             
             // Initial update has no delta.
-            if (self.ClientCharacterMovementData.LastCorrectionTime == 0)
+            if (self.ClientCharacterMovement2Data.LastCorrectionTime == 0)
             {
-                self.ClientCharacterMovementData.SmoothingClientTimeStamp =  self.ClientCharacterMovementData.SmoothingServerTimeStamp;
-                oldServerTimeStamp = self.ClientCharacterMovementData.SmoothingServerTimeStamp;
+                self.ClientCharacterMovement2Data.SmoothingClientTimeStamp =  self.ClientCharacterMovement2Data.SmoothingServerTimeStamp;
+                oldServerTimeStamp = self.ClientCharacterMovement2Data.SmoothingServerTimeStamp;
             }
             
             // Don't let the client fall too far behind or run ahead of new server time.
-            var serverDeltaTime = self.ClientCharacterMovementData.SmoothingServerTimeStamp - oldServerTimeStamp;
-            var maxOffset = self.ClientCharacterMovementData.MaxClientSmoothingDeltaTime;
-            var minOffset = math.min(self.ClientCharacterMovementData.SmoothNetUpdateTime, maxOffset);
+            var serverDeltaTime = self.ClientCharacterMovement2Data.SmoothingServerTimeStamp - oldServerTimeStamp;
+            var maxOffset = self.ClientCharacterMovement2Data.MaxClientSmoothingDeltaTime;
+            var minOffset = math.min(self.ClientCharacterMovement2Data.SmoothNetUpdateTime, maxOffset);
             
             var maxDelta = math.clamp((long)(serverDeltaTime * 1.25f), minOffset, maxOffset);
-            self.ClientCharacterMovementData.SmoothingClientTimeStamp = math.clamp(self.ClientCharacterMovementData.SmoothingClientTimeStamp, 
-                self.ClientCharacterMovementData.SmoothingServerTimeStamp - maxDelta, 
-                self.ClientCharacterMovementData.SmoothingServerTimeStamp );
+            self.ClientCharacterMovement2Data.SmoothingClientTimeStamp = math.clamp(self.ClientCharacterMovement2Data.SmoothingClientTimeStamp, 
+                self.ClientCharacterMovement2Data.SmoothingServerTimeStamp - maxDelta, 
+                self.ClientCharacterMovement2Data.SmoothingServerTimeStamp );
             
             // Compute actual delta between new server timestamp and client simulation.
-            self.ClientCharacterMovementData.LastCorrectionDelta = self.ClientCharacterMovementData.SmoothingServerTimeStamp - self.ClientCharacterMovementData.SmoothingClientTimeStamp;
-            self.ClientCharacterMovementData.LastCorrectionTime = TimeInfo.Instance.ClientNow();
+            self.ClientCharacterMovement2Data.LastCorrectionDelta = self.ClientCharacterMovement2Data.SmoothingServerTimeStamp - self.ClientCharacterMovement2Data.SmoothingClientTimeStamp;
+            self.ClientCharacterMovement2Data.LastCorrectionTime = TimeInfo.Instance.ClientNow();
         }
 
         private static void SmoothClientPosition(this PeriodicMotionComponent self, long deltaTimeMS)
@@ -582,7 +582,7 @@ namespace Bliss
 
         private static void SmoothClientPosition_Interpolate(this PeriodicMotionComponent self, long deltaTimeMS)
         {
-            var clientData = self.ClientCharacterMovementData;
+            var clientData = self.ClientCharacterMovement2Data;
             if (clientData == null) return;
 
             if (self.NetworkSmoothingMode == ENetworkSmoothingMode.Linear)
@@ -686,7 +686,7 @@ namespace Bliss
         }
         private static void SmoothClientPosition_UpdateVisuals(this PeriodicMotionComponent self)
         {
-            var clientData = self.ClientCharacterMovementData;
+            var clientData = self.ClientCharacterMovement2Data;
             if (clientData == null) return;
 
             var transformCmp = self.Parent.GetComponent<TransformComponent>();

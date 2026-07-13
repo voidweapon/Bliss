@@ -23,8 +23,9 @@ namespace Bliss
                 Log.Logger = new NLogger(Options.Instance.AppName, Options.Instance.Process, 0);
                 Log.LogLevel = Options.Instance.LogLevel;
                 ETTask.ExceptionHandler += Log.Error;
-                Log.Debug($"Use Logger:{Log.Logger.GetType()}");
-                
+                Log.Debug($"Use Logger:{Log.Logger.GetType()}"); 
+
+                TimeInfo.Instance.Init();
                 World.Instance.AddSingleton<RootManager>();
                 World.Instance.AddSingleton<CodeLoader>();
             }

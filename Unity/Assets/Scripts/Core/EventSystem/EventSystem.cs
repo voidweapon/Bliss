@@ -37,7 +37,7 @@ namespace Bliss
                 {
                     Log.Error($"event error: {eventInfo.EventHandler.GetType().FullName}");
                     continue;
-                }
+                }     
                 
                 aEvent.Handle(scene, eventData).Coroutine();
             }

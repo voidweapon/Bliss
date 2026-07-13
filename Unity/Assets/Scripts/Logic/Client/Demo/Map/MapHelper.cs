@@ -1,4 +1,7 @@
+using System;
 using ET;
+using Bliss.CharacterMovement;
+using Bliss.Id;
 
 namespace Bliss
 {
@@ -39,6 +42,27 @@ namespace Bliss
             }
             Log.Info($"进入地图{mapId}成功");
 
+        }
+        
+        public static async ETTask<LogicScene> CreateGameplayWorld(LogicScene clientScene)
+        {
+            var gameplayWorld = LogicSceneFactoryCore.CreateLogicScene(clientScene, 1, IdGenerator.Instance.GenerateInstanceId(), ELogicSceneType.GameplayWorld, "GameplayWorld");
+            gameplayWorld.AddComponent<UnitManager>();
+            gameplayWorld.AddComponent<BulletManager>();
+            gameplayWorld.AddComponent<SceneActorManager>();
+            gameplayWorld.AddComponent<KinematicMoverManager, KinematicMoverManagerSettings>(new KinematicMoverManagerSettings()
+            {
+                AutoSimulation = true,
+                Interpolate = true,
+                InterpolateMotor = true,
+                InterpolateMover = true,
+            });
+            await EventSystem.Instance.PushAsync(gameplayWorld, new Event_AfterCreateGameplayWorld());
+                
+            var currentSceneCmp = clientScene.AddComponent<CurrentSceneComponent>();
+            currentSceneCmp.GameplayWorld = gameplayWorld;
+            
+            return gameplayWorld;
         }
 
         public static async ETTask ChangeMap(LogicScene clientScene, LogicScene gameplayWorld, int levelConfigId, long levelId)
@@ -92,5 +116,37 @@ namespace Bliss
             clientScene.GetComponent<ObjectWait>().Notify(new Wait_FinishChangeLevelScene());
         }
 
+        public static Session GetPlayerSession(LogicScene levelScene)
+        {
+            var clientSessionCmp = GetComponentInParentScene<ClientSessionComponent>(levelScene);
+            return (Session)clientSessionCmp.Session;
+        }
+        
+        public static T GetComponentInParentScene<T>(LogicScene scene) where T : Entity
+        {
+            var componentRef = scene.GetComponent<ComponentRef<T>>();
+            if (componentRef == null)
+            {
+                LogicScene tempScene = scene.Parent as LogicScene;
+                while (tempScene != null)
+                {
+                    var com = tempScene.GetComponent<T>();
+                    if (com != null)
+                    {
+                        componentRef = scene.AddComponent<ComponentRef<T>>();
+                        componentRef.SetComponent(com);
+                        break;
+                    }
+
+                    if (tempScene == tempScene.Parent)
+                    {
+                        break;
+                    }
+                    tempScene = tempScene.Parent as LogicScene;
+                }
+            }
+
+            return componentRef?.Component;
+        }
     }
 }

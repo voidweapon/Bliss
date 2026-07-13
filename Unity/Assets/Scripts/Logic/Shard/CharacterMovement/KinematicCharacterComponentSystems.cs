@@ -60,6 +60,46 @@ namespace Bliss.CharacterMovement
             return self.Capsule != null;
         }
 
+        
+        /// <summary>
+        /// Returns all the state information of the motor that is pertinent for simulation
+        /// </summary>
+        public static KinematicCharacterMotorState GetState(this KinematicCharacterComponent self)
+        {
+            KinematicCharacterMotorState state = new KinematicCharacterMotorState();
+
+            state.Position = self._transientPosition;
+            state.Rotation = self._transientRotation;   
+
+            state.BaseVelocity = self.BaseVelocity;
+            state.AttachedRigidbodyVelocity = self._attachedRigidbodyVelocity;
+
+            state.MustUnground = self._mustUnground;
+            state.MustUngroundTime = self._mustUngroundTimeCounter;
+            state.LastMovementIterationFoundAnyGround = self.LastMovementIterationFoundAnyGround;
+            state.GroundingStatus.CopyFrom(self.GroundingStatus);
+            state.AttachedRigidbody = self._attachedRigidbody;
+
+            return state;
+        }
+
+        /// <summary>
+        /// Applies a motor state instantly
+        /// </summary>
+        public static void ApplyState(this KinematicCharacterComponent self, KinematicCharacterMotorState state, bool bypassInterpolation = true)
+        {
+            self.SetPositionAndRotation(state.Position, state.Rotation, bypassInterpolation);
+
+            self._baseVelocity = state.BaseVelocity;
+            self._attachedRigidbodyVelocity = state.AttachedRigidbodyVelocity;
+
+            self._mustUnground = state.MustUnground;
+            self._mustUngroundTimeCounter = state.MustUngroundTime;
+            self.LastMovementIterationFoundAnyGround = state.LastMovementIterationFoundAnyGround;
+            self.GroundingStatus.CopyFrom(state.GroundingStatus);
+            self._attachedRigidbody = state.AttachedRigidbody;
+        }
+        
         #region Capsule Setting
         
         public static void SetCapsuleDimensions(this KinematicCharacterComponent self,
