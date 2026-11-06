@@ -11,6 +11,9 @@ namespace Bliss.CharacterMovement
         
         public IndexList<long, EntityRef<KinematicCharacterComponent>> CharacterMotors = new IndexList<long, EntityRef<KinematicCharacterComponent>>();
         public IndexList<long, EntityRef<KinematicRigidbodyMover>> PhysicsMovers = new IndexList<long, EntityRef<KinematicRigidbodyMover>>();
+        
+        // public Queue<EntityRef<KinematicCharacterComponent>> CharacterMotors = new Queue<EntityRef<KinematicCharacterComponent>>();
+        // public Queue<EntityRef<KinematicCharacterComponent>> PhysicsMovers = new Queue<EntityRef<KinematicCharacterComponent>>();
         public long LogicUpdateTimer;
         
         public long LastCustomInterpolationStartTime = -1L;

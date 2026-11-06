@@ -134,6 +134,31 @@ namespace Bliss
         public float3 AngularVelocity;
         public float3 Location;
         public float3 Rotation;
+        
+        public void CopyFrom(CharacterRepMovement other)
+        {
+            LinearVelocity = other.LinearVelocity;
+            AngularVelocity = other.AngularVelocity;
+            Location = other.Location;
+            Rotation = other.Rotation;
+        }
+    }
+    
+    [MemoryPackable]
+    public partial class ClientAdjustment
+    {
+        public float TimeStamp;
+        public float DeltaTime;
+        public float3 NewLoc; // Note: if bBaseRelativePosition is set, this is a relative location to the Movement base.
+        public float3 NewVel; // Note: if bBaseRelativeVelocity is set, this is a relative velocity to the Movement base.
+        public float3 NewRot;
+        public float3 GravityDirection;
+        public long NewBase;
+        public string NewBaseBoneName;
+        public bool bAckGoodMove;
+        public bool bBaseRelativePosition;
+        public bool bBaseRelativeVelocity;
+        public byte MovementMode;
     }
 
     [MemoryPackable]

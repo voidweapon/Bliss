@@ -40,9 +40,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="..\..\Unity\Assets\Scripts\Model\Shard\AOI\">
-        <Link>Shard\AOI</Link>
-      </Folder>
       <Folder Include="Server\Generated\Configs\" />
       <Folder Include="Server\Generated\Message\" />
       <Folder Include="Server\Generated\Message\Server\" />

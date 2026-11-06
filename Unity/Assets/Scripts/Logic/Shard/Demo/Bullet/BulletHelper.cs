@@ -30,7 +30,18 @@ namespace Bliss
             bullet.AddComponent<SmoothTransformComponent, SmoothTransformComponentInitParam>(new SmoothTransformComponentInitParam(ENetworkSmoothingMode.Linear));
 #endif
             var moverComponent = bullet.AddComponent<MoverComponent>();
-        
+            
+            var gameplayScene = scene.GetLevelGameplayWorld();
+            var aoiManager = gameplayScene.GetComponent<AoiManagerComponent>();
+            var aoiIdentifier = aoiManager.Register(AoiRegisterInfo.CreateSphere(bullet, AOIType.Visibility, transformComponent.Transform.Location, 10f));
+            var aoi = bullet.AddComponent<AOIEntityCmp>();
+            aoi.Add(AOIType.Visibility, aoiIdentifier);
+            
+#if DOTNET
+            var netAoiIdentifier = aoiManager.Register(AoiRegisterInfo.CreateSphere(bullet, AOIType.NetworkVisibility, transformComponent.Transform.Location, 10f));
+            aoi.Add(AOIType.NetworkVisibility, netAoiIdentifier);
+#endif
+            
             if (isRaiseEvent)
             {
                 var unitConfig = bullet.GetConfig();

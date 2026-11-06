@@ -47,6 +47,18 @@
             <Link>Scripts\ThirdParty\%(RecursiveDir)%(FileName)%(Extension)</Link>
         </Compile>
 
+        <Compile Include="..\..\Unity\Assets\Scripts\Model\Shard\AOI\**\*.cs">
+            <Link>Scripts\Model\Shard\AOI\%(RecursiveDir)%(FileName)%(Extension)</Link>
+        </Compile>
+
+        <Compile Include="..\..\Unity\Assets\Scripts\Logic\Shard\AOI\**\*.cs">
+            <Link>Scripts\Logic\Shard\AOI\%(RecursiveDir)%(FileName)%(Extension)</Link>
+        </Compile>
+
+        <Compile Include="..\..\Unity\Assets\Scripts\Logic\Shard\Demo\Map\LevelGameWorldComponent.cs">
+            <Link>Scripts\Logic\Shard\Demo\Map\LevelGameWorldComponent.cs</Link>
+        </Compile>
+
         <Compile Include="..\..\Unity\Library\PackageCache\com.unity.mathematics*\Unity.Mathematics\**\*.cs">
             <Link>Unity.Mathematics/$([System.String]::new(%(RecursiveDir)).Substring($([System.String]::new(%(RecursiveDir)).Indexof("Unity.Mathematics"))).Replace("Unity.Mathematics", ""))/%(FileName)%(Extension)</Link>
         </Compile>

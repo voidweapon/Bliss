@@ -43,6 +43,11 @@ namespace Bliss
             return _entityTypeSystemMgr.IsEntityUpdateInGroup(entityType, group);
         }
         
+        public int GetEntityUpdateGroupPriority(Type entityType, ESystemUpdateGroup group)
+        {
+            return _entityTypeSystemMgr.GetEntityUpdateGroupPriority(entityType, group);
+        }
+        
         private class EntityTypeSystemMgr
         {
             /// <summary>
@@ -80,6 +85,15 @@ namespace Bliss
 
                 return entitySystem.IsEntityUpdateInGroup(group);
             }
+
+            public int GetEntityUpdateGroupPriority(Type entityType, ESystemUpdateGroup group)
+            {
+                if (!_entitySystems.TryGetValue(entityType, out var entitySystem))
+                {
+                    return 0;
+                }
+                return entitySystem.GetEntityUpdateGroupPriority(group);
+            }
         }
 
         private class EntitySystemCategoryMgr
@@ -91,6 +105,8 @@ namespace Bliss
             private readonly MultiMapSortedList<Type, ISystem> _entitySystems = new MultiMapSortedList<Type, ISystem>();
 
             private readonly bool[] _updateInGroup = new bool[(int)ESystemUpdateGroup.Max];
+            
+            private readonly int[] _updateInGroupPriority = new int[(int)ESystemUpdateGroup.Max];
             
             public SortedList<ISystem> GetEntitySystems(Type systemCategoryType)
             {
@@ -106,6 +122,7 @@ namespace Bliss
                 if (ESystemUpdateGroup.None < updateGroup && updateGroup < ESystemUpdateGroup.Max)
                 {
                     _updateInGroup[(int)updateGroup] = true;
+                    _updateInGroupPriority[(int)updateGroup] = systemObject.GetPriority();
                 }
             }
 
@@ -114,6 +131,13 @@ namespace Bliss
                 if(group == ESystemUpdateGroup.None) return false;
                 
                 return _updateInGroup[(int)group];
+            }
+            
+            public int GetEntityUpdateGroupPriority(ESystemUpdateGroup group)
+            {
+                if(group == ESystemUpdateGroup.None) return 0;
+                
+                return _updateInGroupPriority[(int)group];
             }
         }
     }

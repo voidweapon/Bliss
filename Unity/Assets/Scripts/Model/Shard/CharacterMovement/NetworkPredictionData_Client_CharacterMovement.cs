@@ -141,6 +141,13 @@ namespace Bliss.CharacterMovement
             this.SavedMoves = new FixedCircularArray<SavedMove_Character>(this.MaxSavedMoveCount);
         }
 
+        public void Clear()
+        {
+            ClientUpdateRealTime = 0f;
+            CurrentTimeStamp = 0f;
+            
+        }
+
         public SavedMove_Character CreateSavedMove()
         {
             if (SavedMoves.Count >= MaxSavedMoveCount)
@@ -270,7 +277,7 @@ namespace Bliss.CharacterMovement
             // Make sure we do the same, so MoveAutonomous uses the same inputs and is deterministic!!
             if (SavedMoves.Count > 0)
             {
-                var previousMove = SavedMoves[SavedMoves.Count - 1];
+                var previousMove = SavedMoves.TailItem();
                 if (!previousMove.bOldTimeStampBeforeReset)
                 {
                     // How server will calculate its deltatime to update physics.

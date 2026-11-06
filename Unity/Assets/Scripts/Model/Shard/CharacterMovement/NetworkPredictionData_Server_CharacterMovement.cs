@@ -1,7 +1,31 @@
+using Unity.Mathematics;
+
 namespace Bliss.CharacterMovement
 {
     public class NetworkPredictionData_Server_CharacterMovement
     {
+        /** Server clock time when last server move was received or movement was forced to be processed */
+        public float ServerTimeStamp;
+
+        /** Initial ServerTimeStamp that triggered a ForcedPositionUpdate series. Reset to 0 after no longer exceeding update interval. */
+        public float ServerTimeBeginningForcedUpdates;
+        
+        /** ServerTimeStamp last time we called ForcePositionUpdate. */
+        public float ServerTimeLastForcedUpdate;
+        
+        /** Set to true while requirements for ForcePositionUpdate interval are met, and set back to false after updates are received again. */
+        public bool bTriggeringForcedUpdates;
+        
+        /** Set to true while bTriggeringForcedUpdates is true and after update duration has been exceeded (when server will stop forcing updates). */
+        public bool bForcedUpdateDurationExceeded;
+        
+        /** Set to true if last received move request  is bad and needs correction */
+        public bool bLastRequestNeedsForcedUpdates;
+        
+        
+        
+        public ClientAdjustment PendingAdjustment = new ClientAdjustment();
+        
         /** Timestamp from the client of most recent ServerMove() processed for this player. Reset occasionally for timestamp resets (to maintain accuracy). */
         public float CurrentClientTimeStamp;
 
@@ -16,17 +40,17 @@ namespace Bliss.CharacterMovement
 
         /** Server clock time when last server move was received from client (does NOT include forced moves on server) */
         public float ServerTimeStampLastServerMove;
-        
-        /** 
+
+        /**
          * Max delta time for a given move, in real seconds
          * Based off of AGameNetworkManager::MaxMoveDeltaTime config setting, but can be modified per actor
          * if needed.
          * Note: This was previously named MaxResponseTime, but has been renamed to reflect what it does more accurately
          */
-        public float MaxMoveDeltaTime;
+        public float MaxMoveDeltaTime = 0.125f;
 
         /** Force client update on the next ServerMoveHandleClientError() call. */
-        public bool bForceClientUpdate = true;
+        public bool bForceClientUpdate = false;
 
         /** Accumulated timestamp difference between autonomous client and server for tracking long-term trends */
         public float LifetimeRawTimeDiscrepancy;
@@ -58,5 +82,48 @@ namespace Bliss.CharacterMovement
 
         /** Creation time of this prediction data, used to contextualize LifetimeRawTimeDiscrepancy */
         public float WorldCreationTime;
+
+        public void Clear()
+        {
+            ServerTimeStamp = 0f;
+            ServerTimeBeginningForcedUpdates = 0f;
+            ServerTimeLastForcedUpdate = 0f;
+            bTriggeringForcedUpdates = false;
+            bForcedUpdateDurationExceeded = false;
+            bLastRequestNeedsForcedUpdates = false; 
+            
+            
+            CurrentClientTimeStamp = 0f;
+            LastReceivedClientTimeStamp = 0f;
+            LastUpdateTime = 0f;
+            ServerAccumulatedClientTimeStamp = 0f;
+            LastUpdateTime = 0f;
+            ServerTimeStampLastServerMove = 0f;
+            MaxMoveDeltaTime = 0.125f;
+            bForceClientUpdate = true;
+            LifetimeRawTimeDiscrepancy = 0f;
+            TimeDiscrepancy = 0f;
+            bResolvingTimeDiscrepancy = false;
+            TimeDiscrepancyAccumulatedClientDeltasSinceLastServerTick = 0f;
+            WorldCreationTime = 0f;
+        }
+
+        public float GetServerMoveDeltaTime(float clientTimeStamp, float actorTimeDilation)
+        {
+            if (bResolvingTimeDiscrepancy)
+            {
+                return TimeDiscrepancyResolutionMoveDeltaOverride;
+            }
+            else
+            {
+                return GetBaseServerMoveDeltaTime(clientTimeStamp, actorTimeDilation);
+            }
+        }
+
+        private float GetBaseServerMoveDeltaTime(float clientTimeStamp, float actorTimeDilation)
+        {
+            float deltaTime = math.min(MaxMoveDeltaTime * actorTimeDilation, clientTimeStamp - CurrentClientTimeStamp);
+            return deltaTime;
+        }
     }
 }

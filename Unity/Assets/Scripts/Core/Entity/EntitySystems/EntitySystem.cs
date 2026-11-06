@@ -6,13 +6,13 @@ namespace Bliss
 {
     public class EntitySystem 
     {
-        private Queue<EntityWeakRef<Entity>>[] _updateQueue = new Queue<EntityWeakRef<Entity>>[(int)ESystemUpdateGroup.Max];
+        private Queue<EntityRef<Entity>>[] _updateQueue = new Queue<EntityRef<Entity>>[(int)ESystemUpdateGroup.Max];
 
         public EntitySystem()
         {
             for (int i = 0; i < (int)ESystemUpdateGroup.Max; i++)
             {
-                _updateQueue[i] = new Queue<EntityWeakRef<Entity>>();
+                _updateQueue[i] = new Queue<EntityRef<Entity>>();
             }
         }
         
@@ -162,7 +162,7 @@ namespace Bliss
             where TEntity : IEntitySystemConstraint 
             where TSystem : IUpdateGroupSystem
         {
-            Queue<EntityWeakRef<Entity>> updateQueue = _updateQueue[(int)updateGroup];
+            var updateQueue = _updateQueue[(int)updateGroup];
             int thisFrameCount = updateQueue.Count;
             while (thisFrameCount > 0)
             {

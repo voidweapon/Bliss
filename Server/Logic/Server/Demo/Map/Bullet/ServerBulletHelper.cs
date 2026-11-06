@@ -35,7 +35,7 @@ public static class ServerBulletHelper
                 EntityId = ((Entity)targetInfo.TargetEntity)?.Id ?? 0,
             },
         });
-        MapMessageHelper.Broadcast(scene, position, msg);
+        MapMessageHelper.BroadcastAll(scene, position, msg);
         
         return bullet;
     }

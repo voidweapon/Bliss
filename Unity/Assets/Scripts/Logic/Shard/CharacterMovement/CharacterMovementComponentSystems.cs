@@ -193,75 +193,17 @@ namespace Bliss.CharacterMovement
             
             deltaTime = clientData.UpdateTimeStampAndDeltaTime(deltaTime, self.MinTimeBetweenTimeStampResets);
             
-            
-
         }
 
         public static void BeforeUpdateCharacterMovement(this CharacterMovementComponent self, float deltaTime)
         { 
             if (self.LocalNetRole == ENetRole.AutonomousProxy)
             {
-                var clientData = self.GetPredictionData_Client_CharacterMovement();
-                if (clientData == null)
-                {
-                    return;
-                }
-            
-                deltaTime = clientData.UpdateTimeStampAndDeltaTime(self.LogicTimeStamp, self.MinTimeBetweenTimeStampResets);
-            
-                // Find the oldest (unacknowledged) important move (OldMove).
-                // Don't include the last move because it may be combined with the next new move.
-                // A saved move is interesting if it differs significantly from the last acknowledged move
-                SavedMove_Character oldMove = null;
-                if (clientData.LastAckedMove != null)
-                {
-                    int NumSavedMoves = clientData.SavedMoves.Count;
-                    for (int i = 0; i < NumSavedMoves - 1; i++)
-                    {
-                        var currentMove = clientData.SavedMoves[i];
-                        if (currentMove.IsImportantMove(clientData.LastAckedMove))
-                        {
-                            oldMove = currentMove;
-                            break;
-                        }
-                    }
-                }
-                self.OldMove = oldMove;
-            
-                // Get a SavedMove object to store the movement in.
-                var newMove = clientData.CreateSavedMove();
-                if (newMove == null)
-                {
-                    return;
-                }
-                
-                newMove.SetMoveFor(
-                    self,
-                    self.PackNetworkMovementMode(),
-                    self.GetMaxSpeed(),
-                    deltaTime,
-                    0, self.RoundAcceleration(0),
-                    clientData);
-                
-                // see if the two moves could be combined
-                if (clientData.PendingMove != null && clientData.PendingMove.CanCombineWith(newMove, self, clientData.MaxMoveDeltaTime))
-                {
-                    //TODO: Only combine and move back to the start location if we don't move back in to a spot that would make us collide with something new.
-
-                
-                    newMove.CombineWith(clientData.PendingMove, self, float3.zero);
-
-
-                    newMove.SetInitialPosition(self);
-
-                    if (clientData.SavedMoves.Count > 0 && clientData.SavedMoves[clientData.SavedMoves.Count - 1] == clientData.PendingMove)
-                    {
-                        clientData.FreeMove(clientData.PendingMove);
-                    }
-                    clientData.PendingMove = null;
-                }
-
-                self.CurrentMove = newMove;
+                self.OnBeforeCCUpdate_Client(deltaTime);
+            }
+            else if (self.LocalNetRole == ENetRole.Authority && self.RemoteNetRole ==  ENetRole.AutonomousProxy)
+            {
+                self.OnBeforeCCUpdate_Server(deltaTime);
             }
         }
         
@@ -269,55 +211,133 @@ namespace Bliss.CharacterMovement
         {
             if (self.LocalNetRole == ENetRole.AutonomousProxy)
             {
-                var clientData = self.GetPredictionData_Client_CharacterMovement();
-                if (clientData == null)
-                {
-                    return;
-                }
+                //Client
+                self.OnEndCCUpdate_Client();
+            }
+            else if (self.LocalNetRole == ENetRole.Authority && self.RemoteNetRole == ENetRole.AutonomousProxy)
+            {
+                //Server
+                self.OnEndCCUpdate_Server();
+            }
+        }
 
-                var oldMove = self.OldMove;
-                var newMove = self.CurrentMove;
-
-                if (newMove == null)
+        private static void OnBeforeCCUpdate_Client(this CharacterMovementComponent self,float deltaTime)
+        {
+            var clientData = self.GetPredictionData_Client_CharacterMovement();
+            if (clientData == null)
+            {
+                return;
+            }
+            
+            deltaTime = clientData.UpdateTimeStampAndDeltaTime(self.LogicTimeStamp, self.MinTimeBetweenTimeStampResets);
+            
+            // Find the oldest (unacknowledged) important move (OldMove).
+            // Don't include the last move because it may be combined with the next new move.
+            // A saved move is interesting if it differs significantly from the last acknowledged move
+            SavedMove_Character oldMove = null;
+            if (clientData.LastAckedMove != null)
+            {
+                int NumSavedMoves = clientData.SavedMoves.Count;
+                for (int i = 0; i < NumSavedMoves - 1; i++)
                 {
-                    return;
+                    var currentMove = clientData.SavedMoves[i];
+                    if (currentMove.IsImportantMove(clientData.LastAckedMove))
+                    {
+                        oldMove = currentMove;
+                        break;
+                    }
                 }
-                self.OldMove = null;
-                self.CurrentMove = null;
+            }
+            self.OldMove = oldMove;
+            
+            // Get a SavedMove object to store the movement in.
+            var newMove = clientData.CreateSavedMove();
+            if (newMove == null)
+            {
+                return;
+            }
                 
-                newMove.PostUpdate(self, self.PackNetworkMovementMode());
+            newMove.SetMoveFor(
+                self,
+                self.PackNetworkMovementMode(),
+                self.GetMaxSpeed(),
+                deltaTime,
+                0, self.RoundAcceleration(0),
+                clientData);
+                
+            // see if the two moves could be combined
+            if (clientData.PendingMove != null && clientData.PendingMove.CanCombineWith(newMove, self, clientData.MaxMoveDeltaTime))
+            {
+                //TODO: Only combine and move back to the start location if we don't move back in to a spot that would make us collide with something new.
 
-                if (self.bReplicateMovement)
+                
+                newMove.CombineWith(clientData.PendingMove, self, float3.zero);
+
+
+                newMove.SetInitialPosition(self);
+
+                if (clientData.SavedMoves.Count > 0 && clientData.SavedMoves[clientData.SavedMoves.Count - 1] == clientData.PendingMove)
                 {
-                    clientData.SavedMoves.Add(newMove, out _);
-
-                    bool bCanDelayMove = self.CanDelaySendingMove(newMove);
-                    if (bCanDelayMove && clientData.PendingMove == null)
-                    {
-                        float netMoveDeltaSeconds = math.clamp(self.GetClientNetSendDeltaTime(),  1f/120f, 1f/5f);
-                        float secondsSinceLastMoveSent = TimeInfo.Instance.RealTimeSecondSinceStartup - clientData.ClientUpdateRealTime;
-                        
-                        if (secondsSinceLastMoveSent < netMoveDeltaSeconds)
-                        {
-                            // Delay sending this move.
-                            clientData.PendingMove = newMove;
-                            return;
-                        }
-                    }
-                    
-                    clientData.ClientUpdateRealTime =  TimeInfo.Instance.RealTimeSecondSinceStartup;
-                    
-                    bool bSendServerMove = true;
-
-                    // Send move to server if this character is replicating movement
-                    if (bSendServerMove)
-                    {
-                        self.CallServerMove(newMove, clientData.PendingMove, oldMove);
-                    }
+                    clientData.FreeMove(clientData.PendingMove);
                 }
-
                 clientData.PendingMove = null;
             }
+
+            self.CurrentMove = newMove;
+        }
+
+
+
+        private static void OnEndCCUpdate_Client(this CharacterMovementComponent self)
+        {
+            var clientData = self.GetPredictionData_Client_CharacterMovement();
+            if (clientData == null)
+            {
+                return;
+            }
+
+            var oldMove = self.OldMove;
+            var newMove = self.CurrentMove;
+
+            if (newMove == null)
+            {
+                return;
+            }
+            self.OldMove = null;
+            self.CurrentMove = null;
+                
+            newMove.PostUpdate(self, self.PackNetworkMovementMode());
+
+            if (self.bReplicateMovement)
+            {
+                clientData.SavedMoves.Add(newMove, out _);
+
+                bool bCanDelayMove = self.CanDelaySendingMove(newMove);
+                if (bCanDelayMove && clientData.PendingMove == null)
+                {
+                    float netMoveDeltaSeconds = math.clamp(self.GetClientNetSendDeltaTime(),  1f/120f, 1f/5f);
+                    float secondsSinceLastMoveSent = TimeInfo.Instance.RealTimeSecondSinceStartup - clientData.ClientUpdateRealTime;
+                        
+                    if (secondsSinceLastMoveSent < netMoveDeltaSeconds)
+                    {
+                        // Delay sending this move.
+                        clientData.PendingMove = newMove;
+                        return;
+                    }
+                }
+                    
+                clientData.ClientUpdateRealTime =  TimeInfo.Instance.RealTimeSecondSinceStartup;
+                    
+                bool bSendServerMove = true;
+
+                // Send move to server if this character is replicating movement
+                if (bSendServerMove)
+                {
+                    self.CallServerMove(newMove, clientData.PendingMove, oldMove);
+                }
+            }
+
+            clientData.PendingMove = null;
         }
 
         public static void CallServerMove(this CharacterMovementComponent self,
@@ -422,9 +442,293 @@ namespace Bliss.CharacterMovement
 
         private static void ServerMove_HandleMoveData(this CharacterMovementComponent self, CharacterNetworkMoveDataContainer moveDataContainer)
         {
+            var serverData = self.GetPredictionData_Server_CharacterMovement();
+            if (serverData == null)
+            {
+                return;
+            }
+            
+            //Optional Old Move
+            if (moveDataContainer.bHasOldMove)
+            {
+                self.SetCurrentNetworkMoveData(moveDataContainer.OldMoveData);
+                self.ServerMove_PerformMovement(moveDataContainer.OldMoveData);
+            }
+            
+            // Optional pending move as part of "dual move"
+            if (moveDataContainer.bHasPendingMove)
+            {
+                self.SetCurrentNetworkMoveData(moveDataContainer.PendingMoveData);
+                self.ServerMove_PerformMovement(moveDataContainer.PendingMoveData);
+            }
+            
+            // Final standard move
+            if (moveDataContainer.NewMoveData != null)
+            {
+                self.SetCurrentNetworkMoveData(moveDataContainer.NewMoveData);
+                self.ServerMove_PerformMovement(moveDataContainer.NewMoveData);
+            }
+            
+            self.SetCurrentNetworkMoveData(null);
+        }
+
+        public static void ServerMove_PerformMovement(this CharacterMovementComponent self, CharacterNetworkMoveData moveData)
+        {
+            var serverData = self.GetPredictionData_Server_CharacterMovement();
+            if (serverData == null)
+            {
+                return;
+            }
+            
+            float clientTimeStamp = moveData.TimeStamp;
+            if(!self.VerifyClientTimeStamp(clientTimeStamp, serverData))
+            {
+                float serverClientTimeStamp = serverData.CurrentClientTimeStamp;
+                if (serverClientTimeStamp > 1f 
+                    && math.abs(serverClientTimeStamp - clientTimeStamp) > CharacterMovementCVars.NetServerMoveTimestampExpiredWarningThreshold)
+                {
+                    Log.Warning($"ServerMove: TimeStamp expired:{clientTimeStamp}, CurrentClientTimeStamp: {serverClientTimeStamp}, LastReceivedClientTimeStamp: {serverData.LastReceivedClientTimeStamp}");
+                }
+                return;
+            }
+
+            float3 clientAccel = moveData.Acceleration.Value;
+            byte clientMoveFlags = moveData.CompressedMoveFlags;
+            
+            float deltaTime = serverData.GetServerMoveDeltaTime(clientTimeStamp, 1f);
+            if (deltaTime > 0f)
+            {
+                serverData.CurrentClientTimeStamp = clientTimeStamp;
+                serverData.ServerAccumulatedClientTimeStamp += deltaTime;
+                serverData.ServerTimeStamp = TimeInfo.Instance.RealTimeSecondSinceStartup;
+                serverData.ServerTimeStampLastServerMove = serverData.ServerTimeStamp;
+
+                self.MoveAutonomous(clientTimeStamp, deltaTime, clientMoveFlags, clientAccel);
+
+                //TODO: For Quick Test
+                {
+                    float3 location = moveData.Location.Value;
+                    quaternion rotation = quaternion.Euler(moveData.Rotation);
+                    self.KinematicCharacterCmp.SetPositionAndRotation(location, rotation);
+                    self.TransformCmp.SetPositionAndRotation(location, rotation);
+                    serverData.PendingAdjustment.bAckGoodMove = true;
+                }
+            }
+            
+            // Validate move only after old and first dual portion, after all moves are completed.
+            if (moveData.NetworkMoveType == CharacterNetworkMoveData.ENetworkMoveType.NewMove)
+            {
+                
+            }
+        }
+
+        public static void MoveAutonomous(this CharacterMovementComponent self, float clientTimeStamp, float deltaTime, byte clientMoveFlags, float3 clientAccel)
+        {
+            
+        }
+        
+
+        public static bool VerifyClientTimeStamp(this CharacterMovementComponent self, float timeStamp, NetworkPredictionData_Server_CharacterMovement serverData)
+        {
+            bool bFirstMoveAfterForcedUpdates = serverData.bTriggeringForcedUpdates;
+            bool bNeedsForcedUpdate = false;
+            bool bIsValid = self.IsClientTimeStampValid(timeStamp, serverData, out bool bTimeStampResetDetected);
+            if (bIsValid)
+            {
+                if (bTimeStampResetDetected)
+                {
+                    self.LastTimeStampResetServerTime = TimeInfo.Instance.RealTimeSecondSinceStartup;
+                    serverData.CurrentClientTimeStamp -= self.MinTimeBetweenTimeStampResets;
+                }
+                else
+                {
+                    self.ProcessClientTimeStampForTimeDiscrepancy(timeStamp, serverData);
+                }
+                
+                if (bFirstMoveAfterForcedUpdates)
+                {
+                    serverData.CurrentClientTimeStamp = timeStamp;
+                    serverData.ServerTimeStamp = TimeInfo.Instance.RealTimeSecondSinceStartup;
+                }
+            }
+            else
+            {
+                if (bTimeStampResetDetected)
+                {
+                    Log.Debug($"TimeStamp expired. Before TimeStamp Reset. CurrentClientTimeStamp: {serverData.CurrentClientTimeStamp}, LastReceivedClientTimeStamp: {serverData.LastReceivedClientTimeStamp}, TimeStamp: {timeStamp}");
+                }
+                else
+                {
+                    
+                }
+            }
+
+            serverData.LastReceivedClientTimeStamp = timeStamp;
+            serverData.bLastRequestNeedsForcedUpdates = bNeedsForcedUpdate;
+            
+            return bIsValid;
+        }
+
+        /// <summary>
+        /// Processes client timestamps from ServerMoves, detects and protects against time discrepancy between client-reported times and server time
+        /// Called by UCharacterMovementComponent::VerifyClientTimeStamp() for valid timestamps.
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="clientTimeStamp"></param>
+        /// <param name="serverData"></param>
+        private static void ProcessClientTimeStampForTimeDiscrepancy(this CharacterMovementComponent self, float clientTimeStamp, NetworkPredictionData_Server_CharacterMovement serverData)
+        {
+            // Should only be called on server in network games
+            
+            // Movement time discrepancy detection and resolution (potentially caused by client speed hacks, time manipulation)
+            // Track client reported time deltas through ServerMove RPCs vs actual server time, when error accumulates enough
+            // trigger prevention measures where client must "pay back" the time difference
+        }
+
+        /// <summary>
+        /// Internal const check for client timestamp validity without side-effects. 
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="timeStamp"></param>
+        /// <param name="serverData"></param>
+        /// <param name="bTimeStampResetDetected"></param>
+        /// <returns></returns>
+        private static bool IsClientTimeStampValid(this CharacterMovementComponent self, float timeStamp, NetworkPredictionData_Server_CharacterMovement serverData, out bool bTimeStampResetDetected)
+        {
+            bTimeStampResetDetected = false;
+            if (timeStamp < 0f || math.isfinite(timeStamp))
+            {
+                return false;
+            }
+
+            // Very large deltas happen around a TimeStamp reset.
+            float deltaTimeStamp = (timeStamp - serverData.CurrentClientTimeStamp);
+            if (math.abs(deltaTimeStamp) > self.MinTimeBetweenTimeStampResets * 0.5f)
+            {
+                // Client is resetting TimeStamp to increase accuracy.
+                bTimeStampResetDetected = true;
+                if (deltaTimeStamp < 0f)
+                {
+                    // Validate that elapsed time since last reset is reasonable, otherwise client could be manipulating resets.
+                    if (TimeInfo.Instance.RealTimeSecondSinceStartup - self.LastTimeStampResetServerTime < (self.MinTimeBetweenTimeStampResets * 0.5f))
+                    {
+                        // Reset too recently
+                        return false;
+                    }
+                    else
+                    {
+                        // TimeStamp accepted with reset
+                        return true;
+                    }
+                }
+                else
+                {
+                    // We already reset the TimeStamp, but we just got an old outdated move before the switch, not valid.
+                    return false;
+                }
+            }
+
+            // If TimeStamp is in the past, move is outdated, not valid.
+            if( timeStamp <= serverData.CurrentClientTimeStamp )
+            {
+                return false;
+            }
+            
+            // Precision issues (or reordered timestamps from old moves) can cause very small or zero deltas which cause problems.
+            if (deltaTimeStamp < CharacterMovementComponent.MIN_TICK_TIME)
+            {
+                return false;
+            }
+	
+            // TimeStamp valid.
+            return true;
+        }
+
+        /// <summary>
+        /// Check for Server-Client disagreement in position or other movement state important enough to trigger a client correction.
+        /// </summary>
+        /// <param name="self"></param>
+        /// <param name="clientTimeStamp"></param>
+        /// <param name="deltaTime"></param>
+        /// <param name="accel"></param>
+        /// <param name="location"></param>
+        /// <param name="clientMovementMode"></param>
+        /// <param name="clientMovementBase"></param>
+        /// <param name="clientMovementBaseBoneName"></param>
+        private static void ServerMoveHandleClientError(this CharacterMovementComponent self, 
+            float clientTimeStamp, float deltaTime,
+            float3 accel, float3 location, byte clientMovementMode,
+            long clientMovementBase, string clientMovementBaseBoneName)
+        {
             
         }
 
+        public static void SendClientAdjustment(this CharacterMovementComponent self)
+        {
+#if DOTNET
+            
+            var serverData = self.GetPredictionData_Server_CharacterMovement();
+            if (serverData == null)
+            {
+                return;
+            }
+
+            if (serverData.PendingAdjustment.TimeStamp <= 0f)
+            {
+                return;
+            }
+            
+            if(serverData.PendingAdjustment.bAckGoodMove)
+            {
+               M2C_AckGoodCharacterMoveData msg_goodMoveData = M2C_AckGoodCharacterMoveData.Create(true); 
+               MapMessageHelper.SendToClient(self.Parent, msg_goodMoveData);
+            }
+            else
+            {
+                M2C_CharacterMovementRepData msg_repData = M2C_CharacterMovementRepData.Create(true);
+                msg_repData.ReplicatedMovement ??= new CharacterRepMovement();
+                msg_repData.ReplicatedMovement.CopyFrom(self.ReplicatedMovement); 
+                MapMessageHelper.SendToClient(self.Parent, msg_repData);
+            }
+
+            serverData.PendingAdjustment.TimeStamp = 0f;
+            serverData.PendingAdjustment.bAckGoodMove = false;
+            serverData.bForceClientUpdate = false;
+#endif
+        }
+
+        private static void OnBeforeCCUpdate_Server(this CharacterMovementComponent self, float deltaTime)
+        {
+            
+        }
+        
+
+        private static void OnEndCCUpdate_Server(this CharacterMovementComponent self)
+        {
+            
+        }
+
+        public static void GaterCurrentMovement(this CharacterMovementComponent self)
+        {
+            self.ReplicatedMovement.Location = self.TransformCmp.Transform.Location;
+            self.ReplicatedMovement.Rotation = math.Euler(self.TransformCmp.Transform.Rotation);
+            self.ReplicatedMovement.LinearVelocity = self.KinematicCharacterCmp.Velocity;
+            self.ReplicatedMovement.AngularVelocity = float3.zero;
+        }
+
+        public static void SetCurrentNetworkMoveData(this CharacterMovementComponent self, CharacterNetworkMoveData moveData)
+        {
+            self.CurrentNetworkMoveData = moveData;
+        }
+        
+        public static NetworkPredictionData_Server_CharacterMovement GetPredictionData_Server_CharacterMovement(this CharacterMovementComponent self)
+        {
+            if (self.ServerData == null)
+            {
+                self.ServerData = new NetworkPredictionData_Server_CharacterMovement();
+            }
+            return self.ServerData;
+        }
         #endregion
     }
     
@@ -691,6 +995,4 @@ namespace Bliss.CharacterMovement
             return this.MovementCmp.LogicTimeStamp;
         }
     }
-    
-    
 }

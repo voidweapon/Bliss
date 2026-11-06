@@ -50,9 +50,10 @@ public class MessageHandler_M2M_UnitTransferRequest : MessageHandler<LogicScene,
         await MapTransferHelper.FinishTransferUnit(entity, request.FromAddress);
         
         UnitHelper.CreateUnit(gameplayWorld, (Unit)entity, true);
-        //全量状态同步
         entity.AddComponent<RemoteGhost>();
         
+        /*
+        //全量状态同步
         var unitManager = gameplayWorld.GetComponent<UnitManager>();
         if (unitManager != null && unitManager.DicEntityId2Unit.Count > 1)
         {
@@ -108,6 +109,7 @@ public class MessageHandler_M2M_UnitTransferRequest : MessageHandler<LogicScene,
             MapMessageHelper.SendToClient(entity, m2C_CreateBullets);
         }
 
+        */
         Log.Info($"单位 {entity.Id} 进入地图{mapScene.Id}!");
     }
 }

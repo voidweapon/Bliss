@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Bliss;
 
 /// <summary>
@@ -15,4 +17,13 @@ public class RemoteGhost : Entity, IAwake, IDestroy
     /// 远端对象版本
     /// </summary>
     public long ClientVersion;
+    
+    public Dictionary<long, RemoteGhostInfo> RemoteGhostInfos = new Dictionary<long, RemoteGhostInfo>();
+}
+
+public class RemoteGhostInfo
+{
+    public long EntityId;
+    public long Version;
+    public float TimeStamp;
 }

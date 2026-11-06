@@ -15,7 +15,7 @@ namespace Bliss
         /// </summary>
         public string Name;
 
-        internal LogicScene()
+        protected LogicScene()
         {
             
         }

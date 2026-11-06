@@ -32,6 +32,8 @@ namespace Bliss
             gameplayWorld.AddComponent<UnitManager>();
             gameplayWorld.AddComponent<BulletManager>();
             gameplayWorld.AddComponent<SceneActorManager>();
+            gameplayWorld.AddComponent<AoiManagerComponent>();
+            gameplayWorld.AddComponent<ReplicationGraph>();
             
             
             var levelConfigList = ConfigManager.Instance.Tables.TbLevelConfig.DicSceneId2Level[(int)rootScene.Id];

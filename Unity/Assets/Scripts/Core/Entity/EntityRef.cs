@@ -59,6 +59,13 @@ namespace Bliss
             return (int)_instanceId;
         }
 
+        public bool Validate()
+        {
+            return _instanceId != 0 
+                   &&  _entity != null 
+                   && _instanceId == _entity.InstanceId ;
+        }
+
         public class EqualityComparer : IEqualityComparer<EntityRef<T>>
         {
             public bool Equals(EntityRef<T> x, EntityRef<T> y)

@@ -16,6 +16,11 @@ namespace Bliss.CharacterMovement
         Custom,
         Max,
     }
+
+    public static class CharacterMovementCVars
+    {
+        public static float NetServerMoveTimestampExpiredWarningThreshold = 1f;
+    }
     
     public class CharacterMovementComponent : Entity, IAwake, IDestroy
     {
@@ -48,6 +53,8 @@ namespace Bliss.CharacterMovement
         public bool IgnoreGravity;
         public bool IgnoreAirDrag;
         public bool IsSmoothRotationChange;
+        
+        public static readonly float MIN_TICK_TIME = 1e-6f;
 
         public long LogicTimeStamp;
 
@@ -71,6 +78,7 @@ namespace Bliss.CharacterMovement
         public CharacterNetworkMoveDataContainer NetworkMoveDataContainer =  new CharacterNetworkMoveDataContainer();
 
         public CharacterRepMovement ReplicatedMovement;
+        public CharacterNetworkMoveData CurrentNetworkMoveData;
         
         public ENetRole  LocalNetRole;
         public ENetRole  RemoteNetRole;

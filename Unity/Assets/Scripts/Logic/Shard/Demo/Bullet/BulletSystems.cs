@@ -112,7 +112,7 @@ namespace Bliss
             {
                 M2C_DestroyEntities m2c_destroyEntities = M2C_DestroyEntities.Create();
                 m2c_destroyEntities.EntityIds.Add(self.Id);
-                MapMessageHelper.Broadcast(self.Scene(), currentPosition, m2c_destroyEntities); 
+                MapMessageHelper.BroadcastAll(self.Scene(), currentPosition, m2c_destroyEntities); 
                 self.Dispose();
             }
 #endif

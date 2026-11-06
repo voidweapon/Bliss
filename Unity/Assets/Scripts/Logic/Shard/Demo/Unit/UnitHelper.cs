@@ -45,6 +45,7 @@ namespace Bliss
             }
 
             Log.Info($"Start Load Unit View Node");
+            var gameplayScene = root.GetLevelGameplayWorld();
             var unitConfig = minimalUnit.GetUnitConfig();
             EventSystem.Instance.Push(root.Scene(), new Event_AfterCreateSceneActor()
             {
@@ -56,6 +57,16 @@ namespace Bliss
             
             Log.Info($"Start Init UnitCharacterController");
             minimalUnit.AddComponent<CharacterController>();
+            var transformComponent = minimalUnit.GetComponent<TransformComponent>();
+            var aoiManager = gameplayScene.GetComponent<AoiManagerComponent>();
+            var aoiIdentifier = aoiManager.Register(AoiRegisterInfo.CreateSphere(minimalUnit, AOIType.Visibility, transformComponent.Transform.Location, 10f));
+            var aoi = minimalUnit.AddComponent<AOIEntityCmp>();
+            aoi.Add(AOIType.Visibility, aoiIdentifier);
+#if DOTNET
+            var netAoiIdentifier = aoiManager.Register(AoiRegisterInfo.CreateSphere(minimalUnit, AOIType.NetworkVisibility, transformComponent.Transform.Location, 10f));
+            aoi.Add(AOIType.NetworkVisibility, netAoiIdentifier);
+#endif
+            
             return minimalUnit;
         }
         

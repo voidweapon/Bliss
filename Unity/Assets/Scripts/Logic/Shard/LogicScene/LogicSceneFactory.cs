@@ -34,6 +34,8 @@ namespace Bliss
             List<Entity> outResult = null)
         {
             outResult?.Clear();
+            LogicScene gameplayScene = levelScene.GetLevelGameplayWorld();
+            var aoiManager = gameplayScene.GetComponent<AoiManagerComponent>();
             using ListComponent<ASceneActorCmp> tempList = ListComponent<ASceneActorCmp>.Create();
             
             foreach (var sceneActorData in levelActors)
@@ -64,6 +66,14 @@ namespace Bliss
                     LocalNetRole = localRole,
                     RemoteNetRole = remoteRole,
                 });
+                
+                var aoiIdentifier = aoiManager.Register(AoiRegisterInfo.CreateSphere(sceneActor, AOIType.Visibility, config.Position, 10f));
+                var aoi = sceneActor.AddComponent<AOIEntityCmp>();
+                aoi.Add(AOIType.Visibility, aoiIdentifier);
+#if DOTNET
+                var netAoiIdentifier = aoiManager.Register(AoiRegisterInfo.CreateSphere(sceneActor, AOIType.NetworkVisibility, config.Position, 10f));
+                aoi.Add(AOIType.NetworkVisibility, netAoiIdentifier);
+#endif
                 
                 outResult?.Add(sceneActor);
                 tempList.Add(sceneActorCmp);

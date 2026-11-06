@@ -41,7 +41,7 @@ namespace Bliss
         public long FrameTime { get; private set; }
 
         private long StartTicks;
-        public long RealTimeSecondSinceStartup  { get; private set; }
+        public float RealTimeSecondSinceStartup  { get; private set; }
         
 
         public void Init()
@@ -54,7 +54,7 @@ namespace Bliss
         {
             // 赋值long型是原子操作，线程安全
             this.FrameTime = this.ClientNow();
-            RealTimeSecondSinceStartup = (DateTime.UtcNow.Ticks - StartTicks) / TimeSpan.TicksPerSecond;
+            RealTimeSecondSinceStartup = (DateTime.UtcNow.Ticks - StartTicks) / (float)TimeSpan.TicksPerSecond;
         }
         
         /// <summary> 
