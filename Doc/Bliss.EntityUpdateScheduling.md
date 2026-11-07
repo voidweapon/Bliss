@@ -15,7 +15,7 @@
 
 ## 阶段模型
 
-`ESystemUpdateGroup` 使用显式数值定义阶段顺序，并为内建阶段之间的自定义阶段预留数值范围。内建阶段建议使用以下值：
+`ESystemUpdateGroup` 使用显式数值定义阶段顺序，并在内建阶段数值范围内为自定义阶段预留子区段。内建阶段使用以下值：
 
 | 内建阶段 | 数值 |
 | --- | ---: |
@@ -27,13 +27,13 @@
 
 | 调度入口 | 阶段组范围 | 示例 |
 | --- | --- | --- |
-| `EarlyUpdate()` | `None < group <= EarlyUpdate` | 自定义组 A = 90 |
+| `EarlyUpdate()` | `1 <= group <= EarlyUpdate` | 自定义组 A = 90 |
 | `Update()` | `EarlyUpdate < group <= Update` | 自定义组 B = 120 |
 | `LateUpdate()` | `Update < group <= LateUpdate` | 自定义组 C = 210 |
 
-每个入口只处理自己的数值区间。区间内的阶段组按枚举数值升序遍历，因此一个系统每帧只在所属阶段执行一次。数值大于 `LateUpdate` 的组目前没有内建入口负责调度，不属于有效配置。
+每个入口只处理自己的数值区间。区间内的阶段组按枚举数值升序遍历，因此一个系统每帧只在所属阶段执行一次。更新系统的分类接口、Entity 约束和阶段区间必须一致：Early 系统使用 `IEarlyUpdateSystem`、Entity 实现 `IEarlyUpdate`；Update 系统使用 `IUpdateSystem`、Entity 实现 `IUpdate`；Late 系统使用 `ILateUpdateSystem`、Entity 实现 `ILateUpdate`。直接实现 `IUpdateGroupSystem` 的系统也必须声明上述分类之一并遵守对应约束。
 
-`None`、`Max`、未定义枚举值，以及大于 `LateUpdate` 的值都不是有效 UpdateGroup。系统注册时必须立即报错，并在错误信息中包含系统类型和非法组值。
+`None`、`Max`、未定义枚举值以及不属于其分类接口对应区间的值都不是有效 UpdateGroup。系统注册时必须立即报错；非法阶段值使用 `ArgumentOutOfRangeException`，错误信息包含系统类型和非法组值。
 
 ## 调度结构
 
@@ -57,18 +57,18 @@ UpdateGroup
 - 保留 `IEarlyUpdateSystem`、`IUpdateSystem`、`ILateUpdateSystem` 分类接口，以及 `EarlyUpdateSystem<TEntity>`、`UpdateSystem<TEntity>`、`LateUpdateSystem<TEntity>` 基类。
 - 三个基类继续提供各自原有的默认 UpdateGroup，但 `GetUpdateGroup()` 改为可覆写，以允许系统声明自定义阶段组。
 - 管理器收集和查询时统一支持 `IUpdateGroupSystem`，不要求移除现有分类接口或基类。
-- `GetPriority()` 的文档明确规定数值越小越先执行。相同优先级表示系统之间没有顺序依赖；如果需要确定先后关系，应使用不同优先级。
+- `GetPriority()` 数值越小越先执行。相同优先级表示系统之间没有顺序依赖；如果需要确定先后关系，应使用不同优先级。
 
 ## 帧边界与动态注册
 
 - 对由 `EntitySystem` 驱动的更新，`EarlyUpdate()` 开始时作为帧边界。
 - 在该帧边界之前注册的 Entity 可以参与本帧调度；帧边界之后注册的 Entity 从下一帧开始参与，即使它还有尚未执行的后续阶段。
-- 调度器需要在帧开始时确定本帧的可调度集合，或将帧中新增的队列项延迟到下一帧启用，避免遍历期间新增项意外在本帧执行。
-- `UpdateSystemComponent` 遵循同一规则，以它的 `Update()` 调用开始作为该驱动路径的帧边界；该调用依次调度 Early、Update、Late 内建阶段。
+- 调度器在帧开始时确定本帧的可调度集合；帧中新增的队列项延迟到下一帧启用，避免遍历期间新增项在尚未执行的阶段意外参与本帧。
+- `GameplayWorldUpdater` 接入共享调度器后遵循同一规则，以它的 `EarlyUpdate()` 调用开始作为该驱动路径的帧边界，并由 Early、Update、Late 三个入口分别调度对应区间。
 
 ## 验证范围
 
-- 验证自定义阶段按数值归入正确的内建入口，并且入口只执行自己的区间。
+- 验证自定义阶段在各内建阶段的专属数值子区段内运行，并且入口只执行自己的区间。
 - 验证阶段组按枚举值升序、SystemGroup 按优先级升序执行。
 - 验证同一 Entity 类型的多个系统可以分布在不同 UpdateGroup 和优先级中，并各自只在对应组执行。
 - 验证同一优先级的 SystemGroup 顺序不作断言；需要先后关系的系统通过不同优先级确定顺序。

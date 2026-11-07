@@ -9,7 +9,13 @@ namespace Bliss
     public class GameplayWorldUpdater : BObject
     { 
         private Dictionary<long, EntityRef<Entity>> _entities = new Dictionary<long, EntityRef<Entity>>();
-        private List<UpdateGroup> _updateSystemGroups = new List<UpdateGroup>((int)ESystemUpdateGroup.Max);
+        private static readonly ESystemUpdateGroup[] _builtInUpdateGroups =
+        {
+            ESystemUpdateGroup.EarlyUpdate,
+            ESystemUpdateGroup.Update,
+            ESystemUpdateGroup.LateUpdate,
+        };
+        private List<UpdateGroup> _updateSystemGroups = new List<UpdateGroup>(_builtInUpdateGroups.Length);
         private static Dictionary<int, (Type, Type)> _updateSystemGroupTypes = new Dictionary<int, (Type, Type)>()
         {
             
@@ -20,7 +26,7 @@ namespace Bliss
 
         public GameplayWorldUpdater()
         {
-            for (int i = 0; i < (int)ESystemUpdateGroup.Max; i++)
+            for (int i = 0; i < _builtInUpdateGroups.Length; i++)
             {
                 _updateSystemGroups.Add(new UpdateGroup());
             }
@@ -28,9 +34,9 @@ namespace Bliss
 
        public void Update()
        {
-           for (int i = 0; i < (int)ESystemUpdateGroup.Max; i++)
+           for (int i = 0; i < _builtInUpdateGroups.Length; i++)
            {
-               _updateSystemGroups[i].Update((ESystemUpdateGroup)i);
+               _updateSystemGroups[i].Update(_builtInUpdateGroups[i]);
            }
        }
 
@@ -38,11 +44,11 @@ namespace Bliss
        {
            _entities.Add(entity.InstanceId, entity);
            var entityType = entity.GetType();
-           for (int i = 0; i < (int)ESystemUpdateGroup.Max; i++)
+           for (int i = 0; i < _builtInUpdateGroups.Length; i++)
            {
-               if (EntitySystemManager.Instance.IsEntityUpdateInGroup(entityType, (ESystemUpdateGroup)i))
+               if (EntitySystemManager.Instance.IsEntityUpdateInGroup(entityType, _builtInUpdateGroups[i]))
                {
-                   int priority = EntitySystemManager.Instance.GetEntityUpdateGroupPriority(entityType, (ESystemUpdateGroup)i);
+                   int priority = EntitySystemManager.Instance.GetEntityUpdateGroupPriority(entityType, _builtInUpdateGroups[i]);
                    _updateSystemGroups[i].Add(entity, priority);
                }
            }

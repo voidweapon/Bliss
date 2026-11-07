@@ -27,7 +27,7 @@ namespace Bliss
             return typeof(IUpdateSystem);
         }
 
-        public ESystemUpdateGroup GetUpdateGroup()
+        public virtual ESystemUpdateGroup GetUpdateGroup()
         {
             return ESystemUpdateGroup.Update;
         }
@@ -38,7 +38,7 @@ namespace Bliss
         }
         public int CompareTo(ISystem other)
         {
-            return GetPriority() - other.GetPriority();
+            return GetPriority().CompareTo(other.GetPriority());
         }
 
         public void Run(Entity entity)

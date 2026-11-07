@@ -10,6 +10,9 @@ namespace Bliss
         
         ESystemUpdateGroup GetUpdateGroup();
 
+        /// <summary>
+        /// Gets the execution priority. Lower values run first within an update group.
+        /// </summary>
         int GetPriority();
     }
 
