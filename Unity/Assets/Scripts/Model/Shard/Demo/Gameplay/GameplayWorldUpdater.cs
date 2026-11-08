@@ -5,14 +5,14 @@ namespace Bliss
     /// </summary>
     public class GameplayWorldUpdater : BObject
     {
-        private readonly EntityUpdateScheduler _updateScheduler = new EntityUpdateScheduler();
+        private readonly EntityUpdateScheduler updateScheduler = new EntityUpdateScheduler();
 
         /// <summary>
         /// Registers an entity for updates. Call once for each entity.
         /// </summary>
         public void Add(Entity entity)
         {
-            _updateScheduler.Register(
+            updateScheduler.Register(
                 entity,
                 EntitySystemManager.Instance.GetEntityUpdateSystems(entity.GetType()));
         }
@@ -22,8 +22,8 @@ namespace Bliss
         /// </summary>
         public void EarlyUpdate()
         {
-            _updateScheduler.BeginFrame();
-            _updateScheduler.Update(
+            updateScheduler.BeginFrame();
+            updateScheduler.Update(
                 (ESystemUpdateGroup)SystemUpdateGroupRange.FIRST_EARLY_UPDATE,
                 ESystemUpdateGroup.EarlyUpdate);
         }
@@ -33,7 +33,7 @@ namespace Bliss
         /// </summary>
         public void Update()
         {
-            _updateScheduler.Update(
+            updateScheduler.Update(
                 (ESystemUpdateGroup)SystemUpdateGroupRange.FIRST_UPDATE,
                 ESystemUpdateGroup.Update);
         }
@@ -43,7 +43,7 @@ namespace Bliss
         /// </summary>
         public void LateUpdate()
         {
-            _updateScheduler.Update(
+            updateScheduler.Update(
                 (ESystemUpdateGroup)SystemUpdateGroupRange.FIRST_LATE_UPDATE,
                 ESystemUpdateGroup.LateUpdate);
         }
