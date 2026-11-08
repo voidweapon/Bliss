@@ -7,9 +7,6 @@ namespace Bliss
 {
     public  static class MapHelper
     {
-        private const long GAMEPLAY_WORLD_ID = 1;
-        private const string GAMEPLAY_WORLD_NAME = "GameplayWorld";
-
         public static async ETTask EnterMap(LogicScene clientScene, int mapId, ETCancellationToken ctx)
         {
             Session session = (Session)clientScene.GetComponent<ClientSessionComponent>().Session;
@@ -51,9 +48,9 @@ namespace Bliss
         {
             var gameplayWorld = GameplayWorldFactory.Create(
                 clientScene,
-                GAMEPLAY_WORLD_ID,
+                GameplayWorldFactory.DEFAULT_WORLD_ID,
                 IdGenerator.Instance.GenerateInstanceId(),
-                GAMEPLAY_WORLD_NAME);
+                GameplayWorldFactory.DEFAULT_WORLD_NAME);
             gameplayWorld.AddComponent<UnitManager>();
             gameplayWorld.AddComponent<BulletManager>();
             gameplayWorld.AddComponent<SceneActorManager>();

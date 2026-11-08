@@ -6,16 +6,16 @@ namespace Bliss
     public class CurrentSceneComponent : Entity
     {
         
-        private EntityRef<GameplayWorld> _gameplayWorldRef;
+        private EntityRef<GameplayWorld> gameplayWorldRef;
         public GameplayWorld GameplayWorld
         {
             get
             {
-                return (GameplayWorld)_gameplayWorldRef;
+                return (GameplayWorld)gameplayWorldRef;
             }
             set
             {
-                _gameplayWorldRef = value;
+                gameplayWorldRef = value;
             }
         }
         

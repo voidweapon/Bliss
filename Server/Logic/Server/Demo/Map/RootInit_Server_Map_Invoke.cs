@@ -9,9 +9,6 @@ namespace Bliss
     [Invoke((long)ELogicSceneType.Map)]
     public class RootInit_Server_Map_Invoke : AInvokeHandler<Invoke_RootInit, ETTask>
     {
-        private const long GAMEPLAY_WORLD_ID = 1;
-        private const string GAMEPLAY_WORLD_NAME = "GameplayWorld";
-
         public override async ETTask Handle(Invoke_RootInit args)
         {
             Log.Info($"Init Map Start");
@@ -33,9 +30,9 @@ namespace Bliss
             
             var gameplayWorld = GameplayWorldFactory.Create(
                 rootScene,
-                GAMEPLAY_WORLD_ID,
+                GameplayWorldFactory.DEFAULT_WORLD_ID,
                 IdGenerator.Instance.GenerateInstanceId(),
-                GAMEPLAY_WORLD_NAME);
+                GameplayWorldFactory.DEFAULT_WORLD_NAME);
             gameplayWorld.AddComponent<UnitManager>();
             gameplayWorld.AddComponent<BulletManager>();
             gameplayWorld.AddComponent<SceneActorManager>();
