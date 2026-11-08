@@ -162,7 +162,14 @@ namespace Bliss
 {
     public class EntitySystem
     {
-        public void RegisterSystem(Entity entity)
+        public virtual void RegisterSystem(Entity entity)
+        {
+        }
+    }
+
+    public class CustomEntitySystem : EntitySystem
+    {
+        public override void RegisterSystem(Entity entity)
         {
         }
     }
@@ -191,6 +198,11 @@ namespace Bliss
         {
             {|#0:entitySystem.RegisterSystem|}(entity);
         }
+
+        public void Register(CustomEntitySystem entitySystem, Entity entity)
+        {
+            {|#1:entitySystem.RegisterSystem|}(entity);
+        }
     }
 }
 ";
@@ -202,6 +214,9 @@ namespace Bliss
         test.ExpectedDiagnostics.Add(
             new Microsoft.CodeAnalysis.Testing.DiagnosticResult(Bliss.ProjectRule.Analyzer.DiagnosticIds.ENTITY_UPDATE_REGISTRATION_RULE_ID, Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
                 .WithLocation(0));
+        test.ExpectedDiagnostics.Add(
+            new Microsoft.CodeAnalysis.Testing.DiagnosticResult(Bliss.ProjectRule.Analyzer.DiagnosticIds.ENTITY_UPDATE_REGISTRATION_RULE_ID, Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+                .WithLocation(1));
 
         await test.RunAsync();
     }

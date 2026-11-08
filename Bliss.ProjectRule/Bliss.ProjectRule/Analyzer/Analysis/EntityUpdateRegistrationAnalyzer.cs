@@ -18,6 +18,7 @@ public class EntityUpdateRegistrationAnalyzer : DiagnosticAnalyzer
     private const string REGISTER_TO_SYSTEM_METHOD_NAME = "RegisterToSystem";
     private const string REGISTER_METHOD_NAME = "Register";
     private const string ADD_METHOD_NAME = "Add";
+    private const string LOGIC_SCENE_PROPERTY_NAME = "LogicScene";
     private const string UNIT_TEST_ASSEMBLY_NAME = "Bliss.UnitTest";
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
@@ -72,7 +73,7 @@ public class EntityUpdateRegistrationAnalyzer : DiagnosticAnalyzer
     private static bool isRegistrationMethod(IMethodSymbol methodSymbol)
     {
         string containingTypeName = methodSymbol.ContainingType.ToDisplayString();
-        return (methodSymbol.Name == REGISTER_SYSTEM_METHOD_NAME && containingTypeName == ENTITY_SYSTEM_TYPE_NAME)
+        return (methodSymbol.Name == REGISTER_SYSTEM_METHOD_NAME && isEntitySystemRegisterMethod(methodSymbol))
             || (methodSymbol.Name == REGISTER_TO_SYSTEM_METHOD_NAME && isEntityRegisterMethod(methodSymbol))
             || (methodSymbol.Name == REGISTER_METHOD_NAME && containingTypeName == GAMEPLAY_WORLD_TYPE_NAME)
             || (methodSymbol.Name == ADD_METHOD_NAME && containingTypeName == GAMEPLAY_WORLD_UPDATER_TYPE_NAME);
@@ -86,10 +87,10 @@ public class EntityUpdateRegistrationAnalyzer : DiagnosticAnalyzer
         string targetTypeName = targetMethod.ContainingType.ToDisplayString();
         string callerTypeName = callerMethod.ContainingType.ToDisplayString();
 
-        if (targetMethod.Name == REGISTER_SYSTEM_METHOD_NAME
-            && targetTypeName == ENTITY_SYSTEM_TYPE_NAME)
+        if (isEntitySystemRegisterMethod(targetMethod))
         {
-            return callerMethod.Name == REGISTER_TO_SYSTEM_METHOD_NAME
+            return targetTypeName == ENTITY_SYSTEM_TYPE_NAME
+                && callerMethod.Name == REGISTER_TO_SYSTEM_METHOD_NAME
                 && callerTypeName == ENTITY_TYPE_NAME
                 && callerMethod.Parameters.Length == 0
                 && callerMethod.ReturnsVoid
@@ -142,11 +143,32 @@ public class EntityUpdateRegistrationAnalyzer : DiagnosticAnalyzer
         return false;
     }
 
+    private static bool isEntitySystemRegisterMethod(IMethodSymbol methodSymbol)
+    {
+        IMethodSymbol? currentMethod = methodSymbol;
+        while (currentMethod != null)
+        {
+            if (currentMethod.Name == REGISTER_SYSTEM_METHOD_NAME
+                && currentMethod.ContainingType.ToDisplayString() == ENTITY_SYSTEM_TYPE_NAME
+                && currentMethod.Parameters.Length == 1
+                && currentMethod.Parameters[0].Type.ToDisplayString() == ENTITY_TYPE_NAME
+                && currentMethod.ReturnsVoid
+                && (currentMethod.IsVirtual || currentMethod.IsOverride))
+            {
+                return true;
+            }
+
+            currentMethod = currentMethod.OverriddenMethod;
+        }
+
+        return false;
+    }
+
     private static bool isLogicSceneSetter(IMethodSymbol methodSymbol)
     {
         return methodSymbol.MethodKind == MethodKind.PropertySet
             && methodSymbol.AssociatedSymbol is IPropertySymbol propertySymbol
-            && propertySymbol.Name == "LogicScene"
+            && propertySymbol.Name == LOGIC_SCENE_PROPERTY_NAME
             && propertySymbol.ContainingType.ToDisplayString() == ENTITY_TYPE_NAME;
     }
 
