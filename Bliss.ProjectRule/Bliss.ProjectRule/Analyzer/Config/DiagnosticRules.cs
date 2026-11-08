@@ -19,6 +19,7 @@ namespace Bliss.ProjectRule.Analyzer
                 true,
                 Description);
     }
+
     
     public static class EntitySystemOfAnalyzerRule
     {
@@ -73,5 +74,23 @@ namespace Bliss.ProjectRule.Analyzer
                 DiagnosticSeverity.Error,
                 true,
                 Description);
+    }
+
+    public static class EntityUpdateRegistrationAnalyzerRule
+    {
+        private const string TITLE = "实体更新注册调用链受限";
+
+        private const string MESSAGE_FORMAT = "不允许从此位置调用实体更新注册方法: {0}";
+
+        private const string DESCRIPTION = "Entity update registration methods must only be called by their designated bridge methods.";
+
+        public static readonly DiagnosticDescriptor Rule =
+            new DiagnosticDescriptor(DiagnosticIds.ENTITY_UPDATE_REGISTRATION_RULE_ID,
+                TITLE,
+                MESSAGE_FORMAT,
+                DiagnosticCategories.EntitySystem,
+                DiagnosticSeverity.Error,
+                true,
+                DESCRIPTION);
     }
 }
