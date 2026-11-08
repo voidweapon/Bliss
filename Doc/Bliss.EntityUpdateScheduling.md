@@ -37,7 +37,7 @@
 
 ## 调度结构
 
-调度器采用以下层级：[Bliss.GameplayUpdater.md](EngineeringJournal%20/Bliss.GameplayUpdater.md)
+调度器采用以下层级：
 
 ```text
 UpdateGroup

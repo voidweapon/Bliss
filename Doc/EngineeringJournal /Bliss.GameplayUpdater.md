@@ -10,8 +10,8 @@
 ## 功能
 ### UpdateGroup和优先级的组织形式
 DOTS的EntitiySystem是在EntitiySystem处理Entity,EntitySystem变动很小,所以只需要排序EntitySystem就可以
-当前框架是处理Entity,直接排序Entity消耗太大,所以用UpdateGroup,优先级,Entity类型进行分桶排序,桶里面是EntityQueue,
-先以UpdateGroup分桶以Update顺序进行排序,updateGroup桶内以Entity类型分桶,以优先级进行排序,Entity类型桶内是EntityRef的Queue
+当前框架是处理Entity,直接排序Entity消耗太大,所以用UpdateGroup,UpdateGroupSytem类型,优先级,进行分桶排序,桶里面是EntityQueue,
+先以UpdateGroup分桶以Update顺序进行排序,updateGroup桶内以UpdateGroupSytem类型分桶,以优先级进行升序排序,桶内是EntityRef的Queue
 UpdateGroup可以提前扫描类型全部创建,最好支持动态添加
 
 #### UpdateGroup动态添加
