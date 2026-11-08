@@ -63,6 +63,22 @@
             <Link>Scripts\Model\Shard\Demo\Gameplay\GameplayWorldUpdater.cs</Link>
         </Compile>
 
+        <Compile Include="..\..\Unity\Assets\Scripts\Model\Shard\Demo\Gameplay\GameplayWorld.cs">
+            <Link>Scripts\Model\Shard\Demo\Gameplay\GameplayWorld.cs</Link>
+        </Compile>
+
+        <Compile Include="..\..\Unity\Assets\Scripts\Model\Shard\Demo\Gameplay\GamePlayEntity.cs">
+            <Link>Scripts\Model\Shard\Demo\Gameplay\GamePlayEntity.cs</Link>
+        </Compile>
+
+        <Compile Include="..\..\Unity\Assets\Scripts\Model\Shard\Demo\Gameplay\GameplayWorldFactory.cs">
+            <Link>Scripts\Model\Shard\Demo\Gameplay\GameplayWorldFactory.cs</Link>
+        </Compile>
+
+        <Compile Include="..\..\Unity\Assets\Scripts\Logic\Shard\Demo\Map\LevelGameWorldComponentSystems.cs">
+            <Link>Scripts\Logic\Shard\Demo\Map\LevelGameWorldComponentSystems.cs</Link>
+        </Compile>
+
         <Compile Include="..\..\Unity\Library\PackageCache\com.unity.mathematics*\Unity.Mathematics\**\*.cs">
             <Link>Unity.Mathematics/$([System.String]::new(%(RecursiveDir)).Substring($([System.String]::new(%(RecursiveDir)).Indexof("Unity.Mathematics"))).Replace("Unity.Mathematics", ""))/%(FileName)%(Extension)</Link>
         </Compile>
@@ -74,6 +90,10 @@
         <Compile Update="Unity.Mathematics\PropertyAttribute.cs">
           <Link>Unity.Mathematics\PropertyAttribute.cs</Link>
         </Compile>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Bliss.ProjectRule\Bliss.ProjectRule\Bliss.ProjectRule.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>
 
 </Project>

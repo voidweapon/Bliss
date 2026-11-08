@@ -8,7 +8,7 @@ namespace Bliss
     /// </summary>
     public static class LevelSceneFactory
     {
-        public static async ETTask<LogicScene> Create(Entity parent, LogicScene gameplayWorld, int configId, long id, string name)
+        public static async ETTask<LogicScene> Create(Entity parent, GameplayWorld gameplayWorld, int configId, long id, string name)
         {
             LogicScene levelScene = LogicSceneFactoryCore.CreateLogicScene(parent, id, IdGenerator.Instance.GenerateInstanceId(), ELogicSceneType.Level, name);
             var levelGameWorldComponent = levelScene.AddComponent<LevelGameWorldComponent>();

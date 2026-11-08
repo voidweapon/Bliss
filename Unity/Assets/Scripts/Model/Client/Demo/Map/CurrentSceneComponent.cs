@@ -6,12 +6,12 @@ namespace Bliss
     public class CurrentSceneComponent : Entity
     {
         
-        private EntityRef<LogicScene> _gameplayWorldRef;
-        public LogicScene GameplayWorld
+        private EntityRef<GameplayWorld> _gameplayWorldRef;
+        public GameplayWorld GameplayWorld
         {
             get
             {
-                return (LogicScene)_gameplayWorldRef;
+                return (GameplayWorld)_gameplayWorldRef;
             }
             set
             {

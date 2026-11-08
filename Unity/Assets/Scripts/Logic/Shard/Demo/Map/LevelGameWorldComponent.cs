@@ -1,15 +1,15 @@
 namespace Bliss
 {
-    public class LevelGameWorldComponent : Entity
+    public class LevelGameWorldComponent : Entity, IEarlyUpdate, IUpdate, ILateUpdate
     {
-        public LogicScene GameplayWorld;
+        public GameplayWorld GameplayWorld;
     }
 
     public static class LevelGameWorldComponentHelper
     {
-        public static LogicScene GetLevelGameplayWorld(this Entity entity)
+        public static GameplayWorld GetLevelGameplayWorld(this Entity entity)
         {
-            if (entity.Scene().SceneType == ELogicSceneType.GameplayWorld) return entity.Scene();
+            if (entity.Scene() is GameplayWorld gameplayWorld) return gameplayWorld;
             var cmp = entity.GetSceneComponent<LevelGameWorldComponent>();
             return cmp?.GameplayWorld;
         }

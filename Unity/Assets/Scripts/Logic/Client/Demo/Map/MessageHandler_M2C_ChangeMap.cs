@@ -11,7 +11,7 @@ namespace Bliss
         {
             Log.Info($"进入地图 M2C_ChangeMap ");
 
-            LogicScene gameplayWorld = clientScene.GetComponent<CurrentSceneComponent>()?.GameplayWorld;
+            GameplayWorld gameplayWorld = clientScene.GetComponent<CurrentSceneComponent>()?.GameplayWorld;
             if (message.IsLogin)
             {
                 gameplayWorld = await MapHelper.CreateGameplayWorld(clientScene);
