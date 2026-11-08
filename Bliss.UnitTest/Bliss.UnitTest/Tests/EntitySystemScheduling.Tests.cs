@@ -58,6 +58,11 @@ public class EntitySystemSchedulingTests
     [TearDown]
     public void TearDown()
     {
+        EarlyUpdateCallback = null;
+        UseInvalidUpdateGroup = false;
+        UseInvalidUpdateCategory = false;
+        UseInvalidEntityConstraint = false;
+        InvalidGroupUpdateSystem.GroupValue = INVALID_GROUP_VALUE;
         _entitySystemManager.Dispose();
         _typeManager.Dispose();
     }

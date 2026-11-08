@@ -9,10 +9,10 @@ namespace Bliss
         Max = 301,
     }
 
-    internal static class SystemUpdateGroupRange
+    public static class SystemUpdateGroupRange
     {
-        internal const int FIRST_EARLY_UPDATE = 1;
-        internal const int FIRST_UPDATE = (int)ESystemUpdateGroup.EarlyUpdate + 1;
-        internal const int FIRST_LATE_UPDATE = (int)ESystemUpdateGroup.Update + 1;
+        public const int FIRST_EARLY_UPDATE = 1;
+        public const int FIRST_UPDATE = (int)ESystemUpdateGroup.EarlyUpdate + 1;
+        public const int FIRST_LATE_UPDATE = (int)ESystemUpdateGroup.Update + 1;
     }
 }

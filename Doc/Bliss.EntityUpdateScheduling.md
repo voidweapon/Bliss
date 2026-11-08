@@ -61,10 +61,10 @@ UpdateGroup
 
 ## 帧边界与动态注册
 
-- 对由 `EntitySystem` 驱动的更新，`EarlyUpdate()` 开始时作为帧边界。
+- 对由 `EntitySystem` 或 `GameplayWorldUpdater` 驱动的更新，`EarlyUpdate()` 开始时作为各自路径的帧边界。
 - 在该帧边界之前注册的 Entity 可以参与本帧调度；帧边界之后注册的 Entity 从下一帧开始参与，即使它还有尚未执行的后续阶段。
 - 调度器在帧开始时确定本帧的可调度集合；帧中新增的队列项延迟到下一帧启用，避免遍历期间新增项在尚未执行的阶段意外参与本帧。
-- `GameplayWorldUpdater` 接入共享调度器后遵循同一规则，以它的 `EarlyUpdate()` 调用开始作为该驱动路径的帧边界，并由 Early、Update、Late 三个入口分别调度对应区间。
+- `GameplayWorldUpdater.Add()` 使用共享调度器注册 Entity；调用方必须对每个 Entity 只调用一次。其 Early、Update、Late 三个入口分别调度对应区间。
 
 ## 验证范围
 
