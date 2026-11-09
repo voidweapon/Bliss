@@ -8,10 +8,12 @@ namespace Bliss
     /// </summary>
     public sealed class EntityUpdateScheduler
     {
-        private readonly SortedDictionary<int, SortedDictionary<int, List<SystemGroup>>> _groups =
-            new SortedDictionary<int, SortedDictionary<int, List<SystemGroup>>>();
+        // Keys are numeric update groups; values collect system groups assigned to each update group.
+        private readonly SortedDictionary<int, UpdateGroupCollection> _groupsByUpdateGroup =
+            new SortedDictionary<int, UpdateGroupCollection>();
 
-        private readonly Dictionary<Type, SystemGroup> _systemGroups = new Dictionary<Type, SystemGroup>();
+        // Keys are concrete update-system types; values hold their scheduled system groups.
+        private readonly Dictionary<Type, SystemGroup> _systemGroupsByType = new Dictionary<Type, SystemGroup>();
         private readonly List<SystemGroup> _frameGroups = new List<SystemGroup>();
 
         /// <summary>
@@ -32,26 +34,19 @@ namespace Bliss
             foreach (IUpdateGroupSystem system in updateSystems)
             {
                 Type systemType = system.GetType();
-                if (!_systemGroups.TryGetValue(systemType, out SystemGroup systemGroup))
+                if (!_systemGroupsByType.TryGetValue(systemType, out SystemGroup systemGroup))
                 {
                     systemGroup = new SystemGroup(system);
-                    _systemGroups.Add(systemType, systemGroup);
+                    _systemGroupsByType.Add(systemType, systemGroup);
 
                     int updateGroup = (int)system.GetUpdateGroup();
-                    if (!_groups.TryGetValue(updateGroup, out SortedDictionary<int, List<SystemGroup>> priorityGroups))
+                    if (!_groupsByUpdateGroup.TryGetValue(updateGroup, out UpdateGroupCollection updateGroupCollection))
                     {
-                        priorityGroups = new SortedDictionary<int, List<SystemGroup>>();
-                        _groups.Add(updateGroup, priorityGroups);
+                        updateGroupCollection = new UpdateGroupCollection();
+                        _groupsByUpdateGroup.Add(updateGroup, updateGroupCollection);
                     }
 
-                    int priority = system.GetPriority();
-                    if (!priorityGroups.TryGetValue(priority, out List<SystemGroup> systemGroups))
-                    {
-                        systemGroups = new List<SystemGroup>();
-                        priorityGroups.Add(priority, systemGroups);
-                    }
-
-                    systemGroups.Add(systemGroup);
+                    updateGroupCollection.Register(system.GetPriority(), systemGroup);
                 }
 
                 systemGroup.Register(entity);
@@ -64,15 +59,12 @@ namespace Bliss
         public void BeginFrame()
         {
             _frameGroups.Clear();
-            foreach (SortedDictionary<int, List<SystemGroup>> priorityGroups in _groups.Values)
+            foreach (UpdateGroupCollection updateGroupCollection in _groupsByUpdateGroup.Values)
             {
-                foreach (List<SystemGroup> systemGroups in priorityGroups.Values)
+                foreach (SystemGroup systemGroup in updateGroupCollection.SystemGroups)
                 {
-                    foreach (SystemGroup systemGroup in systemGroups)
-                    {
-                        systemGroup.BeginFrame();
-                        _frameGroups.Add(systemGroup);
-                    }
+                    systemGroup.BeginFrame();
+                    _frameGroups.Add(systemGroup);
                 }
             }
         }
@@ -90,6 +82,50 @@ namespace Bliss
                 }
 
                 systemGroup.Update();
+            }
+        }
+
+        private sealed class UpdateGroupCollection
+        {
+            // Keys are system priorities; values contain systems that share the same priority.
+            private readonly SortedDictionary<int, PriorityGroupCollection> _groupsByPriority =
+                new SortedDictionary<int, PriorityGroupCollection>();
+
+            public IEnumerable<SystemGroup> SystemGroups
+            {
+                get
+                {
+                    foreach (PriorityGroupCollection priorityGroup in _groupsByPriority.Values)
+                    {
+                        foreach (SystemGroup systemGroup in priorityGroup.SystemGroups)
+                        {
+                            yield return systemGroup;
+                        }
+                    }
+                }
+            }
+
+            public void Register(int priority, SystemGroup systemGroup)
+            {
+                if (!_groupsByPriority.TryGetValue(priority, out PriorityGroupCollection priorityGroup))
+                {
+                    priorityGroup = new PriorityGroupCollection();
+                    _groupsByPriority.Add(priority, priorityGroup);
+                }
+
+                priorityGroup.Add(systemGroup);
+            }
+        }
+
+        private sealed class PriorityGroupCollection
+        {
+            private readonly List<SystemGroup> _systemGroups = new List<SystemGroup>();
+
+            public IReadOnlyList<SystemGroup> SystemGroups => _systemGroups;
+
+            public void Add(SystemGroup systemGroup)
+            {
+                _systemGroups.Add(systemGroup);
             }
         }
 
