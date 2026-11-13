@@ -6,6 +6,6 @@ class Program
 {
     static void Main(string[] args)
     {
-        BenchmarkRunner.Run<BlockCopyBenchmark>();
+        BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
     }
 }

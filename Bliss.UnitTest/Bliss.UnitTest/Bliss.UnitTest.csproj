@@ -67,6 +67,10 @@
             <Link>Scripts\Model\Shard\Demo\Gameplay\GameplayWorld.cs</Link>
         </Compile>
 
+        <Compile Include="..\..\Unity\Assets\Scripts\Model\Shard\Demo\Gameplay\GameplayWorldTimer.cs">
+            <Link>Scripts\Model\Shard\Demo\Gameplay\GameplayWorldTimer.cs</Link>
+        </Compile>
+
         <Compile Include="..\..\Unity\Assets\Scripts\Model\Shard\Demo\Gameplay\GamePlayEntity.cs">
             <Link>Scripts\Model\Shard\Demo\Gameplay\GamePlayEntity.cs</Link>
         </Compile>
