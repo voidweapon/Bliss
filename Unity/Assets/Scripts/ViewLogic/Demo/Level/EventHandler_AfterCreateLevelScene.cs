@@ -1,3 +1,4 @@
+using System;
 using Bliss.Base.Collections;
 using Bliss.CharacterControllers;
 using Bliss.ViewLogic;
@@ -9,9 +10,7 @@ using UnityEngine.SceneManagement;
 namespace Bliss
 {
     /// <summary>
-    /// 场景切换流程2
-    /// 先切换到空场景(Loading)来卸载, 然后切换到目标场景
-    /// 以此来削减内存峰值
+    /// Loads the destination scene additively and activates it only after LevelScene initialization commits.
     /// <seealso cref="MapHelper.ChangeMap"/>
     /// </summary>
     [Event(ELogicSceneType.Level)]
@@ -24,16 +23,63 @@ namespace Bliss
             
             LevelConfig levelConfig = ConfigManager.Instance.Tables.TbLevelConfig.GetOrDefault(eventInfo.LevelConfigId);
             
-            var loadingHandler = await resourcesLoaderCmp.LoadSceneAsync("Assets/Res/Scenes/Loading.unity", LoadSceneMode.Single);
             var levelHandler = await resourcesLoaderCmp.LoadSceneAsync($"Assets/Res/Scenes/{levelConfig.Name}.unity", LoadSceneMode.Additive);
-            levelHandler.ActivateScene();
-            
-            
-            loadingHandler.UnloadAsync();
 
             var clientScene = levelScene.GetComponent<LevelGameWorldComponent>().GameplayWorld.Parent;
-            clientScene.GetComponent<ObjectWait>().Notify(new Wait_LoadLevelSceneView(), true);
-           await ETTask.CompletedTask;
+            var clientResourcesLoader = clientScene.GetComponent<ResourcesLoaderComponent>();
+            if (clientResourcesLoader == null)
+            {
+                throw new InvalidOperationException("The owning client scene has no resource loader.");
+            }
+
+            Scene previousActiveScene = SceneManager.GetActiveScene();
+            LevelGameWorldComponent levelAssociation = levelScene.GetComponent<LevelGameWorldComponent>();
+            levelAssociation.DeferUntilCommit(
+                () =>
+                {
+                    if (!levelHandler.ActivateScene())
+                    {
+                        throw new InvalidOperationException($"Failed to activate scene {levelHandler.SceneName}.");
+                    }
+                },
+                () =>
+                {
+                    if (previousActiveScene.IsValid() && previousActiveScene.isLoaded)
+                    {
+                        if (!SceneManager.SetActiveScene(previousActiveScene))
+                        {
+                            throw new InvalidOperationException(
+                                $"Failed to restore active scene {previousActiveScene.name} after LevelScene commit failure.");
+                        }
+                    }
+                });
+            levelAssociation.AfterCommit(
+                () => completeSceneTransition(clientScene, clientResourcesLoader, previousActiveScene).Coroutine());
+            await ETTask.CompletedTask;
+        }
+
+        private static async ETTask completeSceneTransition(
+            LogicScene clientScene,
+            ResourcesLoaderComponent resourcesLoader,
+            Scene previousActiveScene)
+        {
+            try
+            {
+                if (previousActiveScene.IsValid() && previousActiveScene.isLoaded)
+                {
+                    await resourcesLoader.UnloadSceneAsync(previousActiveScene);
+                }
+
+                clientScene.GetComponent<ObjectWait>().Notify(new Wait_LoadLevelSceneView(), true);
+            }
+            catch (Exception exception)
+            {
+                Log.Error(exception);
+                clientScene.GetComponent<ObjectWait>().Notify(
+                    new Wait_LoadLevelSceneView { Error = WaitTypeError.Cancel });
+                clientScene.GetComponent<ObjectWait>().Notify(
+                    new Wait_FinishChangeLevelScene { Error = WaitTypeError.Cancel });
+            }
         }
     }
 }

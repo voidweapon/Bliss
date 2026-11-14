@@ -28,7 +28,24 @@ public class EventHandler_AfterCreateLevelScene_Server : AEvent<LogicScene, Even
         physicalScene.LoadActorFromMemoryPackFile(levelConfig.Name);
         
         
-        gameplayWorld.AddComponent<DemoGameMode>();
+        bool demoGameModeCreated = false;
+        levelScene.GetComponent<LevelGameWorldComponent>().DeferUntilCommit(
+            () =>
+            {
+                if (gameplayWorld.GetComponent<DemoGameMode>() == null)
+                {
+                    gameplayWorld.AddComponent<DemoGameMode>();
+                    demoGameModeCreated = true;
+                }
+            },
+            () =>
+            {
+                if (demoGameModeCreated)
+                {
+                    gameplayWorld.RemoveComponent<DemoGameMode>();
+                    demoGameModeCreated = false;
+                }
+            });
         
         //加载场景配置对象
         string settingsFileName = Path.GetFullPath($"../ServerRes/SceneSettings/{levelConfig.Name}.bytes");

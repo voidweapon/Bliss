@@ -54,6 +54,32 @@ namespace Bliss
         }
 
         /// <summary>
+        /// Removes an entity from every registered update-system group.
+        /// </summary>
+        /// <param name="entity">The entity to remove.</param>
+        public void Unregister(Entity entity, IReadOnlyList<IUpdateGroupSystem> updateSystems)
+        {
+            if (entity == null)
+            {
+                throw new ArgumentNullException(nameof(entity));
+            }
+
+            if (updateSystems == null)
+            {
+                throw new ArgumentNullException(nameof(updateSystems));
+            }
+
+            EntityRef<Entity> entityRef = entity;
+            foreach (IUpdateGroupSystem system in updateSystems)
+            {
+                if (_systemGroupsByType.TryGetValue(system.GetType(), out SystemGroup systemGroup))
+                {
+                    systemGroup.Unregister(entityRef);
+                }
+            }
+        }
+
+        /// <summary>
         /// Captures the entities eligible for every phase of the next frame.
         /// </summary>
         public void BeginFrame()
@@ -146,6 +172,19 @@ namespace Bliss
             public void Register(Entity entity)
             {
                 _entities.Add(entity);
+            }
+
+            public void Unregister(EntityRef<Entity> entityRef)
+            {
+                for (int entityIndex = this._entities.Count - 1; entityIndex >= 0; entityIndex--)
+                {
+                    if (EntityRef<Entity>.Comparer.Equals(this._entities[entityIndex], entityRef))
+                    {
+                        this._entities.RemoveAt(entityIndex);
+                    }
+                }
+
+                this._activeEntityCount = Math.Min(this._activeEntityCount, this._entities.Count);
             }
 
             public void BeginFrame()

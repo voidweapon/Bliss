@@ -12,6 +12,11 @@ namespace Bliss
             ELogicSceneType sceneType, 
             string name)
         {
+            if ((sceneType & ELogicSceneType.Level) != 0)
+            {
+                throw new InvalidOperationException("Level scenes must be created through LevelSceneFactory.");
+            }
+
             var scene = new LogicScene(parent.RootScene().Root, id, instanceId, sceneType, name);
             parent.AddChild(scene);
             return scene;

@@ -84,7 +84,24 @@ namespace Bliss
             
             //Create Level Scene
             LevelConfig levelConfig = ConfigManager.Instance.Tables.TbLevelConfig.GetOrDefault(levelConfigId);
-            var levelScene = await LevelSceneFactory.Create(gameplayWorld, gameplayWorld, levelConfigId, levelId, levelConfig.Name);
+            LogicScene levelScene;
+            try
+            {
+                levelScene = await LevelSceneFactory.Create(gameplayWorld, gameplayWorld, levelConfigId, levelId, levelConfig.Name);
+            }
+            catch (Exception exception)
+            {
+                Log.Error(exception);
+                currentSceneComponent.CurrentScene = null;
+                ObjectWait objectWait = clientScene.GetComponent<ObjectWait>();
+                objectWait.Notify(new Wait_CreateLevelScene { Error = WaitTypeError.Cancel });
+                objectWait.Notify(new Wait_CreateMyUnit { Error = WaitTypeError.Cancel });
+                objectWait.Notify(new Wait_LoadLevelSceneView { Error = WaitTypeError.Cancel });
+                objectWait.Notify(new Wait_FinishChangeLevelScene { Error = WaitTypeError.Cancel });
+                await EventSystem.Instance.PushAsync(clientScene, new Event_EndChangeLevelScene());
+                return;
+            }
+
             currentSceneComponent.CurrentScene = levelScene;
             clientScene.GetComponent<ObjectWait>().Notify(new Wait_CreateLevelScene());
             
@@ -93,6 +110,11 @@ namespace Bliss
             var waitCreateMyUnit = await waitCreateMyUnitTcs;
             if (waitCreateMyUnit.Error != WaitTypeError.Success)
             {
+                clientScene.GetComponent<ObjectWait>().Notify(
+                    new Wait_LoadLevelSceneView { Error = WaitTypeError.Cancel });
+                clientScene.GetComponent<ObjectWait>().Notify(
+                    new Wait_FinishChangeLevelScene { Error = WaitTypeError.Cancel });
+                await EventSystem.Instance.PushAsync(clientScene, new Event_EndChangeLevelScene());
                 return;
             }
             
@@ -110,6 +132,9 @@ namespace Bliss
             var waitChangeLevelView = await waitChangeLevelViewTcs;
             if (waitChangeLevelView.Error != WaitTypeError.Success)
             {
+                clientScene.GetComponent<ObjectWait>().Notify(
+                    new Wait_FinishChangeLevelScene { Error = WaitTypeError.Cancel });
+                await EventSystem.Instance.PushAsync(clientScene, new Event_EndChangeLevelScene());
                 return;
             }
 

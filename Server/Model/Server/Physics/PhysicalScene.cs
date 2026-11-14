@@ -28,6 +28,10 @@ public unsafe partial class PhysicalScene : Entity, IAwake<PhysicalWorldComponen
 
     public PhysicalWorldComponent PhysicalWorld;
     public long UpdateTimer;
+    /// <summary>
+    /// Tracks whether the recurring update timer has been added to the Root timer.
+    /// </summary>
+    public bool UpdateTimerScheduled;
     
     public DoublyDictionary<IntPtr, GameplayCollider> ColliderDict = new DoublyDictionary<IntPtr, GameplayCollider>();
     public DoublyDictionary<IntPtr, GameplayRigidbody> RigidbodyDict = new DoublyDictionary<IntPtr, GameplayRigidbody>();

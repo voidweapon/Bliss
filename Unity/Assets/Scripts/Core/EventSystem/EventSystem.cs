@@ -86,6 +86,50 @@ namespace Bliss
                 Log.Error(e);
             }
         }
+
+        /// <summary>
+        /// Runs matching event handlers in sequence, requiring at least one and propagating failures.
+        /// </summary>
+        /// <param name="scene">The scene receiving the event.</param>
+        /// <param name="eventData">The event data.</param>
+        /// <typeparam name="TScene">The scene type expected by handlers.</typeparam>
+        /// <typeparam name="TEvent">The event data type.</typeparam>
+        /// <exception cref="InvalidOperationException">No compatible handler is registered.</exception>
+        public async ETTask PushRequiredAsync<TScene, TEvent>(TScene scene, TEvent eventData)
+            where TScene : class, ILogicScene where TEvent : struct
+        {
+            if (!this.TryGetStaticEvents(typeof(TEvent), out var events))
+            {
+                throw new InvalidOperationException($"Required event handler for {typeof(TEvent).FullName} was not found.");
+            }
+
+            var handlers = new List<AEvent<TScene, TEvent>>();
+            foreach (EventInfo eventInfo in events)
+            {
+                if (!eventInfo.SceneType.HasFlag(scene.SceneType))
+                {
+                    continue;
+                }
+
+                if (eventInfo.EventHandler is not AEvent<TScene, TEvent> handler)
+                {
+                    throw new InvalidOperationException(
+                        $"Event handler {eventInfo.EventHandler.GetType().FullName} is incompatible with {typeof(TScene).FullName}.");
+                }
+
+                handlers.Add(handler);
+            }
+
+            if (handlers.Count == 0)
+            {
+                throw new InvalidOperationException($"Required event handler for {typeof(TEvent).FullName} was not found.");
+            }
+
+            foreach (AEvent<TScene, TEvent> handler in handlers)
+            {
+                await handler.HandleRequired(scene, eventData);
+            }
+        }
         
         /// <summary>
         /// 推送一个下一帧触发的事件

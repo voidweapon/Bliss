@@ -13,6 +13,17 @@ namespace Bliss
                 entity,
                 EntitySystemManager.Instance.GetEntityUpdateSystems(entity.GetType()));
         }
+
+        /// <summary>
+        /// Removes all update-system registrations for an entity.
+        /// </summary>
+        /// <param name="entity">The entity to unregister.</param>
+        public virtual void UnregisterSystem(Entity entity)
+        {
+            _updateScheduler.Unregister(
+                entity,
+                EntitySystemManager.Instance.GetEntityUpdateSystems(entity.GetType()));
+        }
         
         #region Awake Call
         public void Awake(Entity entity)

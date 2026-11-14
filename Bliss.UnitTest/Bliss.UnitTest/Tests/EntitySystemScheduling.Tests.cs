@@ -156,6 +156,25 @@ public class EntitySystemSchedulingTests
     }
 
     [Test]
+    public void UnregisteredEntityDoesNotRunWhileOtherEntitiesRemainScheduled()
+    {
+        var unregisteredEntity = CreateEntity();
+        var registeredEntity = CreateEntity();
+        _entitySystem.RegisterSystem(unregisteredEntity);
+        _entitySystem.RegisterSystem(registeredEntity);
+
+        _entitySystem.UnregisterSystem(unregisteredEntity);
+        _entitySystem.EarlyUpdate();
+        _entitySystem.Update();
+        _entitySystem.LateUpdate();
+
+        Assert.That(ExecutionLog.Exists(entry =>
+            entry.EndsWith($":{unregisteredEntity.InstanceId}", StringComparison.Ordinal)), Is.False);
+        Assert.That(ExecutionLog.Exists(entry =>
+            entry.EndsWith($":{registeredEntity.InstanceId}", StringComparison.Ordinal)), Is.True);
+    }
+
+    [Test]
     public void EntitiesWithoutUpdateSystemsAreNotScheduled()
     {
         var entity = new PlainEntity();

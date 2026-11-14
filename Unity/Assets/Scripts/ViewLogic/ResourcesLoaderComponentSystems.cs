@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
 using Bliss.Core;
 using Bliss.CoroutineLocks;
 using Bliss.ViewModel;
 using ET;
+using UnityEngine.SceneManagement;
 using YooAsset;
 
 namespace Bliss.ViewLogic
@@ -148,6 +150,36 @@ namespace Bliss.ViewLogic
             
             self.handlers.Add(location, handler);
             return (SceneHandle)handler;
+        }
+
+        /// <summary>
+        /// Unloads a scene owned by this resource loader and removes its handle from the loader.
+        /// </summary>
+        /// <param name="self">The resource loader that owns the scene handle.</param>
+        /// <param name="scene">The loaded scene to unload.</param>
+        /// <exception cref="InvalidOperationException">The scene is not owned by this resource loader.</exception>
+        public static async ETTask UnloadSceneAsync(this ResourcesLoaderComponent self, Scene scene)
+        {
+            string location = null;
+            SceneHandle sceneHandle = null;
+            foreach (KeyValuePair<string, HandleBase> entry in self.handlers)
+            {
+                if (entry.Value is SceneHandle candidate && candidate.SceneObject == scene)
+                {
+                    location = entry.Key;
+                    sceneHandle = candidate;
+                    break;
+                }
+            }
+
+            if (sceneHandle == null)
+            {
+                throw new InvalidOperationException(
+                    $"Scene {scene.name} is not owned by {nameof(ResourcesLoaderComponent)}.");
+            }
+
+            await sceneHandle.UnloadAsync().Task;
+            self.handlers.Remove(location);
         }
     }
 }

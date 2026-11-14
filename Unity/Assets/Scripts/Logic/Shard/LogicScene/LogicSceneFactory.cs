@@ -67,12 +67,21 @@ namespace Bliss
                     RemoteNetRole = remoteRole,
                 });
                 
-                var aoiIdentifier = aoiManager.Register(AoiRegisterInfo.CreateSphere(sceneActor, AOIType.Visibility, config.Position, 10f));
                 var aoi = sceneActor.AddComponent<AOIEntityCmp>();
-                aoi.Add(AOIType.Visibility, aoiIdentifier);
+                var levelAssociation = levelScene.GetComponent<LevelGameWorldComponent>();
+                StageAoiRegistration(
+                    levelAssociation,
+                    aoiManager,
+                    aoi,
+                    AOIType.Visibility,
+                    AoiRegisterInfo.CreateSphere(sceneActor, AOIType.Visibility, config.Position, 10f));
 #if DOTNET
-                var netAoiIdentifier = aoiManager.Register(AoiRegisterInfo.CreateSphere(sceneActor, AOIType.NetworkVisibility, config.Position, 10f));
-                aoi.Add(AOIType.NetworkVisibility, netAoiIdentifier);
+                StageAoiRegistration(
+                    levelAssociation,
+                    aoiManager,
+                    aoi,
+                    AOIType.NetworkVisibility,
+                    AoiRegisterInfo.CreateSphere(sceneActor, AOIType.NetworkVisibility, config.Position, 10f));
 #endif
                 
                 outResult?.Add(sceneActor);
@@ -81,16 +90,71 @@ namespace Bliss
             
             foreach (var sceneActorCmp in tempList)
             {
-                EventSystem.Instance.Push(levelScene, new Event_AfterCreateSceneActor()
+                Event_AfterCreateSceneActor actorEvent = new Event_AfterCreateSceneActor()
                 {
                     Actor = sceneActorCmp.Parent,
                     ViewAssetPath = sceneActorCmp.RawConfigData.PrefabPath,
-                });
+                };
+                var levelAssociation = levelScene.GetComponent<LevelGameWorldComponent>();
+                if (levelAssociation == null)
+                {
+                    EventSystem.Instance.Push(levelScene, actorEvent);
+                }
+                else
+                {
+                    levelAssociation.AfterCommit(() => EventSystem.Instance.Push(levelScene, actorEvent));
+                }
             }
             
             foreach (var sceneActorCmp in tempList)
             {
-                sceneActorCmp.EndSceneInit();
+                var actorComponent = sceneActorCmp;
+                var levelAssociation = levelScene.GetComponent<LevelGameWorldComponent>();
+                if (levelAssociation == null)
+                {
+                    actorComponent.EndSceneInit();
+                }
+                else
+                {
+                    levelAssociation.AfterCommit(actorComponent.EndSceneInit);
+                }
+            }
+
+        }
+
+        private static void StageAoiRegistration(
+            LevelGameWorldComponent levelAssociation,
+            AoiManagerComponent aoiManager,
+            AOIEntityCmp aoi,
+            int tag,
+            AoiRegisterInfo registerInfo)
+        {
+            long? identifier = null;
+            void Register()
+            {
+                identifier = aoiManager.Register(registerInfo);
+                aoi.Add(tag, identifier.Value);
+            }
+
+            void Rollback()
+            {
+                if (!identifier.HasValue)
+                {
+                    return;
+                }
+
+                aoiManager.Unregister(identifier.Value);
+                aoi.DicType2AoiIdentifier.Remove(tag);
+                identifier = null;
+            }
+
+            if (levelAssociation == null)
+            {
+                Register();
+            }
+            else
+            {
+                levelAssociation.DeferUntilCommit(Register, Rollback);
             }
         }
     }

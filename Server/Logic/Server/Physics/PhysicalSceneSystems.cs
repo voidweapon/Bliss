@@ -32,7 +32,35 @@ public static unsafe partial class PhysicalSceneSystems
         self.ConfigureSimulationEventCallbacks(ref sceneDesc);
         self.ConfigureQueryFilterCallbacks();
         
-        self.UpdateTimer = self.RootTimerComponent().NewRepeatedTimer(50, TimerInvokeType.PhysicalUpdate, self);
+        void ScheduleUpdates()
+        {
+            self.UpdateTimer = self.RootTimerComponent().NewRepeatedTimer(
+                50,
+                TimerInvokeType.PhysicalUpdate,
+                self);
+            self.UpdateTimerScheduled = true;
+        }
+
+        void RollbackScheduledUpdates()
+        {
+            if (!self.UpdateTimerScheduled)
+            {
+                return;
+            }
+
+            self.RootTimerComponent()?.CancelTimer(ref self.UpdateTimer);
+            self.UpdateTimerScheduled = false;
+        }
+
+        LevelGameWorldComponent? levelAssociation = self.GetSceneComponent<LevelGameWorldComponent>();
+        if (levelAssociation == null)
+        {
+            ScheduleUpdates();
+        }
+        else
+        {
+            levelAssociation.DeferUntilCommit(ScheduleUpdates, RollbackScheduledUpdates);
+        }
     }
 
     private static void Destroy(this PhysicalScene self)
@@ -46,7 +74,11 @@ public static unsafe partial class PhysicalSceneSystems
         self.PxScene = null;
         self.PxDispatcher = null;
         
-        self.RootTimerComponent()?.CancelTimer(ref self.UpdateTimer);
+        if (self.UpdateTimerScheduled)
+        {
+            self.RootTimerComponent()?.CancelTimer(ref self.UpdateTimer);
+            self.UpdateTimerScheduled = false;
+        }
         self.PhysicalWorld = null;
     }
 

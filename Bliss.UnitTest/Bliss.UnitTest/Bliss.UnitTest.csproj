@@ -55,8 +55,16 @@
             <Link>Scripts\Logic\Shard\AOI\%(RecursiveDir)%(FileName)%(Extension)</Link>
         </Compile>
 
-        <Compile Include="..\..\Unity\Assets\Scripts\Logic\Shard\Demo\Map\LevelGameWorldComponent.cs">
-            <Link>Scripts\Logic\Shard\Demo\Map\LevelGameWorldComponent.cs</Link>
+        <Compile Include="..\..\Unity\Assets\Scripts\Model\Shard\Demo\Gameplay\LevelGameWorldComponent.cs">
+            <Link>Scripts\Model\Shard\Demo\Gameplay\LevelGameWorldComponent.cs</Link>
+        </Compile>
+
+        <Compile Include="..\..\Unity\Assets\Scripts\Logic\Shard\Demo\Map\LevelSceneFactory.cs">
+            <Link>Scripts\Logic\Shard\Demo\Map\LevelSceneFactory.cs</Link>
+        </Compile>
+
+        <Compile Include="..\..\Unity\Assets\Scripts\Model\Shard\EventTypes\Event_AfterCreateLevelScene.cs">
+            <Link>Scripts\Model\Shard\EventTypes\Event_AfterCreateLevelScene.cs</Link>
         </Compile>
 
         <Compile Include="..\..\Unity\Assets\Scripts\Model\Shard\Demo\Gameplay\GameplayWorldUpdater.cs">

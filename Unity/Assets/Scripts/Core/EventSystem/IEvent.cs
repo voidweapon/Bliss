@@ -31,6 +31,16 @@ namespace Bliss
             }
         }
 
+        /// <summary>
+        /// Runs the handler and propagates initialization failures to the caller.
+        /// </summary>
+        /// <param name="scene">The scene receiving the event.</param>
+        /// <param name="eventInfo">The event data.</param>
+        public ETTask HandleRequired(TScene scene, TEvent eventInfo)
+        {
+            return this.Run(scene, eventInfo);
+        }
+
         protected abstract ETTask Run(TScene mainScene, TEvent eventInfo);
 
     }

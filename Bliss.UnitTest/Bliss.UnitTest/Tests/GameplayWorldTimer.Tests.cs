@@ -71,7 +71,7 @@ public class GameplayWorldTimerTests
             _root.Scene,
             LEVEL_SCENE_ID,
             LEVEL_SCENE_INSTANCE_ID,
-            ELogicSceneType.Level,
+            ELogicSceneType.Client,
             nameof(LEVEL_SCENE_ID));
         levelScene.AddComponent<LevelGameWorldComponent>().GameplayWorld = _gameplayWorld;
     }
