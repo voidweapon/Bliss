@@ -69,13 +69,13 @@ namespace Bliss
                 throw new InvalidOperationException($"A child with identifier {id} already exists under the LevelScene parent.");
             }
 
-            LogicScene levelScene = new LevelLogicScene(parent.RootScene().Root, id, IdGenerator.Instance.GenerateInstanceId(), name);
-            var levelGameWorldComponent = new LevelGameWorldComponent();
-            levelGameWorldComponent.BeginInitialization(gameplayWorld, parentAssociation);
+            LogicScene levelScene = createLevelLogicScene(parent, id, name);
+            LevelGameWorldComponent levelGameWorldComponent = null!;
             try
             {
+                levelGameWorldComponent = levelScene.AddComponent<LevelGameWorldComponent>();
+                levelGameWorldComponent.BeginInitialization(gameplayWorld, parentAssociation);
                 parent.AddChild(levelScene);
-                levelScene.AddComponent(levelGameWorldComponent);
 
                 await EventSystem.Instance.PushRequiredAsync(levelScene, new Event_AfterCreateLevelScene()
                 {
@@ -88,13 +88,16 @@ namespace Bliss
             catch (Exception exception)
             {
                 List<Exception> cleanupExceptions = new List<Exception>();
-                try
+                if (levelGameWorldComponent != null)
                 {
-                    levelGameWorldComponent.AbortInitialization();
-                }
-                catch (Exception cleanupException)
-                {
-                    cleanupExceptions.Add(cleanupException);
+                    try
+                    {
+                        levelGameWorldComponent.AbortInitialization();
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        cleanupExceptions.Add(cleanupException);
+                    }
                 }
 
                 try
@@ -114,6 +117,15 @@ namespace Bliss
 
                 throw;
             }
+        }
+
+        private static LogicScene createLevelLogicScene(Entity parent, long id, string name)
+        {
+            return new LevelLogicScene(
+                parent.RootScene().Root,
+                id,
+                IdGenerator.Instance.GenerateInstanceId(),
+                name);
         }
 
         private sealed class LevelLogicScene : LogicScene, IEntityRegistrationDeferral

@@ -86,18 +86,12 @@ public class EntityRegistrationBenchmark
         this.disposeRoot();
         this.root = this.createRoot();
         GameplayWorld gameplayWorld = this.createGameplayWorld();
-        this.root.Scene.AddChild(gameplayWorld);
 
-        this.levelScene = new BenchmarkLevelScene(
-            this.root,
-            LEVEL_SCENE_ID,
-            LEVEL_SCENE_INSTANCE_ID,
-            nameof(BenchmarkLevelScene));
+        this.levelScene = this.createLevelScene();
         gameplayWorld.AddChild(this.levelScene);
 
-        this.levelAssociation = new LevelGameWorldComponent();
+        this.levelAssociation = this.levelScene.AddComponent<LevelGameWorldComponent>();
         this.levelAssociation.BeginInitialization(gameplayWorld, null);
-        this.levelScene.AddComponent(this.levelAssociation);
     }
 
     /// <summary>Measures ordinary entity mounting and immediate update registration.</summary>
@@ -130,18 +124,20 @@ public class EntityRegistrationBenchmark
 
     private GameplayWorld createGameplayWorld()
     {
-        ConstructorInfo constructor = typeof(GameplayWorld).GetConstructor(
-            BindingFlags.Instance | BindingFlags.NonPublic,
-            null,
-            new[] { typeof(Root), typeof(long), typeof(long), typeof(string) },
-            null) ?? throw new InvalidOperationException("GameplayWorld constructor was not found.");
-        return (GameplayWorld)constructor.Invoke(new object[]
-        {
-            this.root,
+        return GameplayWorldFactory.Create(
+            this.root.Scene,
             GAMEPLAY_WORLD_ID,
             GAMEPLAY_WORLD_INSTANCE_ID,
-            nameof(EntityRegistrationBenchmark),
-        });
+            nameof(EntityRegistrationBenchmark));
+    }
+
+    private BenchmarkLevelScene createLevelScene()
+    {
+        return new BenchmarkLevelScene(
+            this.root,
+            LEVEL_SCENE_ID,
+            LEVEL_SCENE_INSTANCE_ID,
+            nameof(BenchmarkLevelScene));
     }
 
     private Root createRoot()
