@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using ET;
 using Bliss.CharacterMovement;
 using Bliss.Id;
@@ -69,6 +70,13 @@ namespace Bliss
             return gameplayWorld;
         }
 
+        /// <summary>
+        /// Prepares and enables a destination LevelScene, then completes client scene-transition cleanup.
+        /// </summary>
+        /// <param name="clientScene">The client scene coordinating the map transition.</param>
+        /// <param name="gameplayWorld">The GameplayWorld that owns the destination LevelScene.</param>
+        /// <param name="levelConfigId">The destination Level configuration identifier.</param>
+        /// <param name="levelId">The destination LevelScene identifier within the GameplayWorld.</param>
         public static async ETTask ChangeMap(LogicScene clientScene, GameplayWorld gameplayWorld, int levelConfigId, long levelId)
         {
             var waitChangeLevelViewTcs = clientScene.GetComponent<ObjectWait>().Wait<Wait_LoadLevelSceneView>();
@@ -79,8 +87,6 @@ namespace Bliss
             currentSceneComponent.CurrentScene?.Dispose();
             
             var unitManager = gameplayWorld.GetComponent<UnitManager>();
-            var bulletManager = gameplayWorld.GetComponent<BulletManager>();
-            var sceneActorManager = gameplayWorld.GetComponent<SceneActorManager>();
             
             //Create Level Scene
             LevelConfig levelConfig = ConfigManager.Instance.Tables.TbLevelConfig.GetOrDefault(levelConfigId);
@@ -110,6 +116,8 @@ namespace Bliss
             var waitCreateMyUnit = await waitCreateMyUnitTcs;
             if (waitCreateMyUnit.Error != WaitTypeError.Success)
             {
+                levelScene.Dispose();
+                currentSceneComponent.CurrentScene = null;
                 clientScene.GetComponent<ObjectWait>().Notify(
                     new Wait_LoadLevelSceneView { Error = WaitTypeError.Cancel });
                 clientScene.GetComponent<ObjectWait>().Notify(
@@ -121,14 +129,70 @@ namespace Bliss
             M2C_CreateMyUnit m2CCreateMyUnit = waitCreateMyUnit.Message;
             //从服务过来的NetRole,在本地需要对调一下
             (m2CCreateMyUnit.Unit.LocalRole, m2CCreateMyUnit.Unit.RemoteRole) = (m2CCreateMyUnit.Unit.RemoteRole, m2CCreateMyUnit.Unit.LocalRole);
-            Unit myUnit = m2CCreateMyUnit.Unit.CreateUnit(gameplayWorld);
-            unitManager.ObserveUnitId = myUnit.Id;
-            
-            await EventSystem.Instance.PushAsync(levelScene, new Event_EndCreateLevelScene()
+            long previousObserveUnitId = unitManager.ObserveUnitId;
+            Unit localUnit = null;
+            try
             {
-                LevelConfigId = levelConfigId,
-            });
-            
+                DTOUnitInfo unitInfo = m2CCreateMyUnit.Unit;
+                localUnit = UnitHelper.CreateMinimalUnit(
+                    levelScene,
+                    unitInfo.ConfigId,
+                    unitInfo.UnitId,
+                    unitInfo.LocalRole,
+                    unitInfo.RemoteRole,
+                    unitInfo.Position,
+                    unitInfo.Rotation);
+                await LevelSceneFactory.Enable(
+                    levelScene,
+                    localUnit);
+            }
+            catch (Exception exception)
+            {
+                List<Exception> cleanupExceptions = new List<Exception>();
+                try
+                {
+                    if (!levelScene.IsDisposed)
+                    {
+                        levelScene.Dispose();
+                    }
+                }
+                catch (Exception cleanupException)
+                {
+                    cleanupExceptions.Add(cleanupException);
+                }
+
+                try
+                {
+                    unitManager.ObserveUnitId = previousObserveUnitId;
+                }
+                catch (Exception cleanupException)
+                {
+                    cleanupExceptions.Add(cleanupException);
+                }
+
+                cleanupExceptions.Insert(0, exception);
+                Exception failure = cleanupExceptions.Count == 1
+                    ? exception
+                    : new AggregateException("LevelScene enabling and client-unit cleanup failed.", cleanupExceptions);
+                Log.Error(failure);
+                currentSceneComponent.CurrentScene = null;
+                ObjectWait objectWait = clientScene.GetComponent<ObjectWait>();
+                objectWait.Notify(new Wait_LoadLevelSceneView { Error = WaitTypeError.Cancel });
+                objectWait.Notify(new Wait_FinishChangeLevelScene { Error = WaitTypeError.Cancel });
+                await EventSystem.Instance.PushAsync(clientScene, new Event_EndChangeLevelScene());
+                return;
+            }
+
+            clientScene.GetComponent<ObjectWait>().Notify(new Wait_LoadLevelSceneView());
+            try
+            {
+                await EventSystem.Instance.PushRequiredAsync(clientScene, new Event_AfterEnableLevelScene());
+            }
+            catch (Exception exception)
+            {
+                Log.Error(exception);
+            }
+
             var waitChangeLevelView = await waitChangeLevelViewTcs;
             if (waitChangeLevelView.Error != WaitTypeError.Success)
             {

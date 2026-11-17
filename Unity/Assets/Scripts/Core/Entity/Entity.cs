@@ -703,19 +703,7 @@ namespace Bliss
         
         protected virtual void RegisterToSystem()
         {
-            EntitySystem entitySystem = this.LogicScene.Root.EntitySystem;
-            Action<Entity> register = entitySystem.RegisterSystem;
-            Action<Entity> unregister = entitySystem.UnregisterSystem;
-            for (Entity current = this; current != null; current = current.Parent)
-            {
-                if (current is IEntityRegistrationDeferral registrationDeferral &&
-                    registrationDeferral.DeferRegistration(this, register, unregister))
-                {
-                    return;
-                }
-            }
-
-            register(this);
+            this.LogicScene.Root.EntitySystem.RegisterSystem(this);
         }
 
         public override void Dispose()

@@ -60,6 +60,14 @@ namespace Bliss
                     levelLightData[i].shadowMask = lightDataAsset.shadowMasks[i];
                 }
                 
+                LevelSceneViewTransitionComponent transition =
+                    levelScene.GetComponent<LevelSceneViewTransitionComponent>();
+                if (transition == null)
+                {
+                    throw new InvalidOperationException("The LevelScene has no transition state for lightmap setup.");
+                }
+
+                transition.captureLightingSettings();
                 LightmapSettings.lightmapsMode = lightDataAsset.lightmapsMode;
                 LightmapSettings.lightmaps = levelLightData;
                 

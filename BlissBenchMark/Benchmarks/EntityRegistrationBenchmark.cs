@@ -6,8 +6,8 @@ using Bliss.Core;
 namespace BlissBenchMark;
 
 /// <summary>
-/// Compares ordinary entity mounting with the staged registration path used by LevelScenes.
-/// The measurement includes entity attachment and transaction commit, but excludes scene handlers.
+/// Compares entity mounting in an ordinary scene with the direct registration path used by LevelScenes.
+/// Scene creation and setup are excluded from the measurement.
 /// </summary>
 [MemoryDiagnoser]
 public class EntityRegistrationBenchmark
@@ -37,7 +37,6 @@ public class EntityRegistrationBenchmark
     private Root root = null!;
     private Entity ordinaryParent = null!;
     private BenchmarkLevelScene levelScene = null!;
-    private LevelGameWorldComponent levelAssociation = null!;
 
     /// <summary>Number of entities mounted during each benchmark operation.</summary>
     [Params(SMALL_ENTITY_COUNT, LARGE_ENTITY_COUNT)]
@@ -80,8 +79,8 @@ public class EntityRegistrationBenchmark
     }
 
     /// <summary>Creates a fresh initializing LevelScene outside the measured operation.</summary>
-    [IterationSetup(Target = nameof(StagedLevelEntityRegistration))]
-    public void SetupStagedLevelScene()
+    [IterationSetup(Target = nameof(LevelSceneEntityRegistration))]
+    public void SetupLevelScene()
     {
         this.disposeRoot();
         this.root = this.createRoot();
@@ -89,9 +88,6 @@ public class EntityRegistrationBenchmark
 
         this.levelScene = this.createLevelScene();
         gameplayWorld.AddChild(this.levelScene);
-
-        this.levelAssociation = this.levelScene.AddComponent<LevelGameWorldComponent>();
-        this.levelAssociation.BeginInitialization(gameplayWorld, null);
     }
 
     /// <summary>Measures ordinary entity mounting and immediate update registration.</summary>
@@ -104,16 +100,14 @@ public class EntityRegistrationBenchmark
         }
     }
 
-    /// <summary>Measures entity mounting and deferred registration through a LevelScene commit.</summary>
+    /// <summary>Measures entity mounting and direct Root update registration under a LevelScene.</summary>
     [Benchmark]
-    public void StagedLevelEntityRegistration()
+    public void LevelSceneEntityRegistration()
     {
         for (int entityIndex = 0; entityIndex < this.EntityCount; entityIndex++)
         {
             this.levelScene.AddChild<BenchmarkUpdateEntity>();
         }
-
-        this.levelAssociation.CompleteInitialization();
     }
 
     private void disposeRoot()
@@ -151,21 +145,11 @@ public class EntityRegistrationBenchmark
         });
     }
 
-    private sealed class BenchmarkLevelScene : LogicScene, IEntityRegistrationDeferral
+    private sealed class BenchmarkLevelScene : LogicScene
     {
         public BenchmarkLevelScene(Root root, long id, long instanceId, string name)
             : base(root, id, instanceId, ELogicSceneType.Level, name)
         {
-        }
-
-        public bool DeferRegistration(
-            Entity entity,
-            Action<Entity> register,
-            Action<Entity> unregister)
-        {
-            LevelGameWorldComponent association = this.GetComponent<LevelGameWorldComponent>();
-            return association != null &&
-                   association.DeferEntityRegistration(entity, register, unregister);
         }
     }
 

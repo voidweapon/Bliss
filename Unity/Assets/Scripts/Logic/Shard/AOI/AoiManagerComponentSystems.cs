@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using Bliss.Base.Collections;
 using Bliss.Core;
 using Unity.Mathematics;
@@ -70,14 +71,62 @@ namespace Bliss
             };
             RefreshGeometryCache(entry);
 
-            self.Entries.Add(entry.Identifier, entry);
-            GetOrCreateTagSet(self, entry.Tag).Add(entry.Identifier);
-            using var affectedEntityIds = HashComponent<long>.Create();
-            affectedEntityIds.Add(entry.Identifier);
-            ReindexEntry(self, entry, affectedEntityIds);
-            MarkDirtyBatch(self, affectedEntityIds);
-            self.RefreshDirtyRelations();
-            return identifier;
+            try
+            {
+                self.Entries.Add(entry.Identifier, entry);
+                GetOrCreateTagSet(self, entry.Tag).Add(entry.Identifier);
+                using var affectedEntityIds = HashComponent<long>.Create();
+                affectedEntityIds.Add(entry.Identifier);
+                ReindexEntry(self, entry, affectedEntityIds);
+                MarkDirtyBatch(self, affectedEntityIds);
+                self.RefreshDirtyRelations();
+                return identifier;
+            }
+            catch (Exception registrationException)
+            {
+                List<Exception> cleanupExceptions = new List<Exception>();
+                try
+                {
+                    RemoveTagIndex(self, identifier, entry.Tag);
+                }
+                catch (Exception exception)
+                {
+                    cleanupExceptions.Add(exception);
+                }
+
+                try
+                {
+                    RemoveSpatialIndex(self, identifier);
+                }
+                catch (Exception exception)
+                {
+                    cleanupExceptions.Add(exception);
+                }
+
+                try
+                {
+                    List<Exception> callbackExceptions = RemoveAllVisibilityRelations(self, identifier, entry.Tag);
+                    if (callbackExceptions != null)
+                    {
+                        cleanupExceptions.AddRange(callbackExceptions);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    cleanupExceptions.Add(exception);
+                }
+
+                self.Entries.Remove(identifier);
+                self.DirtyEntityIds.Remove(identifier);
+                if (cleanupExceptions.Count > 0)
+                {
+                    cleanupExceptions.Insert(0, registrationException);
+                    throw new AggregateException("AOI registration failed and cleanup was incomplete.", cleanupExceptions);
+                }
+
+                ExceptionDispatchInfo.Capture(registrationException).Throw();
+                throw;
+            }
         }
 
         /// <summary>
@@ -197,10 +246,10 @@ namespace Bliss
 
             RemoveTagIndex(self, identifier, entry.Tag);
             RemoveSpatialIndex(self, identifier);
-            RemoveAllVisibilityRelations(self, identifier, entry.Tag);
-
+            List<Exception> callbackExceptions = RemoveAllVisibilityRelations(self, identifier, entry.Tag);
             self.Entries.Remove(identifier);
             self.DirtyEntityIds.Remove(identifier);
+            ThrowCallbackExceptions(callbackExceptions);
         }
 
         /// <summary>
@@ -685,42 +734,92 @@ namespace Bliss
         /// <summary>
         /// 清理句柄作为观察者与目标时的全部可见关系，并触发离开事件。
         /// </summary>
-        private static void RemoveAllVisibilityRelations(AoiManagerComponent self, long identifier, int selfTag)
+        private static List<Exception> RemoveAllVisibilityRelations(AoiManagerComponent self, long identifier, int selfTag)
         {
+            List<Exception> callbackExceptions = null;
             if (self.VisibleTargetsByObserver.TryGetValue(identifier, out var visibleTargetIds))
             {
-                foreach (long targetId in visibleTargetIds)
+                var targetIds = new List<long>(visibleTargetIds);
+                self.VisibleTargetsByObserver.Remove(identifier);
+                foreach (long targetId in targetIds)
                 {
                     RemoveVisibleObserver(self, targetId, identifier);
                     if (self.Entries.TryGetValue(targetId, out var targetEntry))
                     {
-                        self.OnLeaveVisible?.Invoke(identifier, targetId, targetEntry.Tag);
+                        invokeVisibilityCallback(
+                            self.OnLeaveVisible,
+                            identifier,
+                            targetId,
+                            targetEntry.Tag,
+                            ref callbackExceptions);
                     }
                 }
-                self.VisibleTargetsByObserver.Remove(identifier);
             }
 
-            if (!self.VisibleObserversByTarget.TryGetValue(identifier, out var visibleObserverIds))
+            if (self.VisibleObserversByTarget.TryGetValue(identifier, out var visibleObserverIds))
+            {
+                var observerIds = new List<long>(visibleObserverIds);
+                self.VisibleObserversByTarget.Remove(identifier);
+                foreach (long observerId in observerIds)
+                {
+                    if (self.VisibleTargetsByObserver.TryGetValue(observerId, out var observerTargets))
+                    {
+                        observerTargets.Remove(identifier);
+                        if (observerTargets.Count == 0)
+                        {
+                            self.VisibleTargetsByObserver.Remove(observerId);
+                        }
+                    }
+
+                    invokeVisibilityCallback(
+                        self.OnLeaveVisible,
+                        observerId,
+                        identifier,
+                        selfTag,
+                        ref callbackExceptions);
+                }
+            }
+
+            return callbackExceptions;
+        }
+
+        private static void invokeVisibilityCallback(
+            Action<long, long, int> visibilityCallback,
+            long observerIdentifier,
+            long targetIdentifier,
+            int targetTag,
+            ref List<Exception> callbackExceptions)
+        {
+            try
+            {
+                visibilityCallback?.Invoke(observerIdentifier, targetIdentifier, targetTag);
+            }
+            catch (Exception exception)
+            {
+                if (callbackExceptions == null)
+                {
+                    callbackExceptions = new List<Exception>();
+                }
+
+                callbackExceptions.Add(exception);
+            }
+        }
+
+        private static void ThrowCallbackExceptions(List<Exception> callbackExceptions)
+        {
+            if (callbackExceptions == null)
             {
                 return;
             }
 
-            foreach (long observerId in visibleObserverIds)
+            if (callbackExceptions.Count == 1)
             {
-                if (!self.VisibleTargetsByObserver.TryGetValue(observerId, out var observerTargets))
-                {
-                    continue;
-                }
-
-                observerTargets.Remove(identifier);
-                if (observerTargets.Count == 0)
-                {
-                    self.VisibleTargetsByObserver.Remove(observerId);
-                }
-                self.OnLeaveVisible?.Invoke(observerId, identifier, selfTag);
+                ExceptionDispatchInfo.Capture(callbackExceptions[0]).Throw();
             }
-
-            self.VisibleObserversByTarget.Remove(identifier);
+            else if (callbackExceptions.Count > 1)
+            {
+                throw new AggregateException("AOI visibility callbacks failed during cleanup.", callbackExceptions);
+            }
         }
 
         private static void AddVisibleObserver(AoiManagerComponent self, long targetId, long observerId)

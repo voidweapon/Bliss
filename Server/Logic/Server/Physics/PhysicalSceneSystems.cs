@@ -16,6 +16,8 @@ namespace Bliss.Physics;
 [EntitySystemOf(typeof(PhysicalScene))]
 public static unsafe partial class PhysicalSceneSystems
 {
+    private const int PHYSICAL_UPDATE_TIMER_INTERVAL_MILLISECONDS = 50;
+
     private static void Awake(this PhysicalScene self, PhysicalWorldComponent pxWorld)
     {
         self.PhysicalWorld = pxWorld;
@@ -31,36 +33,44 @@ public static unsafe partial class PhysicalSceneSystems
         
         self.ConfigureSimulationEventCallbacks(ref sceneDesc);
         self.ConfigureQueryFilterCallbacks();
-        
-        void ScheduleUpdates()
+    }
+
+    /// <summary>
+    /// Starts the recurring physical update timer owned by this scene.
+    /// </summary>
+    /// <param name="self">The physical scene to start.</param>
+    public static void StartUpdates(this PhysicalScene self)
+    {
+        if (self == null || self.IsDisposed)
         {
-            self.UpdateTimer = self.RootTimerComponent().NewRepeatedTimer(
-                50,
-                TimerInvokeType.PhysicalUpdate,
-                self);
-            self.UpdateTimerScheduled = true;
+            throw new InvalidOperationException("A live physical scene is required to start updates.");
         }
 
-        void RollbackScheduledUpdates()
+        if (self.UpdateTimerScheduled)
         {
-            if (!self.UpdateTimerScheduled)
-            {
-                return;
-            }
-
-            self.RootTimerComponent()?.CancelTimer(ref self.UpdateTimer);
-            self.UpdateTimerScheduled = false;
+            return;
         }
 
-        LevelGameWorldComponent? levelAssociation = self.GetSceneComponent<LevelGameWorldComponent>();
-        if (levelAssociation == null)
+        self.UpdateTimer = self.RootTimerComponent().NewRepeatedTimer(
+            PHYSICAL_UPDATE_TIMER_INTERVAL_MILLISECONDS,
+            TimerInvokeType.PhysicalUpdate,
+            self);
+        self.UpdateTimerScheduled = true;
+    }
+
+    /// <summary>
+    /// Stops the recurring physical update timer owned by this scene.
+    /// </summary>
+    /// <param name="self">The physical scene to stop.</param>
+    public static void StopUpdates(this PhysicalScene self)
+    {
+        if (self == null || !self.UpdateTimerScheduled)
         {
-            ScheduleUpdates();
+            return;
         }
-        else
-        {
-            levelAssociation.DeferUntilCommit(ScheduleUpdates, RollbackScheduledUpdates);
-        }
+
+        self.RootTimerComponent()?.CancelTimer(ref self.UpdateTimer);
+        self.UpdateTimerScheduled = false;
     }
 
     private static void Destroy(this PhysicalScene self)
@@ -74,11 +84,7 @@ public static unsafe partial class PhysicalSceneSystems
         self.PxScene = null;
         self.PxDispatcher = null;
         
-        if (self.UpdateTimerScheduled)
-        {
-            self.RootTimerComponent()?.CancelTimer(ref self.UpdateTimer);
-            self.UpdateTimerScheduled = false;
-        }
+        self.StopUpdates();
         self.PhysicalWorld = null;
     }
 

@@ -1,4 +1,3 @@
-using System;
 using Bliss.Core;
 
 namespace Bliss
@@ -12,47 +11,13 @@ namespace Bliss
                 self.RootScene().GetComponent<NetworkEntityManagerComponent>();
             SceneActorManager sceneActorManager =
                 self.GetLevelGameplayWorld()?.GetComponent<SceneActorManager>();
-            bool networkEntityRegistered = false;
-            bool sceneActorRegistered = false;
 
-            void Register()
+            if (networkEntityManager != null)
             {
-                if (networkEntityManager != null)
-                {
-                    networkEntityManager.AddEntity(self.Id, self);
-                    networkEntityRegistered = true;
-                }
-
-                if (sceneActorManager != null)
-                {
-                    sceneActorManager.Add(self);
-                    sceneActorRegistered = true;
-                }
+                networkEntityManager.AddEntity(self.Id, self);
             }
 
-            void Rollback()
-            {
-                if (sceneActorRegistered)
-                {
-                    sceneActorManager.Remove(self.Id);
-                    sceneActorRegistered = false;
-                }
-
-                if (networkEntityRegistered)
-                {
-                    networkEntityManager.RemoveEntity(self.Id);
-                    networkEntityRegistered = false;
-                }
-            }
-
-            LevelGameWorldComponent levelAssociation = self.GetSceneComponent<LevelGameWorldComponent>();
-            if (levelAssociation == null)
-            {
-                Register();
-                return;
-            }
-
-            levelAssociation.DeferUntilCommit(Register, Rollback);
+            sceneActorManager?.Add(self);
         }
         private static void Destroy(this SceneActor self)
         {

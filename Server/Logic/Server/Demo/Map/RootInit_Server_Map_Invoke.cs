@@ -9,6 +9,10 @@ namespace Bliss
     [Invoke((long)ELogicSceneType.Map)]
     public class RootInit_Server_Map_Invoke : AInvokeHandler<Invoke_RootInit, ETTask>
     {
+        /// <summary>
+        /// Prepares and enables the map's default LevelScene before completing root initialization.
+        /// </summary>
+        /// <param name="args">The root initialization request.</param>
         public override async ETTask Handle(Invoke_RootInit args)
         {
             Log.Info($"Init Map Start");
@@ -42,7 +46,13 @@ namespace Bliss
             
             var levelConfigList = ConfigManager.Instance.Tables.TbLevelConfig.DicSceneId2Level[(int)rootScene.Id];
             var defaultLevelConfig = levelConfigList[0];
-            await LevelSceneFactory.Create(gameplayWorld, gameplayWorld, defaultLevelConfig.Id, defaultLevelConfig.Id, defaultLevelConfig.Name);
+            LogicScene levelScene = await LevelSceneFactory.Create(
+                gameplayWorld,
+                gameplayWorld,
+                defaultLevelConfig.Id,
+                defaultLevelConfig.Id,
+                defaultLevelConfig.Name);
+            await LevelSceneFactory.Enable(levelScene);
             
             await ETTask.CompletedTask;
         }

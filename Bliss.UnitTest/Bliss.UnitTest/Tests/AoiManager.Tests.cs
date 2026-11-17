@@ -114,6 +114,83 @@ public class AoiManager_Tests
     }
 
     [Test]
+    public void FailedRegistrationRemovesIndexesAndRelationsEvenWhenCleanupCallbackFails()
+    {
+        var aoiManager = new AoiManagerComponent();
+        long observerIdentifier = aoiManager.Register(new AoiRegisterInfo(
+            AOITestEntity.Create(9001),
+            1,
+            float3.zero,
+            EAoiShapeType.Circle,
+            5f,
+            5f,
+            float3.zero,
+            float3.zero));
+
+        aoiManager.SetVisibilityCallbacks(
+            (_, _, _) => throw new InvalidOperationException("enter callback failed"),
+            (_, _, _) => throw new InvalidOperationException("leave callback failed"));
+
+        AggregateException exception = Assert.Throws<AggregateException>(() =>
+            aoiManager.Register(new AoiRegisterInfo(
+                AOITestEntity.Create(9002),
+                2,
+                new float3(1f, 0f, 1f),
+                EAoiShapeType.Circle,
+                1f,
+                1f,
+                float3.zero,
+                float3.zero)));
+
+        long failedIdentifier = aoiManager.IdentifierGenerator;
+        List<long> results = new List<long>();
+        aoiManager.GetVisibleTargets(observerIdentifier, results);
+
+        Assert.That(exception.InnerExceptions, Has.Count.EqualTo(2));
+        Assert.That(aoiManager.Entries, Has.Count.EqualTo(1));
+        Assert.That(aoiManager.QueryByTag(2), Is.Empty);
+        Assert.That(results, Is.Empty);
+        Assert.That(aoiManager.VisibleObserversByTarget.ContainsKey(failedIdentifier), Is.False);
+    }
+
+    /// <summary>Verifies callback failures do not prevent AOI unregister cleanup.</summary>
+    [Test]
+    public void FailedLeaveCallbackDoesNotPreventUnregisterCleanup()
+    {
+        var aoiManager = new AoiManagerComponent();
+        long observerIdentifier = aoiManager.Register(new AoiRegisterInfo(
+            AOITestEntity.Create(9101),
+            1,
+            float3.zero,
+            EAoiShapeType.Circle,
+            5f,
+            5f,
+            float3.zero,
+            float3.zero));
+        long targetIdentifier = aoiManager.Register(new AoiRegisterInfo(
+            AOITestEntity.Create(9102),
+            2,
+            new float3(1f, 0f, 1f),
+            EAoiShapeType.Circle,
+            1f,
+            1f,
+            float3.zero,
+            float3.zero));
+        aoiManager.SetVisibilityCallbacks(
+            (_, _, _) => { },
+            (_, _, _) => throw new InvalidOperationException("leave callback failed"));
+
+        Assert.Throws<InvalidOperationException>(() => aoiManager.Unregister(targetIdentifier));
+
+        List<long> results = new List<long>();
+        aoiManager.GetVisibleTargets(observerIdentifier, results);
+        Assert.That(aoiManager.Entries, Has.Count.EqualTo(1));
+        Assert.That(aoiManager.QueryByTag(2), Is.Empty);
+        Assert.That(results, Is.Empty);
+        Assert.That(aoiManager.VisibleObserversByTarget.ContainsKey(targetIdentifier), Is.False);
+    }
+
+    [Test]
     public void CircleShapeUsesThreeDimensionalDistance()
     {
         var aoiManager = new AoiManagerComponent();

@@ -34,15 +34,12 @@ public class GameplayWorldLifecycleTests
         _nextInstanceId = FIRST_TEST_INSTANCE_ID;
         TestLevelInitializationHandler.Fail = false;
         TestLevelInitializationHandler.CreateNested = false;
-        TestLevelInitializationHandler.NestedWasCommittedDuringParentInitialization = false;
-        TestLevelInitializationHandler.FailCommit = false;
-        TestLevelInitializationHandler.AppliedEffectCount = 0;
         TestLevelInitializationHandler.ParentDuringInitialization = null;
-        TestLevelInitializationHandler.AddUpdateEntity = false;
-        TestLevelInitializationHandler.UpdateEntity = null;
-        TestLevelInitializationHandler.PublishAfterCommit = false;
-        TestLevelInitializationHandler.AfterCommitWasPublished = false;
-        TestLevelInitializationHandler.AfterCommitRanDuringInitialization = false;
+        TestLevelEnableHandler.EnableCount = 0;
+        TestLevelEnableHandler.UpdateEntity = null;
+        TestLevelEnableHandler.Fail = false;
+        TestLevelEnableHandler.AddUpdateEntity = false;
+        TestLevelStopEnableHandler.Fail = false;
 
         _typeManager = new TypeManager();
         _typeManager.Init(new List<Assembly>
@@ -59,7 +56,7 @@ public class GameplayWorldLifecycleTests
     }
 
     [Test]
-    public void LevelEntitiesEnterRootUpdateSchedulingOnlyAfterCommit()
+    public void LevelEntitiesEnterRootUpdateSchedulingOnlyAfterExplicitEnable()
     {
         GameplayWorld gameplayWorld = GameplayWorldFactory.Create(
             _root.Scene,
@@ -69,26 +66,34 @@ public class GameplayWorldLifecycleTests
         var eventSystem = new EventSystem();
         eventSystem.Init();
         eventSystem.Register();
-        TestLevelInitializationHandler.AddUpdateEntity = true;
-        TestLevelInitializationHandler.PublishAfterCommit = true;
+        TestLevelEnableHandler.AddUpdateEntity = true;
 
         try
         {
-            LevelSceneFactory.Create(
+            LogicScene levelScene = LevelSceneFactory.Create(
                 gameplayWorld,
                 gameplayWorld,
                 ROOT_LEVEL_CONFIG_ID,
                 LEVEL_SCENE_ID,
                 nameof(LEVEL_SCENE_ID)).GetAwaiter().GetResult();
 
-            OrdinaryUpdateEntity entity = TestLevelInitializationHandler.UpdateEntity
-                ?? throw new InvalidOperationException("The initialization handler did not create an update entity.");
-            Assert.That(TestLevelInitializationHandler.AfterCommitRanDuringInitialization, Is.False);
-            Assert.That(TestLevelInitializationHandler.AfterCommitWasPublished, Is.True);
-            Assert.That(
-                ExecutionLog.Exists(entry => entry.EndsWith($":{entity.InstanceId}", StringComparison.Ordinal)),
-                Is.False);
+            Assert.That(levelScene.GetComponent<LevelGameWorldComponent>().IsPrepared, Is.True);
+            Assert.That(levelScene.GetComponent<LevelGameWorldComponent>().IsEnabled, Is.False);
+            Assert.That(TestLevelEnableHandler.EnableCount, Is.Zero);
 
+            _root.EarlyUpdate();
+            _root.Update();
+
+            Assert.That(ExecutionLog, Is.Empty);
+
+            LevelSceneFactory.Enable(levelScene).GetAwaiter().GetResult();
+
+            OrdinaryUpdateEntity entity = TestLevelEnableHandler.UpdateEntity
+                ?? throw new InvalidOperationException("The enable handler did not create an update entity.");
+            Assert.That(TestLevelEnableHandler.EnableCount, Is.EqualTo(1));
+            Assert.That(levelScene.GetComponent<LevelGameWorldComponent>().IsEnabled, Is.True);
+
+            ExecutionLog.Clear();
             _root.EarlyUpdate();
             _root.Update();
 
@@ -206,7 +211,7 @@ public class GameplayWorldLifecycleTests
     }
 
     [Test]
-    public void NestedLevelScenesShareWorldAndActivateTogetherAfterAncestorInitialization()
+    public void NestedLevelScenesRemainPreparedUntilTheRootEnablesTheWholeTree()
     {
         GameplayWorld gameplayWorld = GameplayWorldFactory.Create(
             _root.Scene,
@@ -217,7 +222,6 @@ public class GameplayWorldLifecycleTests
         eventSystem.Init();
         eventSystem.Register();
         TestLevelInitializationHandler.CreateNested = true;
-        TestLevelInitializationHandler.NestedWasCommittedDuringParentInitialization = true;
 
         try
         {
@@ -230,10 +234,31 @@ public class GameplayWorldLifecycleTests
             LogicScene nestedLevel = rootLevel.GetChild<LogicScene>(NESTED_LEVEL_ID);
 
             Assert.That(nestedLevel, Is.Not.Null);
-            Assert.That(TestLevelInitializationHandler.NestedWasCommittedDuringParentInitialization, Is.False);
-            Assert.That(rootLevel.GetComponent<LevelGameWorldComponent>().IsCommitted, Is.True);
-            Assert.That(nestedLevel.GetComponent<LevelGameWorldComponent>().IsCommitted, Is.True);
+            Assert.That(rootLevel.GetComponent<LevelGameWorldComponent>().IsPrepared, Is.True);
+            Assert.That(nestedLevel.GetComponent<LevelGameWorldComponent>().IsPrepared, Is.True);
+            Assert.That(rootLevel.GetComponent<LevelGameWorldComponent>().IsEnabled, Is.False);
+            Assert.That(nestedLevel.GetComponent<LevelGameWorldComponent>().IsEnabled, Is.False);
             Assert.That(nestedLevel.GetComponent<LevelGameWorldComponent>().GameplayWorld, Is.SameAs(gameplayWorld));
+
+            Assert.Throws<InvalidOperationException>(
+                () => LevelSceneFactory.Enable(nestedLevel).GetAwaiter().GetResult());
+            Assert.That(nestedLevel.GetComponent<LevelGameWorldComponent>().IsPrepared, Is.True);
+
+            LevelSceneFactory.Enable(rootLevel).GetAwaiter().GetResult();
+
+            Assert.That(rootLevel.GetComponent<LevelGameWorldComponent>().IsEnabled, Is.True);
+            Assert.That(nestedLevel.GetComponent<LevelGameWorldComponent>().IsEnabled, Is.True);
+            Assert.That(TestLevelEnableHandler.EnableCount, Is.EqualTo(2));
+            Assert.Throws<InvalidOperationException>(
+                () => LevelSceneFactory.Enable(nestedLevel).GetAwaiter().GetResult());
+            Assert.Throws<InvalidOperationException>(
+                () => LevelSceneFactory.Create(
+                    rootLevel,
+                    gameplayWorld,
+                    ROOT_LEVEL_CONFIG_ID,
+                    NESTED_LEVEL_ID,
+                    nameof(NESTED_LEVEL_ID)).GetAwaiter().GetResult());
+            Assert.That(TestLevelEnableHandler.EnableCount, Is.EqualTo(2));
         }
         finally
         {
@@ -243,7 +268,52 @@ public class GameplayWorldLifecycleTests
     }
 
     [Test]
-    public void FailedLevelCommitRollsBackAppliedEffectsAndRemovesScene()
+    public void FailedNestedEnableDestroysThePreparedTreeAndPreservesExistingWorldComponents()
+    {
+        GameplayWorld gameplayWorld = GameplayWorldFactory.Create(
+            _root.Scene,
+            GAMEPLAY_WORLD_ID,
+            GAMEPLAY_WORLD_INSTANCE_ID,
+            nameof(GameplayWorld));
+        WorldMarkerComponent existingWorldMarker = gameplayWorld.AddComponent<WorldMarkerComponent>();
+        var eventSystem = new EventSystem();
+        eventSystem.Init();
+        eventSystem.Register();
+        TestLevelInitializationHandler.CreateNested = true;
+        TestLevelEnableHandler.Fail = true;
+        TestLevelEnableHandler.AddUpdateEntity = true;
+
+        try
+        {
+            LogicScene rootLevel = LevelSceneFactory.Create(
+                gameplayWorld,
+                gameplayWorld,
+                ROOT_LEVEL_CONFIG_ID,
+                LEVEL_SCENE_ID,
+                nameof(LEVEL_SCENE_ID)).GetAwaiter().GetResult();
+
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+                () => LevelSceneFactory.Enable(rootLevel).GetAwaiter().GetResult());
+
+            Assert.That(exception.Message, Is.EqualTo("level enable failed"));
+            Assert.That(gameplayWorld.GetChild<LogicScene>(LEVEL_SCENE_ID), Is.Null);
+            Assert.That(gameplayWorld.GetComponent<WorldMarkerComponent>(), Is.SameAs(existingWorldMarker));
+            Assert.That(TestLevelEnableHandler.EnableCount, Is.EqualTo(1));
+            _root.EarlyUpdate();
+            _root.Update();
+            Assert.That(ExecutionLog, Is.Empty);
+        }
+        finally
+        {
+            TestLevelInitializationHandler.CreateNested = false;
+            TestLevelEnableHandler.Fail = false;
+            TestLevelEnableHandler.AddUpdateEntity = false;
+            eventSystem.Dispose();
+        }
+    }
+
+    [Test]
+    public void EnableCleanupFailureReportsBothTheEnableAndCleanupErrors()
     {
         GameplayWorld gameplayWorld = GameplayWorldFactory.Create(
             _root.Scene,
@@ -253,28 +323,29 @@ public class GameplayWorldLifecycleTests
         var eventSystem = new EventSystem();
         eventSystem.Init();
         eventSystem.Register();
-        TestLevelInitializationHandler.FailCommit = true;
-        TestLevelInitializationHandler.AppliedEffectCount = 0;
+        TestLevelEnableHandler.Fail = true;
+        TestLevelStopEnableHandler.Fail = true;
 
         try
         {
-            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
-                LevelSceneFactory.Create(
-                    gameplayWorld,
-                    gameplayWorld,
-                    ROOT_LEVEL_CONFIG_ID,
-                    LEVEL_SCENE_ID,
-                    nameof(LEVEL_SCENE_ID)).GetAwaiter().GetResult());
+            LogicScene levelScene = LevelSceneFactory.Create(
+                gameplayWorld,
+                gameplayWorld,
+                ROOT_LEVEL_CONFIG_ID,
+                LEVEL_SCENE_ID,
+                nameof(LEVEL_SCENE_ID)).GetAwaiter().GetResult();
 
-            Assert.That(exception.Message, Is.EqualTo("level commit failed"));
-            Assert.That(TestLevelInitializationHandler.AppliedEffectCount, Is.Zero);
+            AggregateException exception = Assert.Throws<AggregateException>(
+                () => LevelSceneFactory.Enable(levelScene).GetAwaiter().GetResult());
+
+            Assert.That(exception.InnerExceptions[0].Message, Is.EqualTo("level enable failed"));
+            Assert.That(exception.InnerExceptions[1].Message, Is.EqualTo("level cleanup failed"));
             Assert.That(gameplayWorld.GetChild<LogicScene>(LEVEL_SCENE_ID), Is.Null);
         }
         finally
         {
-            TestLevelInitializationHandler.FailCommit = false;
-            TestLevelInitializationHandler.AddUpdateEntity = false;
-            TestLevelInitializationHandler.UpdateEntity = null;
+            TestLevelEnableHandler.Fail = false;
+            TestLevelStopEnableHandler.Fail = false;
             eventSystem.Dispose();
         }
     }
@@ -374,35 +445,50 @@ public class GameplayWorldLifecycleTests
     }
 
     [Test]
-    public void RootPhasesForwardThroughLevelComponentToGameplayEntity()
+    public void RootPhasesForwardToGameplayWorldOnlyAfterLevelSceneEnable()
     {
         GameplayWorld gameplayWorld = GameplayWorldFactory.Create(
             _root.Scene,
             GAMEPLAY_WORLD_ID,
             GAMEPLAY_WORLD_INSTANCE_ID,
             nameof(GameplayWorld));
-        var levelScene = LogicSceneFactoryCore.CreateLogicScene(
-            _root.Scene,
-            LEVEL_SCENE_ID,
-            LEVEL_SCENE_INSTANCE_ID,
-            ELogicSceneType.Client,
-            nameof(LEVEL_SCENE_ID));
-        var levelGameWorldComponent = levelScene.AddComponent<LevelGameWorldComponent>();
-        levelGameWorldComponent.GameplayWorld = gameplayWorld;
         var entity = gameplayWorld.AddChild<UpdateGameplayEntity>();
+        var eventSystem = new EventSystem();
+        eventSystem.Init();
+        eventSystem.Register();
+        LogicScene levelScene = LevelSceneFactory.Create(
+            gameplayWorld,
+            gameplayWorld,
+            ROOT_LEVEL_CONFIG_ID,
+            LEVEL_SCENE_ID,
+            nameof(LEVEL_SCENE_ID)).GetAwaiter().GetResult();
 
-        _root.EarlyUpdate();
-        _root.Update();
-        _root.LateUpdate();
+        try
+        {
+            _root.EarlyUpdate();
+            _root.Update();
+            _root.LateUpdate();
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                $"gameplayEarly:{entity.InstanceId}",
-                $"gameplayUpdate:{entity.InstanceId}",
-                $"gameplayLate:{entity.InstanceId}",
-            },
-            ExecutionLog);
+            Assert.That(ExecutionLog, Is.Empty);
+
+            LevelSceneFactory.Enable(levelScene).GetAwaiter().GetResult();
+            _root.EarlyUpdate();
+            _root.Update();
+            _root.LateUpdate();
+
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    $"gameplayEarly:{entity.InstanceId}",
+                    $"gameplayUpdate:{entity.InstanceId}",
+                    $"gameplayLate:{entity.InstanceId}",
+                },
+                ExecutionLog);
+        }
+        finally
+        {
+            eventSystem.Dispose();
+        }
     }
 
     [Test]
@@ -443,20 +529,16 @@ public class GameplayWorldLifecycleTests
     {
     }
 
+    public class WorldMarkerComponent : Entity
+    {
+    }
+
     [Event(ELogicSceneType.Level)]
     public class TestLevelInitializationHandler : AEvent<LogicScene, Event_AfterCreateLevelScene>
     {
         public static bool Fail { get; set; }
         public static bool CreateNested { get; set; }
-        public static bool NestedWasCommittedDuringParentInitialization { get; set; }
-        public static bool FailCommit { get; set; }
-        public static int AppliedEffectCount { get; set; }
         public static Entity? ParentDuringInitialization { get; set; }
-        public static bool AddUpdateEntity { get; set; }
-        public static OrdinaryUpdateEntity? UpdateEntity { get; set; }
-        public static bool PublishAfterCommit { get; set; }
-        public static bool AfterCommitWasPublished { get; set; }
-        public static bool AfterCommitRanDuringInitialization { get; set; }
 
         protected override async ETTask Run(LogicScene scene, Event_AfterCreateLevelScene eventInfo)
         {
@@ -471,45 +553,55 @@ public class GameplayWorldLifecycleTests
                 scene.Parent = ParentDuringInitialization;
             }
 
-            if (AddUpdateEntity)
-            {
-                LogicScene nestedScene = LogicSceneFactoryCore.CreateLogicScene(
-                    scene,
-                    NESTED_CLIENT_SCENE_ID,
-                    NESTED_CLIENT_SCENE_ID,
-                    ELogicSceneType.Client,
-                    nameof(NESTED_CLIENT_SCENE_ID));
-                UpdateEntity = nestedScene.AddChild<OrdinaryUpdateEntity>();
-                scene.Root.EarlyUpdate();
-                scene.Root.Update();
-            }
-
-            if (PublishAfterCommit)
-            {
-                association.AfterCommit(() => AfterCommitWasPublished = true);
-                AfterCommitRanDuringInitialization = AfterCommitWasPublished;
-            }
-
             if (CreateNested && eventInfo.LevelConfigId == ROOT_LEVEL_CONFIG_ID)
             {
-                LogicScene nestedScene = await LevelSceneFactory.Create(
+                await LevelSceneFactory.Create(
                     scene,
                     association.GameplayWorld,
                     NESTED_LEVEL_CONFIG_ID,
                     NESTED_LEVEL_ID,
                     nameof(NESTED_LEVEL_ID));
-                NestedWasCommittedDuringParentInitialization =
-                    nestedScene.GetComponent<LevelGameWorldComponent>().IsCommitted;
             }
 
-            if (FailCommit)
+            await ETTask.CompletedTask;
+        }
+    }
+
+    [Event(ELogicSceneType.Level)]
+    public class TestLevelEnableHandler : AEvent<LogicScene, Event_EnableLevelScene>
+    {
+        public static int EnableCount { get; set; }
+        public static OrdinaryUpdateEntity? UpdateEntity { get; set; }
+        public static bool Fail { get; set; }
+        public static bool AddUpdateEntity { get; set; }
+
+        protected override async ETTask Run(LogicScene scene, Event_EnableLevelScene eventInfo)
+        {
+            EnableCount++;
+            if (AddUpdateEntity)
             {
-                association.DeferUntilCommit(
-                    () => AppliedEffectCount++,
-                    () => AppliedEffectCount--);
-                association.DeferUntilCommit(
-                    () => throw new InvalidOperationException("level commit failed"),
-                    static () => { });
+                UpdateEntity = scene.AddChild<OrdinaryUpdateEntity>();
+            }
+
+            if (Fail)
+            {
+                throw new InvalidOperationException("level enable failed");
+            }
+
+            await ETTask.CompletedTask;
+        }
+    }
+
+    [Event(ELogicSceneType.Level)]
+    public class TestLevelStopEnableHandler : AEvent<LogicScene, Event_StopEnableLevelScene>
+    {
+        public static bool Fail { get; set; }
+
+        protected override async ETTask Run(LogicScene scene, Event_StopEnableLevelScene eventInfo)
+        {
+            if (Fail)
+            {
+                throw new InvalidOperationException("level cleanup failed");
             }
 
             await ETTask.CompletedTask;

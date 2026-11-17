@@ -12,9 +12,8 @@ public class GameplayWorldTimerTests
     private const int ROOT_ID = 101;
     private const int ROOT_ZONE = 1;
     private const long GAMEPLAY_WORLD_ID = 202;
-    private const long GAMEPLAY_WORLD_INSTANCE_ID = 10001;
     private const int LEVEL_SCENE_ID = 303;
-    private const long LEVEL_SCENE_INSTANCE_ID = 10002;
+    private const long GAMEPLAY_WORLD_INSTANCE_ID = 10001;
     private const long IMMEDIATE_DELAY_MILLISECONDS = 0;
     private const long INVALID_DELAY_MILLISECONDS = -1;
     private const long INVALID_TIMER_ID = 0;
@@ -36,6 +35,7 @@ public class GameplayWorldTimerTests
 
     private TypeManager _typeManager;
     private EntitySystemManager _entitySystemManager;
+    private EventSystem _eventSystem;
     private Root _root;
     private GameplayWorld _gameplayWorld;
     private ILogger _previousLogger;
@@ -61,24 +61,28 @@ public class GameplayWorldTimerTests
         _entitySystemManager.Init();
         _entitySystemManager.Register();
         _root = new Root(ROOT_ID, ROOT_ZONE, ELogicSceneType.Main, nameof(GameplayWorldTimerTests));
+        _eventSystem = new EventSystem();
+        _eventSystem.Init();
+        _eventSystem.Register();
 
         _gameplayWorld = GameplayWorldFactory.Create(
             _root.Scene,
             GAMEPLAY_WORLD_ID,
             GAMEPLAY_WORLD_INSTANCE_ID,
             nameof(GameplayWorld));
-        var levelScene = LogicSceneFactoryCore.CreateLogicScene(
-            _root.Scene,
+        var levelScene = LevelSceneFactory.Create(
+            _gameplayWorld,
+            _gameplayWorld,
             LEVEL_SCENE_ID,
-            LEVEL_SCENE_INSTANCE_ID,
-            ELogicSceneType.Client,
-            nameof(LEVEL_SCENE_ID));
-        levelScene.AddComponent<LevelGameWorldComponent>().GameplayWorld = _gameplayWorld;
+            LEVEL_SCENE_ID,
+            nameof(LEVEL_SCENE_ID)).GetAwaiter().GetResult();
+        LevelSceneFactory.Enable(levelScene).GetAwaiter().GetResult();
     }
 
     [TearDown]
     public void TearDown()
     {
+        _eventSystem?.Dispose();
         _gameplayWorld?.Dispose();
         _root?.Dispose();
         _entitySystemManager.Dispose();
@@ -370,6 +374,26 @@ public class GameplayWorldTimerTests
     private static void setServerTime(long serverTime)
     {
         TimeInfo.Instance.ServerMinusClientTime = serverTime - TimeInfo.Instance.FrameTime;
+    }
+
+    /// <summary>Completes LevelScene preparation for timer integration tests.</summary>
+    [Event(ELogicSceneType.Level)]
+    public sealed class TimerLevelInitializationHandler : AEvent<LogicScene, Event_AfterCreateLevelScene>
+    {
+        protected override async ETTask Run(LogicScene levelScene, Event_AfterCreateLevelScene eventInfo)
+        {
+            await ETTask.CompletedTask;
+        }
+    }
+
+    /// <summary>Completes LevelScene enabling for timer integration tests.</summary>
+    [Event(ELogicSceneType.Level)]
+    public sealed class TimerLevelEnableHandler : AEvent<LogicScene, Event_EnableLevelScene>
+    {
+        protected override async ETTask Run(LogicScene levelScene, Event_EnableLevelScene eventInfo)
+        {
+            await ETTask.CompletedTask;
+        }
     }
 
     public class TimerOwnerEntity : Entity
