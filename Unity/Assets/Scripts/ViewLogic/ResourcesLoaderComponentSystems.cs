@@ -6,6 +6,7 @@ using Bliss.ViewModel;
 using ET;
 using UnityEngine.SceneManagement;
 using YooAsset;
+using SceneHandle = YooAsset.SceneHandle;
 
 namespace Bliss.ViewLogic
 {

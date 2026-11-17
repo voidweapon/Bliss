@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
 using Bliss.CharacterMovement;
+using Bliss.ViewLogic;
 using Bliss.ViewModel;
 using ET;
 using UnityEngine.SceneManagement;
