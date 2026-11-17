@@ -54,6 +54,10 @@
 
 ## Agent skills
 
+### Skill 加载排错
+
+读取或加载 skill 失败时，按 `Doc/Bliss.AgentSkillTroubleshooting.md` 排查。
+
 ### Issue tracker
 
 Issues and specs are tracked in this repository's GitHub Issues. See `docs/agents/issue-tracker.md`.
