@@ -97,4 +97,4 @@ AOI 回调失败清理修改前后，在同一机器和 BenchmarkDotNet `ShortRu
 
 四项耗时置信区间均重叠，误差相对测量值较大；分配量完全一致。数据未显示成功注册路径有可确认的性能变化，但不能据此断言耗时等价。该基准不覆盖回调抛错路径或注销操作；错误清理路径只在失败时分配异常收集结构，正常注销不会创建异常列表。BenchmarkDotNet 同样提示迭代耗时低于其建议的 100 ms，结论仅限于上述成功注册负载。
 
-AOI、GameplayWorld 生命周期和 Timer 定向测试共 35 项通过；完整单元测试套件 54 项全部通过。服务端 `Logic` 构建通过。客户端 `ViewLogic` 的 .NET 构建仍未完成：本机被忽略的 Unity `.csproj` 文件有过期/缺失的显式源文件清单；临时补齐后又遇到 `ResourcesLoaderComponentSystems.cs` 中 `SceneHandle` 类型歧义。相关 Unity 项目文件已恢复原状，Unity 编辑器编译与运行时验证仍待完成。实现不承诺提交隔离或外部副作用原子回滚。
+AOI、GameplayWorld 生命周期和 Timer 定向测试共 35 项通过；完整单元测试套件 54 项全部通过。服务端 `Logic` 构建通过。客户端最初的 .NET 构建因本机被忽略的 Unity `.csproj` 源文件清单过期而受阻；后续使用 Unity CLI 批处理 Editor 发现并修复 `SceneHandle` 歧义及缺失命名空间，脚本编译通过。日志仍提示许可访问令牌更新失败，客户端运行时尚未验证。具体流程见 [Unity 客户端工程处理与编译排错](Bliss.UnityClientWorkflow.md)。实现不承诺提交隔离或外部副作用原子回滚。
