@@ -38,7 +38,6 @@ namespace Bliss
             }
 
             bool belongsToWorld = false;
-            LevelGameWorldComponent parentAssociation = null;
             for (Entity current = parent; current != null; current = current.Parent)
             {
                 if (ReferenceEquals(current, gameplayWorld))
@@ -61,7 +60,6 @@ namespace Bliss
                             "LevelScenes cannot be created under an enabling or enabled parent tree.");
                     }
 
-                    parentAssociation ??= owner;
                 }
             }
 
@@ -80,7 +78,7 @@ namespace Bliss
             try
             {
                 levelGameWorldComponent = levelScene.AddComponent<LevelGameWorldComponent>();
-                levelGameWorldComponent.Initialize(gameplayWorld, configId, parentAssociation == null);
+                levelGameWorldComponent.Initialize(gameplayWorld, configId);
                 parent.AddChild(levelScene);
 
                 await EventSystem.Instance.PushRequiredAsync(levelScene, new Event_AfterCreateLevelScene()

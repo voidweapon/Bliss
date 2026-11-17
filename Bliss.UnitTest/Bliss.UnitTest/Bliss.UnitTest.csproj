@@ -79,16 +79,20 @@
             <Link>Scripts\Model\Shard\Demo\Gameplay\GameplayWorldTimer.cs</Link>
         </Compile>
 
+        <Compile Include="..\..\Unity\Assets\Scripts\Model\Shard\Demo\Gameplay\GameplayWorldLogicPriority.cs">
+            <Link>Scripts\Model\Shard\Demo\Gameplay\GameplayWorldLogicPriority.cs</Link>
+        </Compile>
+
+        <Compile Include="..\..\Unity\Assets\Scripts\Model\Shard\Demo\Gameplay\GameplayWorldLogicUpdateException.cs">
+            <Link>Scripts\Model\Shard\Demo\Gameplay\GameplayWorldLogicUpdateException.cs</Link>
+        </Compile>
+
         <Compile Include="..\..\Unity\Assets\Scripts\Model\Shard\Demo\Gameplay\GamePlayEntity.cs">
             <Link>Scripts\Model\Shard\Demo\Gameplay\GamePlayEntity.cs</Link>
         </Compile>
 
         <Compile Include="..\..\Unity\Assets\Scripts\Model\Shard\Demo\Gameplay\GameplayWorldFactory.cs">
             <Link>Scripts\Model\Shard\Demo\Gameplay\GameplayWorldFactory.cs</Link>
-        </Compile>
-
-        <Compile Include="..\..\Unity\Assets\Scripts\Logic\Shard\Demo\Map\LevelGameWorldComponentSystems.cs">
-            <Link>Scripts\Logic\Shard\Demo\Map\LevelGameWorldComponentSystems.cs</Link>
         </Compile>
 
         <Compile Include="..\..\Unity\Library\PackageCache\com.unity.mathematics*\Unity.Mathematics\**\*.cs">

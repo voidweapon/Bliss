@@ -19,6 +19,11 @@ public class GameplayWorldLifecycleTests
     private const int ROOT_LEVEL_CONFIG_ID = 405;
     private const long NESTED_LEVEL_ID = 406;
     private const long NESTED_CLIENT_SCENE_ID = 407;
+    private const long FIRST_FRAME_TIME = 1000;
+    private const long FIRST_LOGIC_TICK_TIME = 1050;
+    private const int TEST_LOGIC_PRIORITY = 100;
+    private const long IMMEDIATE_DELAY = 0;
+    private const long NO_SERVER_TIME_OFFSET = 0;
 
     private TypeManager _typeManager;
     private EntitySystemManager _entitySystemManager;
@@ -111,6 +116,7 @@ public class GameplayWorldLifecycleTests
         _root?.Dispose();
         _entitySystemManager.Dispose();
         _typeManager.Dispose();
+        TimeInfo.Instance.ServerMinusClientTime = NO_SERVER_TIME_OFFSET;
     }
 
     [Test]
@@ -427,6 +433,51 @@ public class GameplayWorldLifecycleTests
         }
     }
 
+    /// <summary>Checks complete Root phase ordering with a real enabled LevelScene.</summary>
+    [Test]
+    public void RootRunsWorldPhasesInFixedSimulationOrderWithEnabledLevelScene()
+    {
+        TimeInfo.Instance.ServerMinusClientTime = FIRST_FRAME_TIME - TimeInfo.Instance.FrameTime;
+        GameplayWorld world = GameplayWorldFactory.Create(
+            _root.Scene,
+            GAMEPLAY_WORLD_ID,
+            GAMEPLAY_WORLD_INSTANCE_ID,
+            nameof(GameplayWorld));
+        var eventSystem = new EventSystem();
+        eventSystem.Init();
+        eventSystem.Register();
+        try
+        {
+            LogicScene levelScene = LevelSceneFactory.Create(
+                world, world, ROOT_LEVEL_CONFIG_ID, LEVEL_SCENE_ID, nameof(LEVEL_SCENE_ID))
+                .GetAwaiter().GetResult();
+            LevelSceneFactory.Enable(levelScene).GetAwaiter().GetResult();
+            var entity = world.AddChild<UpdateGameplayEntity>();
+            _root.Scene.AddChild<FirstGroupUpdateEntity>();
+            world.Timer.ScheduleOnce(IMMEDIATE_DELAY, () => ExecutionLog.Add("timer"));
+            world.LogicUpdate.Register(entity, "logic", TEST_LOGIC_PRIORITY, _ => ExecutionLog.Add("logic"));
+
+            TimeInfo.Instance.ServerMinusClientTime = FIRST_LOGIC_TICK_TIME - TimeInfo.Instance.FrameTime;
+            _root.EarlyUpdate();
+            _root.Update();
+            _root.LateUpdate();
+
+            Assert.That(ExecutionLog, Is.EqualTo(new[]
+            {
+                $"gameplayEarly:{entity.InstanceId}",
+                "timer",
+                "logic",
+                $"gameplayUpdate:{entity.InstanceId}",
+                "rootFirstUpdate",
+                $"gameplayLate:{entity.InstanceId}",
+            }));
+        }
+        finally
+        {
+            eventSystem.Dispose();
+        }
+    }
+
     [Test]
     public void FactoryCreatesGameplayWorldWithRequestedIdentityAndParent()
     {
@@ -444,8 +495,9 @@ public class GameplayWorldLifecycleTests
         Assert.That(gameplayWorld.Name, Is.EqualTo(nameof(GameplayWorld)));
     }
 
+    /// <summary>Checks that ordinary World phases do not depend on LevelScene enablement.</summary>
     [Test]
-    public void RootPhasesForwardToGameplayWorldOnlyAfterLevelSceneEnable()
+    public void RootPhasesForwardToGameplayWorldIndependentlyOfLevelSceneEnable()
     {
         GameplayWorld gameplayWorld = GameplayWorldFactory.Create(
             _root.Scene,
@@ -469,9 +521,17 @@ public class GameplayWorldLifecycleTests
             _root.Update();
             _root.LateUpdate();
 
-            Assert.That(ExecutionLog, Is.Empty);
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    $"gameplayEarly:{entity.InstanceId}",
+                    $"gameplayUpdate:{entity.InstanceId}",
+                    $"gameplayLate:{entity.InstanceId}",
+                },
+                ExecutionLog);
 
             LevelSceneFactory.Enable(levelScene).GetAwaiter().GetResult();
+            ExecutionLog.Clear();
             _root.EarlyUpdate();
             _root.Update();
             _root.LateUpdate();
@@ -526,6 +586,11 @@ public class GameplayWorldLifecycleTests
     }
 
     public class OrdinaryUpdateEntity : Entity, IUpdate
+    {
+    }
+
+    /// <summary>Ordinary Root participant in the first Update group.</summary>
+    public class FirstGroupUpdateEntity : Entity, IUpdate
     {
     }
 
@@ -641,6 +706,20 @@ public class GameplayWorldLifecycleTests
         protected override void Update(OrdinaryUpdateEntity entity)
         {
             ExecutionLog.Add($"rootUpdate:{entity.InstanceId}");
+        }
+    }
+
+    /// <summary>Records an ordinary update in the first Update group.</summary>
+    [EntitySystem]
+    public class FirstGroupUpdateEntitySystem : UpdateSystem<FirstGroupUpdateEntity>
+    {
+        /// <inheritdoc />
+        public override ESystemUpdateGroup GetUpdateGroup() =>
+            (ESystemUpdateGroup)SystemUpdateGroupRange.FIRST_UPDATE;
+
+        protected override void Update(FirstGroupUpdateEntity entity)
+        {
+            ExecutionLog.Add("rootFirstUpdate");
         }
     }
 }

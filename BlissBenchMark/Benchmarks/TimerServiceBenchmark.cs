@@ -8,7 +8,8 @@ namespace BlissBenchMark;
 
 /// <summary>
 /// Compares the real timer services using matching ownerless wait workloads.
-/// This does not include world lifecycle, owner validation, or callback dispatch.
+/// GameplayWorldTimer also contains the world's fixed-step marker timer, so its update includes that extra timer.
+/// This does not include world lifecycle, owner validation, or LogicUpdate dispatch.
 /// </summary>
 [MemoryDiagnoser]
 [GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]

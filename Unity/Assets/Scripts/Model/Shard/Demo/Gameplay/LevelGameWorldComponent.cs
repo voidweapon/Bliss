@@ -4,9 +4,8 @@ namespace Bliss
     /// <summary>
     /// Associates a LevelScene with its owning GameplayWorld and tracks its lifecycle.
     /// </summary>
-    public class LevelGameWorldComponent : Entity, IEarlyUpdate, IUpdate, ILateUpdate
+    public class LevelGameWorldComponent : Entity
     {
-        private bool drivesGameplayWorld;
         private bool isEnabling;
 
         /// <summary>
@@ -39,12 +38,10 @@ namespace Bliss
         /// </summary>
         /// <param name="gameplayWorld">The world that owns the LevelScene.</param>
         /// <param name="levelConfigId">The configuration identifier used to prepare the LevelScene.</param>
-        /// <param name="drivesGameplayWorld">Whether this association forwards update phases to the world.</param>
-        public void Initialize(GameplayWorld gameplayWorld, int levelConfigId, bool drivesGameplayWorld)
+        public void Initialize(GameplayWorld gameplayWorld, int levelConfigId)
         {
             this.GameplayWorld = gameplayWorld;
             this.LevelConfigId = levelConfigId;
-            this.drivesGameplayWorld = drivesGameplayWorld;
         }
 
         /// <summary>
@@ -140,38 +137,6 @@ namespace Bliss
             this.IsEnabled = true;
         }
 
-        /// <summary>
-        /// Advances the owning GameplayWorld during its early update phase after enabling.
-        /// </summary>
-        public void EarlyUpdate()
-        {
-            if (this.IsEnabled && this.drivesGameplayWorld)
-            {
-                this.GameplayWorld.EarlyUpdate();
-            }
-        }
-
-        /// <summary>
-        /// Advances the owning GameplayWorld during its update phase after enabling.
-        /// </summary>
-        public void Update()
-        {
-            if (this.IsEnabled && this.drivesGameplayWorld)
-            {
-                this.GameplayWorld.Update();
-            }
-        }
-
-        /// <summary>
-        /// Advances the owning GameplayWorld during its late update phase after enabling.
-        /// </summary>
-        public void LateUpdate()
-        {
-            if (this.IsEnabled && this.drivesGameplayWorld)
-            {
-                this.GameplayWorld.LateUpdate();
-            }
-        }
     }
 
     /// <summary>
