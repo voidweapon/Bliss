@@ -114,3 +114,4 @@ Unity/Assets/StreamingAssets.meta
 bin/
 /Tools/ProtoGenerator/Generate
 /Bliss.UnitTest/Bliss.UnitTest/TestResults
+*.meta
