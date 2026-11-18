@@ -5,6 +5,7 @@
 - 客户端 Unity 工程位于仓库根目录的 `Unity/`；使用 `Unity/ProjectSettings/ProjectVersion.txt` 中指定的 Editor 版本。
 - 客户端与服务端共用的 Model、Logic 源码分别放在 `Unity/Assets/Scripts/Model/Shard/` 和 `Unity/Assets/Scripts/Logic/Shard/`。服务端对应的 `.csproj` 直接链接这些文件；修改共用逻辑应修改这里的实际源码，并验证两端编译，不要只修改某一端生成的工程文件。
 - 客户端专用视图逻辑位于 `Unity/Assets/Scripts/ViewLogic/`，服务端专用逻辑位于 `Server/` 对应程序集目录。处理源码时遵循程序集边界。
+- 客户端自动化测试环境的已确认建设范围与验收标准见 `Doc/Bliss.UnityTestEnvironmentPlan.md`；该计划标明实施状态，不代表测试环境已建成。
 
 ## 用 Unity CLI 获取编译错误
 
