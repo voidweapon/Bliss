@@ -1,39 +1,33 @@
-using System.Collections.Generic;
+using System;
 using Bliss.Base.Collections;
 using Bliss.Core;
-using Bliss.Core.EventSystem;
-using Bliss.Timer;
 
 namespace Bliss
 {
     [EntitySystemOf(typeof(MoverComponent))]
     public static partial class MoverComponentSystem
     {
+        private static readonly Action<Entity, float> logicUpdateCallback = dispatchLogicUpdate;
+
         private static void Awake(this MoverComponent self)
         {
-            self.UpdateTimer = self.RootTimerComponent().NewRepeatedTimer(GamePlayDefines.LogicUpdateDeltaTimeMS, TimerInvokeType.MoverUpdate, self);
-            self.PrevUpdateTime = TimeInfo.Instance.ClientNow();
+            self.RegisterLogicUpdate(GameplayWorldLogicPriority.MOVEMENT, logicUpdateCallback);
         }
-        private static void Destroy(this MoverComponent self)
+
+        private static void dispatchLogicUpdate(Entity entity, float deltaTime)
         {
-            self.RootTimerComponent().CancelTimer(ref self.UpdateTimer);
+            ((MoverComponent)entity).logicUpdate();
         }
     
-        [Invoke(TimerInvokeType.MoverUpdate)]
-        private class MoverTimer : ATimer<MoverComponent>
+        private static void logicUpdate(this MoverComponent self)
         {
-            protected override void Run(MoverComponent self)
+            LogicScene scene = self.Scene();
+            if (scene.SceneType == ELogicSceneType.Level &&
+                !scene.GetComponent<LevelGameWorldComponent>().IsEnabled)
             {
-                self.LogicUpdate();
+                return;
             }
-        }
-    
-        private static void LogicUpdate(this MoverComponent self)
-        {
-            long now = TimeInfo.Instance.ClientNow();
-            long dtMS = now - self.PrevUpdateTime;
-            self.PrevUpdateTime = now;
-            
+
             using var removeList = ListComponent<Entity>.Create();
             
             foreach (var kv in self.Children)
@@ -44,7 +38,7 @@ namespace Bliss
                     continue;
                 }
                 
-                mover.LogicUpdate(dtMS);
+                mover.LogicUpdate(GameplayWorldLogicUpdate.STEP_MILLISECONDS);
                 
                 if (mover.IsCompleted)
                 {

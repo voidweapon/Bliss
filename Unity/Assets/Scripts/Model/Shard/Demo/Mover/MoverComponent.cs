@@ -1,8 +1,7 @@
 namespace Bliss
 {
-    public class MoverComponent : Entity, IAwake, IDestroy
+    /// <summary>Owns and advances the Mover hierarchy for its cargo entity.</summary>
+    public class MoverComponent : GamePlayEntity, IAwake
     {
-        public long UpdateTimer;
-        public long PrevUpdateTime;
     }
 }

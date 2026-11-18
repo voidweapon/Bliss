@@ -12,6 +12,7 @@
 - 没有任何 `IUpdateGroupSystem` 的 Entity 不加入更新队列。
 - 同一优先级的不同 SystemGroup 之间不保证执行顺序；若系统之间有先后依赖，必须设置不同优先级。
 - 同一 SystemGroup 的 EntityRef 队列按注册顺序遍历；已销毁或无效的 EntityRef 跳过。
+- 业务 Entity 尽量只保留数据，业务逻辑放到对应 System 的扩展方法中；尽量避免闭包和 lambda，调度回调优先使用缓存的静态方法并显式传入实体。`Entity`、`GamePlayEntity`、`LogicScene`、`LevelLogicScene`、`GameplayWorld` 等基础设施类型不受纯数据约束，可以封装共享生命周期与调度逻辑。
 
 ## 阶段模型
 
@@ -73,6 +74,55 @@ UpdateGroup
 - 延迟时只产生一次 tick，并从当前 Timer 处理时刻安排下次，固定 delta 为 0.05 秒；不追补。派发开始时消费 tick，回调失败包装并传播，后续入口不运行，已消费的 tick 不重试。销毁 World 会取消 Timer、完成等待并清除待处理 tick。
 - 通过 `world.LogicUpdate.Register(entity, entryName, priority, callback)` 注册；身份是活跃实体实例和入口名，重复注册报错。参与者必须属于该 World；注销使用 `Unregister(entity, entryName)`。优先级按数值升序，同优先级按注册顺序。共享顺序使用 `GameplayWorldLogicPriority`：发射点检测、角色移动、共享移动模拟、弹道检测、物理模拟；最终物理优先级保留给服务端物理模拟。
 - 派发开始时确定快照；期间新增或注销后重注册的入口从下次 tick 开始，已注销、销毁、复用或脱离 World 的参与者跳过。World 销毁会中止快照内剩余入口。调用方仍应在自身销毁时主动注销。
+- `GamePlayEntity` 可以直接属于 GameplayWorld，也可以属于关联到该 World 的 LevelScene；后者注册前校验 LevelScene 与 World 的层级和 Root 归属，实体的逻辑场景仍为 LevelScene。
+- System 在 Awake 中通过 `self.RegisterLogicUpdate(priority, callback)` 注册一个主入口；`GamePlayEntity` 以实体完整类型名作为入口名，保存注册时的 World，并在 `Entity.Dispose` 清空 InstanceId 前统一注销。业务实体无需覆写 Dispose。重复注册主入口会报错；通过 World 接口直接注册的其他命名入口仍需调用方主动注销。
+- World 同时支持原有 `Action<float>` 和新的 `Action<Entity, float>` 回调，后者显式接收已验证的实体，不使用闭包包装旧接口。两种入口共享顺序、快照和池化规则，回收时同时清空两种回调引用。Mover 与 Kinematic System 各缓存一个静态回调，并转发到各自的扩展方法。
+- `MoverComponent`、`Mover` 和 `MoverStageRuntime` 归属于 GameplayWorld。每个 MoverComponent 以 `MOVEMENT` 优先级注册一个入口，使用固定 50ms 推进其所有 Mover；所属 LevelScene 尚未启用时不推进。组件销毁前主动注销，派发中销毁后的替代组件从下个 tick 开始运行。
+- `KinematicMoverManager` 也注册到 `MOVEMENT`，使用固定 50ms 并与 Mover 按实际注册顺序执行；销毁前主动注销，普通 LateUpdate 插值仍由 World 驱动。管理器属于 LevelScene 时，场景启用前既不模拟也不插值。此处只提前实现 #13 的管理器调度部分，角色筛选、角色组件及输入处理仍由 #13 完成。Bullet 的独立 Timer 和碰撞顺序由 #15 处理，迁移期间 Mover 已先于 Root 常规 Timer 驱动，不能视为完整 Bullet 固定步长方案。
+- 当前客户端的 Kinematic 管理器属于 World，Mover 和角色在创建时直接注册到该管理器；因此已启用的 World 管理器仍可能处理尚未启用的 LevelScene 参与者。此问题不由管理器自身的 LevelScene 启用检查解决，参与者的场景筛选留待 #13。
+
+### Mover 迁移基准
+
+使用 `BlissBenchMark/Benchmarks/MoverSimulationBenchmark.cs` 测量真实 Root 驱动路径。每个 cargo 创建一个 MoverComponent 和使用服务端配置 `TestMover1`（速度 10）的直线 Mover；0、100、1,000 个 cargo 直接放在 GameplayWorld 下，每轮测量一个到期 tick，实体构建和发射不计时。基准验证每个 cargo 确实移动；为使旧版基线有近似 50ms 的真实时间差，计时外将旧入口的上次更新时间设为当前时间减 50ms。旧版实际 delta 使用墙钟，因此只能近似匹配新方案的精确 50ms，不是严格等价的时间语义。
+
+在 macOS 26.6.2、Apple M1 Pro、.NET 8.0.19、BenchmarkDotNet ShortRun 下，迁移前后使用相同负载；每项 3 次测量，误差为 99.9% 置信区间半宽：
+
+| cargo 数量 | 迁移前耗时 | 迁移后耗时 | 迁移前分配 | 迁移后分配 |
+| ---: | ---: | ---: | ---: | ---: |
+| 0 | 3.791 ± 32.956 µs | 3.111 ± 8.549 µs | 496 B | 496 B |
+| 100 | 156.861 ± 24.596 µs | 127.265 ± 28.074 µs | 20,744 B | 16,744 B |
+| 1,000 | 1,612.208 ± 264.756 µs | 1,307.743 ± 904.540 µs | 193,552 B | 160,744 B |
+
+旧路径包括每个组件的 Root Timer 派发和重排，新路径包括 World Timer 与 LogicUpdate 派发；均包含移动和 Transform 事件，不包含场景创建、销毁、碰撞、Kinematic 或完整游戏帧。100 和 1,000 cargo 的测得分配下降约 19% 和 17%，但剩余分配仍随数量增长。所有迭代均短于 BenchmarkDotNet 建议的 100ms，样本仅 3 次且耗时置信区间重叠，不能据此保证耗时改善。LevelScene 启用检查、销毁和派发中替换由真实生命周期集成测试覆盖，而非此基准。
+
+### Kinematic 管理器迁移基准
+
+使用 `BlissBenchMark/Benchmarks/KinematicSimulationBenchmark.cs` 测量真实 Root 和 KinematicMoverManager 调度；一个启用的管理器驱动 0、100 或 1,000 个 KinematicRigidbodyMover，每个使用固定目标的测试控制器和真实 Transform、GameplayRigidbody。实体准备不计时；旧版在计时外将管理器上次帧时间设为当前帧时间减 50ms，确保两版均传入 0.05 秒，基准校验每个平台的实际移动。刚体没有 native 物理对象，因此这个基准不测量物理引擎、角色、插值或真实场景负载。
+
+同上环境和 ShortRun 配置，每项 3 次测量，误差为 99.9% 置信区间半宽：
+
+| 平台数量 | 迁移前耗时 | 迁移后耗时 | 迁移前分配 | 迁移后分配 |
+| ---: | ---: | ---: | ---: | ---: |
+| 0 | 5.889 ± 28.185 µs | 3.166 ± 5.947 µs | 856 B | 568 B |
+| 100 | 118.500 ± 26.142 µs | 119.792 ± 38.093 µs | 856 B | 568 B |
+| 1,000 | 1,193.694 ± 38.627 µs | 1,163.090 ± 120.407 µs | 856 B | 568 B |
+
+测得每 tick 分配均减少 288 B；迭代时间低于 BenchmarkDotNet 建议的 100ms，样本仅 3 次，计时置信区间重叠，不能据此判断耗时改善或退化。同优先级的实际 Mover 与 Kinematic 顺序、固定 delta 和销毁边界由集成测试覆盖。
+
+### 静态回调与共享生命周期复测
+
+上述迁移数据对应首次迁移版本。随后将业务实体中的注册与 Dispose 逻辑收敛到 `GamePlayEntity`，并将捕获实体的回调替换为 System 缓存的静态方法。使用相同的两个真实基准，在同上环境和 ShortRun 配置下分别测量本次重构前后；每项 3 次，误差仍为 99.9% 置信区间半宽：
+
+| 负载 | 数量 | 重构前耗时 | 重构后耗时 | 重构前分配 | 重构后分配 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Mover | 0 | 3.861 ± 18.029 µs | 12.24 ± 129.76 µs | 496 B | 496 B |
+| Mover | 100 | 144.209 ± 323.871 µs | 130.89 ± 99.34 µs | 16,744 B | 16,744 B |
+| Mover | 1,000 | 1,354.007 ± 1,121.636 µs | 1,285.62 ± 280.16 µs | 160,744 B | 160,744 B |
+| Kinematic | 0 | 5.431 ± 50.285 µs | 14.78 ± 170.74 µs | 568 B | 568 B |
+| Kinematic | 100 | 119.333 ± 11.874 µs | 127.62 ± 137.28 µs | 568 B | 568 B |
+| Kinematic | 1,000 | 1,200.778 ± 751.181 µs | 1,226.13 ± 857.86 µs | 568 B | 568 B |
+
+测得每 tick 分配不变；迭代低于建议的 100ms，置信区间重叠，不能判断耗时改善或退化。本次目的是集中生命周期管理并避免每个实体注册时捕获闭包，不是减少既有移动计算的 tick 分配。实体创建和注册不在计时范围内，因此没有量化注册分配收益。源码层面的空间取舍是：每个 GamePlayEntity 增加一个注册 World 引用，每个池化入口增加一个显式实体回调引用，而两个 System 各复用一个静态委托；不能把移除闭包直接等同于总内存下降。
 
 ### LogicUpdate 基准
 

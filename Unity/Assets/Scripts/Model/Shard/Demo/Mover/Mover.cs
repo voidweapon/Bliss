@@ -2,7 +2,8 @@ using Unity.Mathematics;
 
 namespace Bliss
 {
-    public class Mover : Entity, IAwake<int>
+    /// <summary>Tracks a cargo entity's configured movement stages.</summary>
+    public class Mover : GamePlayEntity, IAwake<int>
     {
         public int MoverConfigId;
         public MoverConfig MoverConfig;

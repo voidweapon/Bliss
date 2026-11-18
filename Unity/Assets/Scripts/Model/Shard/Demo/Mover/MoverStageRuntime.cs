@@ -1,6 +1,7 @@
 namespace Bliss
 {
-    public class MoverStageRuntime : Entity, IAwake<MoverStageCfg>, IDestroy
+    /// <summary>Stores the runtime state of a single Mover stage.</summary>
+    public class MoverStageRuntime : GamePlayEntity, IAwake<MoverStageCfg>, IDestroy
     {
         public MoverStageCfg StageCfg;
         

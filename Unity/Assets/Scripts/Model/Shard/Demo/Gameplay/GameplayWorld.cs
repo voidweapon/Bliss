@@ -180,6 +180,29 @@ namespace Bliss
         /// <exception cref="ObjectDisposedException">The world scheduler has been disposed.</exception>
         public void Register(Entity entity, string entryName, int priority, Action<float> callback)
         {
+            this.register(entity, entryName, priority, callback, null);
+        }
+
+        /// <summary>
+        /// Registers a callback receiving its live owner explicitly, allowing shared static callbacks without closures.
+        /// Registrations made during dispatch start on the next tick.
+        /// </summary>
+        /// <param name="entity">The owning entity, which must be in this World's subtree.</param>
+        /// <param name="entryName">A nonempty name unique to this participant.</param>
+        /// <param name="priority">Execution priority; use <see cref="GameplayWorldLogicPriority"/> for shared ordering.</param>
+        /// <param name="callback">Receives the live owner and fixed delta in seconds.</param>
+        /// <exception cref="ArgumentNullException">The entity or callback is null.</exception>
+        /// <exception cref="ArgumentException">The entry name is empty or whitespace.</exception>
+        /// <exception cref="InvalidOperationException">The owner is invalid or the entity and name are already registered.</exception>
+        /// <exception cref="ObjectDisposedException">The World scheduler has been disposed.</exception>
+        public void Register(Entity entity, string entryName, int priority, Action<Entity, float> callback)
+        {
+            this.register(entity, entryName, priority, null, callback);
+        }
+
+        private void register(Entity entity, string entryName, int priority,
+            Action<float> callback, Action<Entity, float> entityCallback)
+        {
             if (this.isDisposed)
             {
                 throw new ObjectDisposedException(nameof(GameplayWorldLogicUpdate));
@@ -195,7 +218,7 @@ namespace Bliss
                 throw new ArgumentException("An entry name is required.", nameof(entryName));
             }
 
-            if (callback == null)
+            if (callback == null && entityCallback == null)
             {
                 throw new ArgumentNullException(nameof(callback));
             }
@@ -220,7 +243,7 @@ namespace Bliss
             LogicUpdateEntry entry = this.availableEntries.Count > 0
                 ? this.availableEntries.Pop()
                 : new LogicUpdateEntry();
-            entry.initialize(entity, key, priority, callback);
+            entry.initialize(entity, key, priority, callback, entityCallback);
             this.entriesByKey.Add(key, entry);
             bucket.Entries.AddLast(entry.Node);
         }
@@ -287,7 +310,14 @@ namespace Bliss
 
                         try
                         {
-                            entry.Callback(STEP_SECONDS);
+                            if (entry.EntityCallback != null)
+                            {
+                                entry.EntityCallback((Entity)entry.Entity, STEP_SECONDS);
+                            }
+                            else
+                            {
+                                entry.Callback(STEP_SECONDS);
+                            }
                         }
                         catch (Exception exception)
                         {
@@ -426,12 +456,14 @@ namespace Bliss
                 this.Node = new LinkedListNode<LogicUpdateEntry>(this);
             }
 
-            internal void initialize(Entity entity, LogicUpdateKey key, int priority, Action<float> callback)
+            internal void initialize(Entity entity, LogicUpdateKey key, int priority,
+                Action<float> callback, Action<Entity, float> entityCallback)
             {
                 this.Entity = entity;
                 this.Key = key;
                 this.Priority = priority;
                 this.Callback = callback;
+                this.EntityCallback = entityCallback;
                 this.Active = true;
             }
 
@@ -441,6 +473,7 @@ namespace Bliss
                 this.Key = default;
                 this.Priority = default;
                 this.Callback = null;
+                this.EntityCallback = null;
                 this.Active = false;
             }
 
@@ -448,6 +481,7 @@ namespace Bliss
             internal LogicUpdateKey Key { get; private set; }
             internal int Priority { get; private set; }
             internal Action<float> Callback { get; private set; }
+            internal Action<Entity, float> EntityCallback { get; private set; }
             internal LinkedListNode<LogicUpdateEntry> Node { get; }
             internal bool Active { get; set; }
         }

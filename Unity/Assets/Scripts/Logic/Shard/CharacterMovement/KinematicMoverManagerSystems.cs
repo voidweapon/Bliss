@@ -1,8 +1,6 @@
-using System.Collections.Generic;
+using System;
 using Bliss.Base.Collections;
 using Bliss.Core;
-using Bliss.Core.EventSystem;
-using Bliss.Timer;
 using Unity.Mathematics;
 
 namespace Bliss.CharacterMovement
@@ -10,28 +8,37 @@ namespace Bliss.CharacterMovement
     [EntitySystemOf(typeof(KinematicMoverManager))]
     public static partial class KinematicMoverManagerSystems
     {
+        private static readonly Action<Entity, float> logicUpdateCallback = dispatchLogicUpdate;
+
         private static void Awake(this KinematicMoverManager self, KinematicMoverManagerSettings settings)
         {
             self.Enable = false;
             self.Settings = settings;
             self.CharacterMotors.Clear();
             self.PhysicsMovers.Clear();
-            self.PreviousTimeStamp = TimeInfo.Instance.ClientFrameTime();
-            self.LogicUpdateTimer = self.RootTimerComponent().NewRepeatedTimer(GamePlayDefines.LogicUpdateDeltaTimeMS, TimerInvokeType.KinematicMoverManagerUpdate, self);
+            self.RegisterLogicUpdate(GameplayWorldLogicPriority.MOVEMENT, logicUpdateCallback);
+        }
+
+        private static void dispatchLogicUpdate(Entity entity, float deltaTime)
+        {
+            ((KinematicMoverManager)entity).logicUpdate(deltaTime);
         }
 
         private static void Destroy(this KinematicMoverManager self)
         {
             self.CharacterMotors.Clear();
             self.PhysicsMovers.Clear();
-            self.RootTimerComponent().CancelTimer(ref self.LogicUpdateTimer);
         }
 
-        private static void LogicUpdate(this KinematicMoverManager self, long deltaTimeMS)
+        private static void logicUpdate(this KinematicMoverManager self, float deltaTime)
         {
+            if (!self.isLevelEnabled())
+            {
+                return;
+            }
+
             if (self.Settings.AutoSimulation && self.Enable)
             {
-                float deltaTime = deltaTimeMS / 1000.0f;
                 if (self.Settings.Interpolate)
                 {
                     self.PreSimulationInterpolationUpdate(deltaTime);
@@ -48,24 +55,17 @@ namespace Bliss.CharacterMovement
         
         private static void LateUpdate(this KinematicMoverManager self)
         {
-            if (self.Settings.Interpolate)
+            if (self.isLevelEnabled() && self.Settings.Interpolate)
             {
                 self.CustomInterpolationUpdate();
             }
         }
 
-
-        [Invoke(TimerInvokeType.KinematicMoverManagerUpdate)]
-        private class LogicUpdateTimerHandler : ATimer<KinematicMoverManager>
+        private static bool isLevelEnabled(this KinematicMoverManager self)
         {
-            protected override void Run(KinematicMoverManager self)
-            {
-                var timeStamp = TimeInfo.Instance.ClientFrameTime();
-                long deltaTime = timeStamp - self.PreviousTimeStamp;
-                self.PreviousTimeStamp = timeStamp;
-                
-                self.LogicUpdate(deltaTime);
-            }
+            LogicScene scene = self.Scene();
+            return scene.SceneType != ELogicSceneType.Level ||
+                scene.GetComponent<LevelGameWorldComponent>().IsEnabled;
         }
 
         /// <summary>
