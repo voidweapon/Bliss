@@ -4,8 +4,6 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Bliss.Core;
-using Bliss.Core.EventSystem;
-using Bliss.Timer;
 using Unity.Mathematics;
 using MagicPhysX;
 using MemoryPack;
@@ -16,7 +14,8 @@ namespace Bliss.Physics;
 [EntitySystemOf(typeof(PhysicalScene))]
 public static unsafe partial class PhysicalSceneSystems
 {
-    private const int PHYSICAL_UPDATE_TIMER_INTERVAL_MILLISECONDS = 50;
+    private const uint NO_PHYSX_ERROR = 0;
+    private static readonly Action<Entity, float> simulationCallback = simulate;
 
     private static void Awake(this PhysicalScene self, PhysicalWorldComponent pxWorld)
     {
@@ -36,9 +35,11 @@ public static unsafe partial class PhysicalSceneSystems
     }
 
     /// <summary>
-    /// Starts the recurring physical update timer owned by this scene.
+    /// Registers physical simulation at the owning World's final fixed-step priority.
     /// </summary>
     /// <param name="self">The physical scene to start.</param>
+    /// <exception cref="InvalidOperationException">The scene is absent, disposed, has another primary entry, or its World is faulted.</exception>
+    /// <exception cref="ObjectDisposedException">The owning World scheduler has been disposed.</exception>
     public static void StartUpdates(this PhysicalScene self)
     {
         if (self == null || self.IsDisposed)
@@ -46,31 +47,26 @@ public static unsafe partial class PhysicalSceneSystems
             throw new InvalidOperationException("A live physical scene is required to start updates.");
         }
 
-        if (self.UpdateTimerScheduled)
+        if (self.HasLogicUpdate(simulationCallback))
         {
             return;
         }
 
-        self.UpdateTimer = self.RootTimerComponent().NewRepeatedTimer(
-            PHYSICAL_UPDATE_TIMER_INTERVAL_MILLISECONDS,
-            TimerInvokeType.PhysicalUpdate,
-            self);
-        self.UpdateTimerScheduled = true;
+        self.RegisterLogicUpdate(GameplayWorldLogicPriority.PHYSICS, simulationCallback);
     }
 
     /// <summary>
-    /// Stops the recurring physical update timer owned by this scene.
+    /// Stops the physical simulation entry if it is registered.
     /// </summary>
     /// <param name="self">The physical scene to stop.</param>
     public static void StopUpdates(this PhysicalScene self)
     {
-        if (self == null || !self.UpdateTimerScheduled)
+        if (self == null || !self.HasLogicUpdate(simulationCallback))
         {
             return;
         }
 
-        self.RootTimerComponent()?.CancelTimer(ref self.UpdateTimer);
-        self.UpdateTimerScheduled = false;
+        self.UnregisterLogicUpdate();
     }
 
     private static void Destroy(this PhysicalScene self)
@@ -242,31 +238,42 @@ public static unsafe partial class PhysicalSceneSystems
     #endregion
 
     #region Simulation Step
-    [Invoke(TimerInvokeType.PhysicalUpdate)]
-    private class PhysicalWorldTimer : ATimer<PhysicalScene>
+    private static void simulate(Entity entity, float deltaTime)
     {
-        protected override void Run(PhysicalScene self)
+        PhysicalScene self = (PhysicalScene)entity;
+        LogicScene scene = self.Scene();
+        if (scene.SceneType == ELogicSceneType.Level &&
+            !scene.GetComponent<LevelGameWorldComponent>().IsEnabled)
         {
-            self.StepSimulation();
+            return;
+        }
+
+        GameplayWorld world = self.GetLevelGameplayWorld()
+            ?? throw new InvalidOperationException("The physical scene has no owning GameplayWorld.");
+        try
+        {
+            self.stepSimulation(deltaTime);
+        }
+        catch (Exception failure)
+        {
+            world.StopWithFailure(failure);
+            throw;
         }
     }
 
-    private static void StepSimulation(this PhysicalScene self)
+    private static void stepSimulation(this PhysicalScene self, float deltaTime)
     {
-        if (self == null || self.IsDisposed)
+        if (self.PxScene == null)
         {
-            return;
+            throw new InvalidOperationException("The physical scene has no native PhysX scene.");
         }
 
-        if(self.PxScene == null) return;
-
-        self.PxScene->SimulateMut(1.0f / 20.0f, null, null, 0, true);
+        self.PxScene->SimulateMut(deltaTime, null, null, 0, true);
             
-        uint error = 0;
-        if (!PxScene_fetchResults_mut(self.PxScene, true, &error))
+        uint error = NO_PHYSX_ERROR;
+        if (!PxScene_fetchResults_mut(self.PxScene, true, &error) || error != NO_PHYSX_ERROR)
         {
-            Log.Error($"PhysX Fetch Result Failed: {error}");
-            return;
+            throw new InvalidOperationException($"PhysX fetch results failed with error code {error}.");
         }
         
     }

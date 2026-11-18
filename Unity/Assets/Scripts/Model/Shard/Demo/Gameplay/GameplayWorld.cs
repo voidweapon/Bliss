@@ -6,7 +6,8 @@ namespace Bliss
     /// <summary>Owns gameplay updates, timers and fixed-step simulation within a Root.</summary>
     public class GameplayWorld : LogicScene
     {
-        public GameplayWorldUpdater Updater { get; } = new GameplayWorldUpdater();
+        /// <summary>Gets the updater associated with this World and its fault state.</summary>
+        public GameplayWorldUpdater Updater { get; }
 
         /// <summary>
         /// Gets the timer service owned by this world.
@@ -16,9 +17,16 @@ namespace Bliss
         /// <summary>Gets the fixed-step simulation scheduler owned by this world.</summary>
         public GameplayWorldLogicUpdate LogicUpdate { get; }
 
+        /// <summary>Gets the failure that stopped this World's updates, or null if no failure was recorded.</summary>
+        public Exception Failure { get; private set; }
+
+        /// <summary>Gets whether this World has been stopped after a failure.</summary>
+        public bool IsFaulted => this.Failure != null;
+
         internal GameplayWorld(Root root, long id, long instanceId, string name)
             : base(root, id, instanceId, ELogicSceneType.GameplayWorld, name)
         {
+            this.Updater = new GameplayWorldUpdater(this);
             this.Timer = new GameplayWorldTimer(this);
             this.LogicUpdate = new GameplayWorldLogicUpdate(this, this.Timer);
         }
@@ -32,20 +40,39 @@ namespace Bliss
         {
         }
 
+        /// <summary>Runs the World's early updates unless the World is faulted.</summary>
         public void EarlyUpdate()
         {
             Updater.EarlyUpdate();
         }
 
-        /// <summary>Runs ordinary gameplay updates; fixed ticks are driven independently by Root.</summary>
+        /// <summary>Runs ordinary updates unless faulted; fixed ticks are driven independently by Root.</summary>
         public void Update()
         {
             Updater.Update();
         }
 
+        /// <summary>Runs the World's late updates unless the World is faulted.</summary>
         public void LateUpdate()
         {
             Updater.LateUpdate();
+        }
+
+        /// <summary>
+        /// Stops World-owned updates and retains the first failure for diagnosis. If called during
+        /// an update, the caller must propagate the failure to abort the current dispatch.
+        /// Root timers and external messages are not stopped by this method.
+        /// </summary>
+        /// <param name="failure">The cause of the failure; it is not automatically retried.</param>
+        /// <exception cref="ArgumentNullException">The failure is null.</exception>
+        public void StopWithFailure(Exception failure)
+        {
+            if (failure == null)
+            {
+                throw new ArgumentNullException(nameof(failure));
+            }
+
+            this.Failure ??= failure;
         }
 
         /// <summary>Disposes the world and clears its timers and pending simulation ticks.</summary>
@@ -176,7 +203,7 @@ namespace Bliss
         /// <param name="callback">The callback receiving the fixed delta in seconds.</param>
         /// <exception cref="ArgumentNullException">The entity or callback is null.</exception>
         /// <exception cref="ArgumentException">The entry name is empty or whitespace.</exception>
-        /// <exception cref="InvalidOperationException">The owner is invalid or the entity and name are already registered.</exception>
+        /// <exception cref="InvalidOperationException">The World is faulted, the owner is invalid, or the entry already exists.</exception>
         /// <exception cref="ObjectDisposedException">The world scheduler has been disposed.</exception>
         public void Register(Entity entity, string entryName, int priority, Action<float> callback)
         {
@@ -193,7 +220,7 @@ namespace Bliss
         /// <param name="callback">Receives the live owner and fixed delta in seconds.</param>
         /// <exception cref="ArgumentNullException">The entity or callback is null.</exception>
         /// <exception cref="ArgumentException">The entry name is empty or whitespace.</exception>
-        /// <exception cref="InvalidOperationException">The owner is invalid or the entity and name are already registered.</exception>
+        /// <exception cref="InvalidOperationException">The World is faulted, the owner is invalid, or the entry already exists.</exception>
         /// <exception cref="ObjectDisposedException">The World scheduler has been disposed.</exception>
         public void Register(Entity entity, string entryName, int priority, Action<Entity, float> callback)
         {
@@ -206,6 +233,11 @@ namespace Bliss
             if (this.isDisposed)
             {
                 throw new ObjectDisposedException(nameof(GameplayWorldLogicUpdate));
+            }
+
+            if (this.world.IsFaulted)
+            {
+                throw new InvalidOperationException("The GameplayWorld has stopped after a failure.", this.world.Failure);
             }
 
             if (entity == null)
@@ -276,9 +308,16 @@ namespace Bliss
             return false;
         }
 
+        internal bool hasRegistration(Entity entity, string entryName, Action<Entity, float> callback)
+        {
+            var key = new LogicUpdateKey(entity, entryName);
+            return this.entriesByKey.TryGetValue(key, out LogicUpdateEntry entry) &&
+                entry.EntityCallback == callback;
+        }
+
         internal void update()
         {
-            if (this.isDisposed || !this.hasPendingTick)
+            if (this.isDisposed || this.world.IsFaulted || !this.hasPendingTick)
             {
                 return;
             }

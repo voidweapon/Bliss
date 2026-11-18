@@ -2,7 +2,8 @@ using Unity.Mathematics;
 
 namespace Bliss.Physics
 {
-    public class PhysicalScene :  Entity, IAwake, IDestroy
+    /// <summary>Provides client physics queries for its owning LevelScene and GameplayWorld.</summary>
+    public class PhysicalScene : GamePlayEntity, IAwake, IDestroy
     {
         
     }

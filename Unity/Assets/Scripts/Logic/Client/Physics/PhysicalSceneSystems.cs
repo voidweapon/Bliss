@@ -1,4 +1,5 @@
 using Bliss.Core;
+using ET;
 using Unity.Mathematics;
 
 namespace Bliss.Physics
@@ -30,5 +31,16 @@ namespace Bliss.Physics
             return count;
         }
 
+    }
+
+    /// <summary>Creates the client query adapter during LevelScene preparation.</summary>
+    [Event(ELogicSceneType.Level)]
+    public sealed class EventHandler_PreparePhysicalScene_Client : AEvent<LogicScene, Event_AfterCreateLevelScene>
+    {
+        protected override async ETTask Run(LogicScene levelScene, Event_AfterCreateLevelScene data)
+        {
+            levelScene.AddComponent<PhysicalScene>();
+            await ETTask.CompletedTask;
+        }
     }
 }

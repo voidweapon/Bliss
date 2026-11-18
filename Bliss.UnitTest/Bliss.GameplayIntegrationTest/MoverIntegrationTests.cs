@@ -2,10 +2,14 @@ using System.Reflection;
 using Bliss;
 using Bliss.CharacterMovement;
 using Bliss.Core;
+using Bliss.Core.EventSystem;
+using Bliss.Physics;
 using Bliss.Timer;
 using ET;
+using MagicPhysX;
 using NUnit.Framework;
 using Unity.Mathematics;
+using static MagicPhysX.NativeMethods;
 
 namespace Bliss.GameplayIntegrationTest;
 
@@ -39,6 +43,18 @@ public class MoverIntegrationTests
     private const int SINGLE_REGISTRATION = 1;
     private const int TWO_REGISTRATIONS = 2;
     private const long ELAPSED_INTERPOLATION_MILLISECONDS = 1000;
+    private const float PHYSICS_INITIAL_HEIGHT = 10f;
+    private const float PHYSICS_IDENTITY_W = 1f;
+    private const float PHYSICS_FIRST_TICK_VELOCITY = -0.49f;
+    private const float PHYSICS_SECOND_TICK_VELOCITY = -0.98f;
+    private const long NEXT_DELAYED_TICK_TIME = 1550;
+    private const int FIRST_MANAGED_ROOT_ID = 501;
+    private const int SECOND_MANAGED_ROOT_ID = 502;
+    private const int CHILD_ROOT_ID = 503;
+    private const long HEALTHY_WORLD_ID = 504;
+    private const long HEALTHY_WORLD_INSTANCE_ID = 10002;
+    private const int SUPPRESS_INFO_LOG_LEVEL = 4;
+    private const long FAULTED_WORLD_TIMER_INTERVAL = 200;
     private static readonly float3 moveDirection = new float3(UNIT_AXIS, ZERO_AXIS, ZERO_AXIS);
     private static readonly Action<Entity, float> recordLogicCallback = recordLogicUpdate;
     private static readonly ConstructorInfo rootConstructor =
@@ -322,6 +338,329 @@ public class MoverIntegrationTests
         update(this.root);
         Assert.That(component.IsDisposed, Is.True);
         Assert.That(transform.Transform.Location.x, Is.Zero.Within(POSITION_TOLERANCE));
+    }
+
+    /// <summary>Physics runs at its World priority before later same-priority participants.</summary>
+    [Test]
+    public unsafe void PhysicalSimulationRunsAtWorldFinalPriority()
+    {
+        LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+        PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+        PhysicalScene physicalScene = this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+        PxVec3 position = new PxVec3 { y = PHYSICS_INITIAL_HEIGHT };
+        PxQuat rotation = new PxQuat { w = PHYSICS_IDENTITY_W };
+        PxTransform transform = PxTransform_new_5(&position, &rotation);
+        PxRigidDynamic* actor = PxPhysics_createRigidDynamic_mut(physicalWorld.Physics, &transform);
+        Assert.That((nint)actor, Is.Not.EqualTo(IntPtr.Zero));
+        try
+        {
+            PxScene_addActor_mut(physicalScene.PxScene, (PxActor*)actor, null);
+            physicalScene.StartUpdates();
+            physicalScene.StartUpdates();
+            TestCargo observerOwner = this.level.AddChild<TestCargo>();
+            PhysicalObserver gameplayObserver = new PhysicalObserver((nint)actor);
+            PhysicalObserver observer = new PhysicalObserver((nint)actor);
+            this.world.LogicUpdate.Register(observerOwner, nameof(gameplayObserver),
+                GameplayWorldLogicPriority.MOVEMENT, gameplayObserver.Observe);
+            this.world.LogicUpdate.Register(observerOwner, nameof(PhysicalSimulationRunsAtWorldFinalPriority),
+                GameplayWorldLogicPriority.PHYSICS, observer.Observe);
+
+            earlyUpdate(this.root);
+            setServerTime(FIRST_TICK_TIME);
+            update(this.root);
+            Assert.That(gameplayObserver.UpdateCount, Is.EqualTo(FIRST_SIMULATION_COUNT));
+            Assert.That(gameplayObserver.Height, Is.EqualTo(PHYSICS_INITIAL_HEIGHT));
+            Assert.That(observer.UpdateCount, Is.EqualTo(FIRST_SIMULATION_COUNT));
+            Assert.That(observer.Height, Is.LessThan(PHYSICS_INITIAL_HEIGHT));
+            Assert.That(PxRigidBody_getLinearVelocity((PxRigidBody*)actor).y,
+                Is.EqualTo(PHYSICS_FIRST_TICK_VELOCITY).Within(POSITION_TOLERANCE));
+        }
+        finally
+        {
+            PxRigidActor_release_mut((PxRigidActor*)actor);
+        }
+    }
+
+    /// <summary>A missing native scene fails the World tick explicitly instead of being silently skipped.</summary>
+    [Test]
+    public unsafe void MissingNativePhysicalSceneFailsWorldTick()
+    {
+        LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+        PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+        PhysicalScene physicalScene = this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+        this.root.Scene.RemoveComponent<TimerComponent>();
+        physicalScene.StartUpdates();
+        PxScene* nativeScene = physicalScene.PxScene;
+        try
+        {
+            physicalScene.PxScene = null;
+            earlyUpdate(this.root);
+            setServerTime(FIRST_TICK_TIME);
+            Exception exception = Assert.Catch(() => update(this.root))!;
+            Assert.That(exception.ToString(), Does.Contain("The physical scene has no native PhysX scene."));
+        }
+        finally
+        {
+            physicalScene.PxScene = nativeScene;
+        }
+    }
+
+    /// <summary>A physical failure stops its World without losing the Root or other Worlds.</summary>
+    [Test]
+    public unsafe void PhysicalFailureStopsOnlyItsWorld()
+    {
+        int previousLogLevel = Log.LogLevel;
+        Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+        RootManager rootManager = new RootManager();
+        rootManager.Init();
+        registerSingleton.Invoke(rootManager, null);
+        PhysicalScene? physicalScene = null;
+        PxScene* nativeScene = null;
+        try
+        {
+            rootManager.Create(FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.None, nameof(FIRST_MANAGED_ROOT_ID))
+                .GetAwaiter().GetResult();
+            Root firstRoot = TestRootInit.LastCreatedRoot!;
+            Root child = firstRoot.CreateChild(CHILD_ROOT_ID, ELogicSceneType.None, nameof(CHILD_ROOT_ID));
+            rootManager.Create(SECOND_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.None, nameof(SECOND_MANAGED_ROOT_ID))
+                .GetAwaiter().GetResult();
+            Root secondRoot = TestRootInit.LastCreatedRoot!;
+
+            GameplayWorld failedWorld = GameplayWorldFactory.Create(child.Scene, WORLD_ID, WORLD_INSTANCE_ID, "failed");
+            GameplayWorld healthyWorld = GameplayWorldFactory.Create(
+                child.Scene, HEALTHY_WORLD_ID, HEALTHY_WORLD_INSTANCE_ID, "healthy");
+            GameplayWorld otherRootWorld = GameplayWorldFactory.Create(
+                secondRoot.Scene, WORLD_ID, WORLD_INSTANCE_ID, "other");
+            LogicScene level = LevelSceneFactory.Create(
+                failedWorld, failedWorld, LEVEL_ID, LEVEL_ID, nameof(LEVEL_ID)).GetAwaiter().GetResult();
+            LevelSceneFactory.Enable(level).GetAwaiter().GetResult();
+            PhysicalWorldComponent physicalWorld = child.Scene.AddComponent<PhysicalWorldComponent>();
+            physicalScene = level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+            physicalScene.StartUpdates();
+            TestLogicEntity failedParticipant = failedWorld.AddChild<TestLogicEntity>();
+            TestLogicEntity healthyParticipant = healthyWorld.AddChild<TestLogicEntity>();
+            TestLogicEntity otherRootParticipant = otherRootWorld.AddChild<TestLogicEntity>();
+            TestWorldUpdateProbe failedProbe = failedWorld.AddChild<TestWorldUpdateProbe>();
+            TestWorldUpdateProbe healthyProbe = healthyWorld.AddChild<TestWorldUpdateProbe>();
+            TestTimerCounter timerCounter = new TestTimerCounter();
+            failedWorld.Timer.ScheduleRepeated(FAULTED_WORLD_TIMER_INTERVAL, timerCounter.Increment);
+            failedParticipant.RegisterLogicUpdate(GameplayWorldLogicPriority.MOVEMENT, recordLogicCallback);
+            healthyParticipant.RegisterLogicUpdate(GameplayWorldLogicPriority.MOVEMENT, recordLogicCallback);
+            otherRootParticipant.RegisterLogicUpdate(GameplayWorldLogicPriority.MOVEMENT, recordLogicCallback);
+
+            nativeScene = physicalScene.PxScene;
+            physicalScene.PxScene = null;
+            World.Instance.EarlyUpdate();
+            World.Instance.EarlyUpdate();
+            World.Instance.EarlyUpdate();
+            setServerTime(FIRST_TICK_TIME);
+            Exception exception = Assert.Catch(World.Instance.Update)!;
+            Assert.That(exception.ToString(), Does.Contain("The physical scene has no native PhysX scene."));
+            Assert.That(failedWorld.IsFaulted, Is.True);
+            Assert.That(failedWorld.Failure!.Message, Is.EqualTo("The physical scene has no native PhysX scene."));
+            Assert.That(failedWorld.IsDisposed, Is.False);
+            Assert.That(failedParticipant.UpdateCount, Is.EqualTo(FIRST_SIMULATION_COUNT));
+            int failedEarlyCount = failedProbe.EarlyCount;
+            TestTimerRegistration registration = new TestTimerRegistration(failedWorld, timerCounter);
+            Assert.Throws<InvalidOperationException>(registration.Schedule);
+
+            World.Instance.EarlyUpdate();
+            setServerTime(DELAYED_TICK_TIME);
+            Assert.DoesNotThrow(World.Instance.Update);
+            World.Instance.LateUpdate();
+            Assert.That(failedParticipant.UpdateCount, Is.EqualTo(FIRST_SIMULATION_COUNT));
+            Assert.That(timerCounter.Count, Is.Zero);
+            Assert.That(failedProbe.EarlyCount, Is.EqualTo(failedEarlyCount));
+            Assert.That(failedProbe.UpdateCount, Is.Zero);
+            Assert.That(failedProbe.LateCount, Is.Zero);
+            Assert.That(healthyProbe.UpdateCount, Is.GreaterThan(NO_REGISTRATIONS));
+            Assert.That(healthyProbe.LateCount, Is.GreaterThan(NO_REGISTRATIONS));
+            failedWorld.Updater.EarlyUpdate();
+            failedWorld.Updater.Update();
+            failedWorld.Updater.LateUpdate();
+            Assert.That(failedProbe.EarlyCount, Is.EqualTo(failedEarlyCount));
+            Assert.That(failedProbe.UpdateCount, Is.Zero);
+            Assert.That(failedProbe.LateCount, Is.Zero);
+            Assert.That(healthyParticipant.UpdateCount, Is.GreaterThan(NO_REGISTRATIONS));
+            Assert.That(otherRootParticipant.UpdateCount, Is.GreaterThan(NO_REGISTRATIONS));
+
+            physicalScene.PxScene = nativeScene;
+            World.Instance.EarlyUpdate();
+            setServerTime(NEXT_DELAYED_TICK_TIME);
+            Assert.DoesNotThrow(World.Instance.Update);
+            Assert.That(failedParticipant.UpdateCount, Is.EqualTo(FIRST_SIMULATION_COUNT));
+            Assert.That(timerCounter.Count, Is.Zero);
+            Assert.That(failedWorld.IsFaulted, Is.True);
+        }
+        finally
+        {
+            if (physicalScene != null)
+            {
+                physicalScene.PxScene = nativeScene;
+            }
+
+            rootManager.Dispose();
+            Log.LogLevel = previousLogLevel;
+        }
+    }
+
+    /// <summary>A stopped physical scene does not advance until it is restarted.</summary>
+    [Test]
+    public unsafe void StoppedPhysicalSceneCanRestart()
+    {
+        LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+        PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+        PhysicalScene physicalScene = this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+        PxVec3 position = new PxVec3 { y = PHYSICS_INITIAL_HEIGHT };
+        PxQuat rotation = new PxQuat { w = PHYSICS_IDENTITY_W };
+        PxTransform transform = PxTransform_new_5(&position, &rotation);
+        PxRigidDynamic* actor = PxPhysics_createRigidDynamic_mut(physicalWorld.Physics, &transform);
+        Assert.That((nint)actor, Is.Not.EqualTo(IntPtr.Zero));
+        try
+        {
+            PxScene_addActor_mut(physicalScene.PxScene, (PxActor*)actor, null);
+            physicalScene.StartUpdates();
+            physicalScene.StopUpdates();
+            earlyUpdate(this.root);
+            setServerTime(FIRST_TICK_TIME);
+            update(this.root);
+            Assert.That(PxRigidActor_getGlobalPose((PxRigidActor*)actor).p.y, Is.EqualTo(PHYSICS_INITIAL_HEIGHT));
+
+            physicalScene.StartUpdates();
+            setServerTime(DELAYED_TICK_TIME);
+            update(this.root);
+            Assert.That(PxRigidActor_getGlobalPose((PxRigidActor*)actor).p.y, Is.LessThan(PHYSICS_INITIAL_HEIGHT));
+        }
+        finally
+        {
+            PxRigidActor_release_mut((PxRigidActor*)actor);
+        }
+    }
+
+    /// <summary>Removing the primary entry directly does not prevent physical simulation restarting.</summary>
+    [Test]
+    public unsafe void UnregisteredPhysicalSceneCanRestart()
+    {
+        LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+        PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+        PhysicalScene physicalScene = this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+        PxVec3 position = new PxVec3 { y = PHYSICS_INITIAL_HEIGHT };
+        PxQuat rotation = new PxQuat { w = PHYSICS_IDENTITY_W };
+        PxTransform transform = PxTransform_new_5(&position, &rotation);
+        PxRigidDynamic* actor = PxPhysics_createRigidDynamic_mut(physicalWorld.Physics, &transform);
+        Assert.That((nint)actor, Is.Not.EqualTo(IntPtr.Zero));
+        try
+        {
+            PxScene_addActor_mut(physicalScene.PxScene, (PxActor*)actor, null);
+            physicalScene.StartUpdates();
+            physicalScene.UnregisterLogicUpdate();
+            physicalScene.StartUpdates();
+            earlyUpdate(this.root);
+            setServerTime(FIRST_TICK_TIME);
+            update(this.root);
+            Assert.That(PxRigidActor_getGlobalPose((PxRigidActor*)actor).p.y, Is.LessThan(PHYSICS_INITIAL_HEIGHT));
+        }
+        finally
+        {
+            PxRigidActor_release_mut((PxRigidActor*)actor);
+        }
+    }
+
+    /// <summary>A World-level removal of the primary entry does not prevent physical simulation restarting.</summary>
+    [Test]
+    public unsafe void WorldUnregistrationDoesNotBlockPhysicalRestart()
+    {
+        LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+        PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+        PhysicalScene physicalScene = this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+        PxVec3 position = new PxVec3 { y = PHYSICS_INITIAL_HEIGHT };
+        PxQuat rotation = new PxQuat { w = PHYSICS_IDENTITY_W };
+        PxTransform transform = PxTransform_new_5(&position, &rotation);
+        PxRigidDynamic* actor = PxPhysics_createRigidDynamic_mut(physicalWorld.Physics, &transform);
+        Assert.That((nint)actor, Is.Not.EqualTo(IntPtr.Zero));
+        try
+        {
+            PxScene_addActor_mut(physicalScene.PxScene, (PxActor*)actor, null);
+            physicalScene.StartUpdates();
+            Assert.That(this.world.LogicUpdate.Unregister(physicalScene, physicalScene.GetType().FullName!), Is.True);
+            physicalScene.StartUpdates();
+            earlyUpdate(this.root);
+            setServerTime(FIRST_TICK_TIME);
+            update(this.root);
+            Assert.That(PxRigidActor_getGlobalPose((PxRigidActor*)actor).p.y, Is.LessThan(PHYSICS_INITIAL_HEIGHT));
+        }
+        finally
+        {
+            PxRigidActor_release_mut((PxRigidActor*)actor);
+        }
+    }
+
+    /// <summary>A different primary callback cannot be mistaken for physical simulation.</summary>
+    [Test]
+    public void PhysicalSceneRejectsAnotherPrimaryCallback()
+    {
+        PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+        PhysicalScene physicalScene = this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+        physicalScene.RegisterLogicUpdate(GameplayWorldLogicPriority.PHYSICS, recordLogicCallback);
+
+        Assert.Throws<InvalidOperationException>(physicalScene.StartUpdates);
+        physicalScene.StopUpdates();
+        Assert.That(physicalScene.HasLogicUpdate(recordLogicCallback), Is.True);
+    }
+
+    /// <summary>A replacement World entry is not removed by stale primary-entry tracking.</summary>
+    [Test]
+    public void PhysicalSceneDoesNotRemoveReplacedWorldEntry()
+    {
+        PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+        PhysicalScene physicalScene = this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+        physicalScene.StartUpdates();
+        string entryName = physicalScene.GetType().FullName!;
+        Assert.That(this.world.LogicUpdate.Unregister(physicalScene, entryName), Is.True);
+        this.world.LogicUpdate.Register(physicalScene, entryName, GameplayWorldLogicPriority.PHYSICS, recordLogicCallback);
+
+        physicalScene.StopUpdates();
+        physicalScene.UnregisterLogicUpdate();
+        Assert.That(this.world.LogicUpdate.Unregister(physicalScene, entryName), Is.True);
+    }
+
+    /// <summary>Prepared levels stay frozen and delayed physics ticks use one fixed 50 ms step.</summary>
+    [Test]
+    public unsafe void PreparedPhysicalSceneWaitsAndDelayedTicksDoNotCatchUp()
+    {
+        PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+        PhysicalScene physicalScene = this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+        PxVec3 position = new PxVec3 { y = PHYSICS_INITIAL_HEIGHT };
+        PxQuat rotation = new PxQuat { w = PHYSICS_IDENTITY_W };
+        PxTransform transform = PxTransform_new_5(&position, &rotation);
+        PxRigidDynamic* actor = PxPhysics_createRigidDynamic_mut(physicalWorld.Physics, &transform);
+        Assert.That((nint)actor, Is.Not.EqualTo(IntPtr.Zero));
+        try
+        {
+            PxScene_addActor_mut(physicalScene.PxScene, (PxActor*)actor, null);
+            physicalScene.StartUpdates();
+            earlyUpdate(this.root);
+            setServerTime(FIRST_TICK_TIME);
+            update(this.root);
+            Assert.That(PxRigidBody_getLinearVelocity((PxRigidBody*)actor).y,
+                Is.Zero.Within(POSITION_TOLERANCE));
+
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            setServerTime(DELAYED_TICK_TIME);
+            update(this.root);
+            update(this.root);
+            Assert.That(PxRigidBody_getLinearVelocity((PxRigidBody*)actor).y,
+                Is.EqualTo(PHYSICS_FIRST_TICK_VELOCITY).Within(POSITION_TOLERANCE));
+
+            setServerTime(NEXT_DELAYED_TICK_TIME);
+            update(this.root);
+            Assert.That(PxRigidBody_getLinearVelocity((PxRigidBody*)actor).y,
+                Is.EqualTo(PHYSICS_SECOND_TICK_VELOCITY).Within(POSITION_TOLERANCE));
+        }
+        finally
+        {
+            PxRigidActor_release_mut((PxRigidActor*)actor);
+        }
     }
 
     /// <summary>The actual Kinematic manager and Mover follow their shared registration order.</summary>
@@ -617,6 +956,42 @@ public class MoverIntegrationTests
     {
     }
 
+    /// <summary>Initializes test Roots without production network resources.</summary>
+    [Invoke((long)ELogicSceneType.None)]
+    public sealed class TestRootInit : AInvokeHandler<Invoke_RootInit, ETTask>
+    {
+        /// <summary>Most recently initialized test Root.</summary>
+        public static Root? LastCreatedRoot { get; private set; }
+
+        /// <inheritdoc />
+        public override async ETTask Handle(Invoke_RootInit args)
+        {
+            LastCreatedRoot = args.Root;
+            await ETTask.CompletedTask;
+        }
+    }
+
+    private sealed class TestTimerCounter
+    {
+        internal int Count { get; private set; }
+
+        internal void Increment() => this.Count++;
+    }
+
+    private sealed class TestTimerRegistration
+    {
+        private readonly GameplayWorld world;
+        private readonly TestTimerCounter counter;
+
+        internal TestTimerRegistration(GameplayWorld world, TestTimerCounter counter)
+        {
+            this.world = world;
+            this.counter = counter;
+        }
+
+        internal void Schedule() => this.world.Timer.ScheduleRepeated(FAULTED_WORLD_TIMER_INTERVAL, this.counter.Increment);
+    }
+
     /// <summary>Data-only participant exercising the shared gameplay entity lifecycle.</summary>
     public sealed class TestLogicEntity : GamePlayEntity
     {
@@ -625,6 +1000,62 @@ public class MoverIntegrationTests
 
         /// <summary>Delta received by this participant's most recent fixed update.</summary>
         public float ObservedDelta;
+    }
+
+    /// <summary>Observes ordinary World update phases.</summary>
+    public sealed class TestWorldUpdateProbe : GamePlayEntity, IEarlyUpdate, IUpdate, ILateUpdate
+    {
+        /// <summary>Number of EarlyUpdate calls.</summary>
+        public int EarlyCount;
+
+        /// <summary>Number of Update calls.</summary>
+        public int UpdateCount;
+
+        /// <summary>Number of LateUpdate calls.</summary>
+        public int LateCount;
+    }
+
+    /// <summary>Records the probe's EarlyUpdate calls.</summary>
+    [EntitySystem]
+    public sealed class TestWorldEarlyProbeSystem : EarlyUpdateSystem<TestWorldUpdateProbe>
+    {
+        /// <inheritdoc />
+        protected override void EarlyUpdate(TestWorldUpdateProbe entity) => entity.EarlyCount++;
+    }
+
+    /// <summary>Records the probe's Update calls.</summary>
+    [EntitySystem]
+    public sealed class TestWorldUpdateProbeSystem : UpdateSystem<TestWorldUpdateProbe>
+    {
+        /// <inheritdoc />
+        protected override void Update(TestWorldUpdateProbe entity) => entity.UpdateCount++;
+    }
+
+    /// <summary>Records the probe's LateUpdate calls.</summary>
+    [EntitySystem]
+    public sealed class TestWorldLateProbeSystem : LateUpdateSystem<TestWorldUpdateProbe>
+    {
+        /// <inheritdoc />
+        protected override void LateUpdate(TestWorldUpdateProbe entity) => entity.LateCount++;
+    }
+
+    private sealed class PhysicalObserver
+    {
+        private readonly nint actor;
+
+        internal PhysicalObserver(nint actor)
+        {
+            this.actor = actor;
+        }
+
+        internal float Height { get; private set; } = PHYSICS_INITIAL_HEIGHT;
+        internal int UpdateCount { get; private set; }
+
+        internal unsafe void Observe(float deltaTime)
+        {
+            this.UpdateCount++;
+            this.Height = PxRigidActor_getGlobalPose((PxRigidActor*)this.actor).p.y;
+        }
     }
 
     /// <summary>Observes cargo while supplying a deterministic Kinematic platform goal.</summary>

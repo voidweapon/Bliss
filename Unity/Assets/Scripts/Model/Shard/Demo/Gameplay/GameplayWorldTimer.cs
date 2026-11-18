@@ -44,7 +44,7 @@ namespace Bliss
         /// <returns>The identifier used to cancel this timer.</returns>
         /// <exception cref="ArgumentOutOfRangeException">The delay is negative.</exception>
         /// <exception cref="ArgumentNullException">The callback is null.</exception>
-        /// <exception cref="InvalidOperationException">The owner does not belong to this GameplayWorld.</exception>
+        /// <exception cref="InvalidOperationException">The World is faulted or the owner does not belong to it.</exception>
         /// <exception cref="ObjectDisposedException">A future wait is requested after this timer or its GameplayWorld is disposed.</exception>
         public long ScheduleOnce(long delayMilliseconds, Action callback, Entity? owner = null)
         {
@@ -68,7 +68,7 @@ namespace Bliss
         /// <param name="owner">Optional entity in this GameplayWorld; the timer is skipped if it becomes invalid.</param>
         /// <returns>The identifier used to cancel this timer.</returns>
         /// <exception cref="ArgumentNullException">The callback is null.</exception>
-        /// <exception cref="InvalidOperationException">The owner does not belong to this GameplayWorld.</exception>
+        /// <exception cref="InvalidOperationException">The World is faulted or the owner does not belong to it.</exception>
         /// <exception cref="ObjectDisposedException">A future wait is requested after this timer or its GameplayWorld is disposed.</exception>
         public long ScheduleOnceAt(long dueTimestampMilliseconds, Action callback, Entity? owner = null)
         {
@@ -89,7 +89,7 @@ namespace Bliss
         /// <returns>The identifier used to cancel this timer.</returns>
         /// <exception cref="ArgumentOutOfRangeException">The interval is not positive.</exception>
         /// <exception cref="ArgumentNullException">The callback is null.</exception>
-        /// <exception cref="InvalidOperationException">The owner does not belong to this GameplayWorld.</exception>
+        /// <exception cref="InvalidOperationException">The World is faulted or the owner does not belong to it.</exception>
         /// <exception cref="ObjectDisposedException">A future wait is requested after this timer or its GameplayWorld is disposed.</exception>
         public long ScheduleRepeated(long intervalMilliseconds, Action callback, Entity? owner = null)
         {
@@ -139,7 +139,7 @@ namespace Bliss
         /// <param name="cancellationToken">Optional token that cancels the wait.</param>
         /// <param name="owner">Optional entity in this GameplayWorld; disposing it cancels the wait.</param>
         /// <returns><see langword="true"/> when the duration elapses; otherwise, <see langword="false"/> if cancelled.</returns>
-        /// <exception cref="InvalidOperationException">The owner does not belong to this GameplayWorld.</exception>
+        /// <exception cref="InvalidOperationException">A future wait is requested on a faulted World or the owner is invalid.</exception>
         /// <exception cref="ObjectDisposedException">This timer or its GameplayWorld is disposed.</exception>
         public async ETTask<bool> WaitDurationAsync(
             long durationMilliseconds,
@@ -169,7 +169,7 @@ namespace Bliss
         /// <param name="cancellationToken">Optional token that cancels the wait.</param>
         /// <param name="owner">Optional entity in this GameplayWorld; disposing it cancels the wait.</param>
         /// <returns><see langword="true"/> when the timestamp is reached; otherwise, <see langword="false"/> if cancelled.</returns>
-        /// <exception cref="InvalidOperationException">The owner does not belong to this GameplayWorld.</exception>
+        /// <exception cref="InvalidOperationException">A future wait is requested on a faulted World or the owner is invalid.</exception>
         /// <exception cref="ObjectDisposedException">This timer or its GameplayWorld is disposed.</exception>
         public async ETTask<bool> WaitUntilAsync(
             long dueTimestampMilliseconds,
@@ -197,7 +197,7 @@ namespace Bliss
         /// <param name="cancellationToken">Optional token that cancels the wait.</param>
         /// <param name="owner">Optional entity in this GameplayWorld; disposing it cancels the wait.</param>
         /// <returns><see langword="true"/> when the next timer update is processed; otherwise, <see langword="false"/> if cancelled.</returns>
-        /// <exception cref="InvalidOperationException">The owner does not belong to this GameplayWorld.</exception>
+        /// <exception cref="InvalidOperationException">A wait is requested on a faulted World or the owner is invalid.</exception>
         /// <exception cref="ObjectDisposedException">This timer or its GameplayWorld is disposed.</exception>
         public async ETTask<bool> WaitNextFrameAsync(
             ETCancellationToken? cancellationToken = null,
@@ -222,6 +222,11 @@ namespace Bliss
             if (this.isDisposed || this.gameplayWorld.IsDisposed)
             {
                 throw new ObjectDisposedException(nameof(GameplayWorldTimer));
+            }
+
+            if (this.gameplayWorld.IsFaulted)
+            {
+                throw new InvalidOperationException("The GameplayWorld has stopped after a failure.", this.gameplayWorld.Failure);
             }
 
             if (callback is null)
@@ -279,7 +284,7 @@ namespace Bliss
 
         internal void update()
         {
-            if (this.isDisposed || this.dueTimers.IsEmpty)
+            if (this.isDisposed || this.gameplayWorld.IsFaulted || this.dueTimers.IsEmpty)
             {
                 return;
             }

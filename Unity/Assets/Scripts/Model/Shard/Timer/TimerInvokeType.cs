@@ -4,7 +4,6 @@ namespace Bliss.Timer
     {
         //框架层用200 - 300
         public const int MessageLocationSenderCheck = 201;
-        public const int PhysicalUpdate = 261;
         
         public const int BulletTimeout = 263;
         public const int BulletLogicUpdate = 264;

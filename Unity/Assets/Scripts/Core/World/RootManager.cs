@@ -85,8 +85,15 @@ namespace Bliss
                     continue;
                 }
                 
-                updateAction(item);
-                _updateQueue.Enqueue(rootId);
+                try
+                {
+                    updateAction(item);
+                }
+                finally
+                {
+                    // A propagated update failure must not silently remove a live Root from later frames.
+                    _updateQueue.Enqueue(rootId);
+                }
             }
             
             while (_addQueue.Count > 0)

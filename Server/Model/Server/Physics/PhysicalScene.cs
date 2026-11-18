@@ -6,7 +6,8 @@ using MagicPhysX;
 
 namespace Bliss.Physics;
 
-public unsafe partial class PhysicalScene : Entity, IAwake<PhysicalWorldComponent>, IDestroy
+/// <summary>Owns server PhysX scene resources associated with a GameplayWorld.</summary>
+public unsafe partial class PhysicalScene : GamePlayEntity, IAwake<PhysicalWorldComponent>, IDestroy
 {
     public PxDefaultCpuDispatcher* PxDispatcher;
     public PxScene* PxScene;
@@ -27,12 +28,6 @@ public unsafe partial class PhysicalScene : Entity, IAwake<PhysicalWorldComponen
     public static readonly PxVec3 DefaultGravity = new PxVec3(){x = 0, y = -9.8f, z = 0};
 
     public PhysicalWorldComponent PhysicalWorld;
-    public long UpdateTimer;
-    /// <summary>
-    /// Tracks whether the recurring update timer has been added to the Root timer.
-    /// </summary>
-    public bool UpdateTimerScheduled;
-    
     public DoublyDictionary<IntPtr, GameplayCollider> ColliderDict = new DoublyDictionary<IntPtr, GameplayCollider>();
     public DoublyDictionary<IntPtr, GameplayRigidbody> RigidbodyDict = new DoublyDictionary<IntPtr, GameplayRigidbody>();
 }

@@ -75,11 +75,43 @@ UpdateGroup
 - 通过 `world.LogicUpdate.Register(entity, entryName, priority, callback)` 注册；身份是活跃实体实例和入口名，重复注册报错。参与者必须属于该 World；注销使用 `Unregister(entity, entryName)`。优先级按数值升序，同优先级按注册顺序。共享顺序使用 `GameplayWorldLogicPriority`：发射点检测、角色移动、共享移动模拟、弹道检测、物理模拟；最终物理优先级保留给服务端物理模拟。
 - 派发开始时确定快照；期间新增或注销后重注册的入口从下次 tick 开始，已注销、销毁、复用或脱离 World 的参与者跳过。World 销毁会中止快照内剩余入口。调用方仍应在自身销毁时主动注销。
 - `GamePlayEntity` 可以直接属于 GameplayWorld，也可以属于关联到该 World 的 LevelScene；后者注册前校验 LevelScene 与 World 的层级和 Root 归属，实体的逻辑场景仍为 LevelScene。
-- System 在 Awake 中通过 `self.RegisterLogicUpdate(priority, callback)` 注册一个主入口；`GamePlayEntity` 以实体完整类型名作为入口名，保存注册时的 World，并在 `Entity.Dispose` 清空 InstanceId 前统一注销。业务实体无需覆写 Dispose。重复注册主入口会报错；通过 World 接口直接注册的其他命名入口仍需调用方主动注销。
+- System 在 Awake 中通过 `self.RegisterLogicUpdate(priority, callback)` 注册一个主入口；`GamePlayEntity` 以实体完整类型名作为入口名，保存注册时的 World，并在 `Entity.Dispose` 清空 InstanceId 前统一注销。业务实体无需覆写 Dispose。重复注册主入口会报错；通过 World 接口直接删除该入口后可重新注册，替代的不同回调不会被误删。其他命名入口仍需调用方主动注销。
 - World 同时支持原有 `Action<float>` 和新的 `Action<Entity, float>` 回调，后者显式接收已验证的实体，不使用闭包包装旧接口。两种入口共享顺序、快照和池化规则，回收时同时清空两种回调引用。Mover 与 Kinematic System 各缓存一个静态回调，并转发到各自的扩展方法。
 - `MoverComponent`、`Mover` 和 `MoverStageRuntime` 归属于 GameplayWorld。每个 MoverComponent 以 `MOVEMENT` 优先级注册一个入口，使用固定 50ms 推进其所有 Mover；所属 LevelScene 尚未启用时不推进。组件销毁前主动注销，派发中销毁后的替代组件从下个 tick 开始运行。
 - `KinematicMoverManager` 也注册到 `MOVEMENT`，使用固定 50ms 并与 Mover 按实际注册顺序执行；销毁前主动注销，普通 LateUpdate 插值仍由 World 驱动。管理器属于 LevelScene 时，场景启用前既不模拟也不插值。此处只提前实现 #13 的管理器调度部分，角色筛选、角色组件及输入处理仍由 #13 完成。Bullet 的独立 Timer 和碰撞顺序由 #15 处理，迁移期间 Mover 已先于 Root 常规 Timer 驱动，不能视为完整 Bullet 固定步长方案。
 - 当前客户端的 Kinematic 管理器属于 World，Mover 和角色在创建时直接注册到该管理器；因此已启用的 World 管理器仍可能处理尚未启用的 LevelScene 参与者。此问题不由管理器自身的 LevelScene 启用检查解决，参与者的场景筛选留待 #13。
+- 服务端和客户端 `PhysicalScene` 均属于 `GamePlayEntity`，并在 LevelScene 准备时创建。服务端在启用流程注册 `PHYSICS` 最终优先级，传入固定 0.05 秒；尚未启用的 LevelScene 不模拟，启用失败时注销，销毁前通过 `GamePlayEntity` 注销。缺失 native 场景、PhysX fetch 失败或物理模拟抛出异常时，记录故障原因并向上传播。此优先级只保证排在 **World LogicUpdate** 内的其他业务逻辑之后；尚未迁移的 Bullet Root Timer 不受此顺序约束，留待 #15。
+- 物理失败后，`GameplayWorld.IsFaulted` 为 true，`Failure` 保存首次异常；World 自身的 Timer、LogicUpdate 和常规 Early/Update/Late 驱动停止，不自动恢复，已消费的 tick 不重试。现有待处理 Timer 和等待保留，新的未来 Timer 和 LogicUpdate 注册会显式失败；等待可能一直挂起，直到 World 被显式销毁或取消。Root 和子 Root 在异常传播时仍保留调度资格，其他 World 在后续帧继续运行。本次只对物理模拟失败标记 World 故障；其他持续抛错的 Root 更新仍可能在后续帧重复报错并中断当前帧，需单独制定故障策略。此隔离不阻止旧 Root Timer、外部消息或调用方直接操作实体，因此故障状态不是完整的不可变快照。Bullet 的旧 Timer 留待 #15；#12 涵盖 ShooterGear 所属游戏实体的迁移，其当前描述未单独列出 ShooterGear Timer 迁移。
+- 客户端查询仍通过既有 Unity 物理适配器，不手动驱动 Unity 物理模拟；现有适配器使用 Unity 全局物理查询，并未实现各 LevelScene 的独立 Unity 物理场景隔离。现有查询适配器未限制向调用方数组复制的命中数，小于命中数的结果数组可能越界，此次未改造该既有路径。
+- 真实服务端地图资源加载仍将物理材质存入 Root 级 `PhysicalWorldComponent.MaterialsRef`，Level 销毁不会移除对应项；重复加载相同材质 ID 或失败后重试可能发生重复键错误。此次测试替换了地图资源加载处理器，未覆盖该既有资源生命周期问题。
+
+### 服务端物理场景迁移基准
+
+使用 `BlissBenchMark/Benchmarks/PhysicalSimulationBenchmark.cs` 比较实际 Root 驱动的迁移前 Root Timer 与迁移后 World LogicUpdate，均运行 native PhysX 50ms 模拟。场景位于 World 下，包含 0、10 或 100 个无碰撞形状的独立动态刚体；准备和销毁不计时，并验证每个刚体受重力移动。该基准不包含碰撞形状、接触、场景资源、LevelScene 启用、游戏实体或完整帧，不能代表实际地图的物理开销。
+
+macOS 26.6.2、Apple M1 Pro、.NET 8.0.19、BenchmarkDotNet ShortRun；每项 3 次测量，误差为 99.9% 置信区间半宽：
+
+| 刚体数量 | 迁移前耗时 | 迁移后耗时 | 迁移前分配 | 迁移后分配 |
+| ---: | ---: | ---: | ---: | ---: |
+| 0 | 28.35 ± 12.87 µs | 32.51 ± 175.09 µs | 856 B | 568 B |
+| 10 | 45.07 ± 231.44 µs | 41.90 ± 228.79 µs | 856 B | 568 B |
+| 100 | 41.10 ± 75.75 µs | 56.03 ± 256.81 µs | 856 B | 568 B |
+
+测得每 tick 的托管分配减少 288 B；每次迭代短于建议的 100ms，样本少且耗时置信区间重叠，无法判断耗时改善或退化。每个 World 在 Physics 最终优先级按注册顺序模拟各场景，而不是原先由 Root Timer 独立驱动。
+
+### Root 异常保护基准
+
+使用 `BlissBenchMark/Benchmarks/RootSchedulingBenchmark.cs` 比较 Root 队列异常保护及 World 故障检查前后实际 `RootManager.Update` 路径。每个顶层 Root 含一个子 Root，二者各有一个带普通 Update 参与者的 GameplayWorld；在准备阶段验证每个参与者均运行。计时只覆盖正常 Update，不包含故障、到期物理 tick、资源加载或完整帧。
+
+同上环境和 ShortRun 配置，每项 3 次测量；误差为 99.9% 置信区间半宽：
+
+| 顶层 Root 数量 | 修改前耗时 | 修改后耗时 | 修改前分配 | 修改后分配 |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 184.4 ± 9.74 ns | 187.9 ± 26.07 ns | 400 B | 400 B |
+| 10 | 1,912.0 ± 46.11 ns | 1,850.0 ± 45.28 ns | 3,424 B | 3,424 B |
+| 100 | 26,052.1 ± 1,093.99 ns | 25,983.2 ± 11,865.13 ns | 33,664 B | 33,664 B |
+
+测得分配不变；三次样本的耗时置信区间重叠，不据此判断耗时变化。异常隔离及两个 Root 的继续运行由真实调度路径的集成测试覆盖。
 
 ### Mover 迁移基准
 
@@ -122,7 +154,7 @@ UpdateGroup
 | Kinematic | 100 | 119.333 ± 11.874 µs | 127.62 ± 137.28 µs | 568 B | 568 B |
 | Kinematic | 1,000 | 1,200.778 ± 751.181 µs | 1,226.13 ± 857.86 µs | 568 B | 568 B |
 
-测得每 tick 分配不变；迭代低于建议的 100ms，置信区间重叠，不能判断耗时改善或退化。本次目的是集中生命周期管理并避免每个实体注册时捕获闭包，不是减少既有移动计算的 tick 分配。实体创建和注册不在计时范围内，因此没有量化注册分配收益。源码层面的空间取舍是：每个 GamePlayEntity 增加一个注册 World 引用，每个池化入口增加一个显式实体回调引用，而两个 System 各复用一个静态委托；不能把移除闭包直接等同于总内存下降。
+测得每 tick 分配不变；迭代低于建议的 100ms，置信区间重叠，不能判断耗时改善或退化。本次目的是集中生命周期管理并避免每个实体注册时捕获闭包，不是减少既有移动计算的 tick 分配。实体创建和注册不在计时范围内，因此没有量化注册分配收益。源码层面的空间取舍是：每个 GamePlayEntity 在当前版本保存注册 World 和主回调引用，每个池化入口保存一个显式实体回调引用，而两个 System 各复用一个静态委托；不能把移除闭包直接等同于总内存下降。
 
 ### LogicUpdate 基准
 

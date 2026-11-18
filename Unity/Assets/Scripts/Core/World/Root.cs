@@ -121,8 +121,15 @@ namespace Bliss
                     continue;
                 }
                 
-                updateAction(item);
-                _updateQueue.Enqueue(rootId);
+                try
+                {
+                    updateAction(item);
+                }
+                finally
+                {
+                    // Preserve child scheduling when an update reports a failure to the parent.
+                    _updateQueue.Enqueue(rootId);
+                }
             }
             
             while (_removeQueue.Count > 0)
