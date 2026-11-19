@@ -861,7 +861,10 @@ namespace Bliss
         public DTOGameplayTargetInfo TargetInfo { get; set; }
         
         [MemoryPackOrder(8)]
-        public long Runtime { get; set; }
+        public long RemainingLifetimeMS { get; set; }
+
+        [MemoryPackOrder(9)]
+        public long ShooterEntityId { get; set; }
         
         public static DTOBulletInfo Create(bool isFromPool = false)
         {
@@ -884,12 +887,13 @@ namespace Bliss
             this.LocalRole = default;
             this.RemoteRole = default;
             this.TargetInfo = default;
-            this.Runtime = default;
+            this.RemainingLifetimeMS = default;
+            this.ShooterEntityId = default;
                 
             ObjectPool.Instance.Recycle(this);
         }
        
-        private static int _sizeHint = System.Runtime.CompilerServices.Unsafe.SizeOf<long>() + System.Runtime.CompilerServices.Unsafe.SizeOf<int>() + 3 * sizeof(float) + 4 * sizeof(float) + System.Runtime.CompilerServices.Unsafe.SizeOf<Bliss.ENetRole>() + System.Runtime.CompilerServices.Unsafe.SizeOf<Bliss.ENetRole>() + System.Runtime.CompilerServices.Unsafe.SizeOf<DTOGameplayTargetInfo>() + System.Runtime.CompilerServices.Unsafe.SizeOf<long>();
+        private static int _sizeHint = System.Runtime.CompilerServices.Unsafe.SizeOf<long>() + System.Runtime.CompilerServices.Unsafe.SizeOf<int>() + 3 * sizeof(float) + 4 * sizeof(float) + System.Runtime.CompilerServices.Unsafe.SizeOf<Bliss.ENetRole>() + System.Runtime.CompilerServices.Unsafe.SizeOf<Bliss.ENetRole>() + System.Runtime.CompilerServices.Unsafe.SizeOf<DTOGameplayTargetInfo>() + System.Runtime.CompilerServices.Unsafe.SizeOf<long>() + System.Runtime.CompilerServices.Unsafe.SizeOf<long>();
         
         partial void CustomSizeHint(ref int sizeHint);
         

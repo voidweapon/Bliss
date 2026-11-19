@@ -43,6 +43,8 @@ public class PhysicalSceneClientTests
     private const long UNIT_ID = 404;
     private const int BULLET_CONFIG_ID = 1;
     private const long BULLET_ID = 405;
+    private const long EXPIRED_LIFETIME_MILLISECONDS = 0;
+    private const long BULLET_REMAINING_LIFETIME_MILLISECONDS = 1000;
     private const int SUPPRESS_INFO_LOG_LEVEL = 4;
     private const long UNUPDATED_VIEW_TIME = -1;
     private const long INITIAL_TICK_TIME = 1000;
@@ -185,9 +187,9 @@ public class PhysicalSceneClientTests
         Assert.That(RecordWorldCreated.Count, Is.EqualTo(EXPECTED_HIT_COUNT));
     }
 
-    /// <summary>The client Bullet factory uses the production World's AOI and smoothing components.</summary>
+    /// <summary>The client creates a replicated Bullet DTO, skipping expiry and registering live Bullets under its World.</summary>
     [Test]
-    public void ClientBulletFactoryUsesWorldAoiAndSmoothing()
+    public void ClientBulletDtoCreatesWorldAoiAndSmoothing()
     {
         int previousLogLevel = Log.LogLevel;
         ConfigManager configManager = new ConfigManager();
@@ -199,20 +201,40 @@ public class PhysicalSceneClientTests
             registerSingleton(configManager);
             moverHandlers.Init();
             registerSingleton(moverHandlers);
+            this.root.Scene.AddComponent<NetworkEntityManagerComponent>();
             this.root.Scene.AddComponent<TimerComponent>();
             GameplayWorld world = MapHelper.CreateGameplayWorld(this.root.Scene).GetAwaiter().GetResult();
             LogicScene level = LevelSceneFactory.Create(
                 world, world, LEVEL_ID, LEVEL_ID, nameof(LEVEL_ID)).GetAwaiter().GetResult();
-            Bullet bullet = BulletHelper.CreateBullet(level, BULLET_CONFIG_ID, BULLET_ID,
-                ENetRole.Authority, ENetRole.SimulatedProxy, float3.zero, quaternion.identity,
-                new GameplayTargetInfo { TargetDir = new float3(UNIT_AXIS, ZERO_AXIS, ZERO_AXIS) },
-                isRaiseEvent: false);
+            DTOBulletInfo expiredBulletInfo = DTOBulletInfo.Create();
+            expiredBulletInfo.ConfigId = BULLET_CONFIG_ID;
+            expiredBulletInfo.RemainingLifetimeMS = EXPIRED_LIFETIME_MILLISECONDS;
+            Assert.That(expiredBulletInfo.TryCreateBullet(level, out Bullet expiredBullet), Is.False);
+            Assert.That(expiredBullet, Is.Null);
+            expiredBulletInfo.Dispose();
+
+            SceneActor shooterHost = level.AddChild<SceneActor>();
+            ShooterGear shooter = shooterHost.AddComponent<ShooterGear>();
+            shooter.SetConfig(new ShooterGearConfig { BulletConfigId = BULLET_CONFIG_ID });
+            DTOBulletInfo bulletInfo = DTOBulletInfo.Create();
+            bulletInfo.BulletId = BULLET_ID;
+            bulletInfo.ConfigId = BULLET_CONFIG_ID;
+            bulletInfo.Position = float3.zero;
+            bulletInfo.Rotation = quaternion.identity;
+            bulletInfo.LocalRole = ENetRole.Authority;
+            bulletInfo.RemoteRole = ENetRole.SimulatedProxy;
+            bulletInfo.RemainingLifetimeMS = BULLET_REMAINING_LIFETIME_MILLISECONDS;
+            bulletInfo.ShooterEntityId = shooterHost.Id;
+            bulletInfo.TargetInfo = DTOGameplayTargetInfo.Create();
+            bulletInfo.TargetInfo.Direction = new float3(UNIT_AXIS, ZERO_AXIS, ZERO_AXIS);
+            Assert.That(bulletInfo.TryCreateBullet(level, out Bullet bullet), Is.True);
             AoiManagerComponent aoiManager = world.GetComponent<AoiManagerComponent>();
-            Assert.That(bullet, Is.Not.InstanceOf<GamePlayEntity>());
+            Assert.That(bullet, Is.InstanceOf<GamePlayEntity>());
             Assert.That(bullet.GetComponent<AOIEntityCmp>(), Is.InstanceOf<GamePlayEntity>());
             Assert.That(bullet.GetComponent<SmoothTransformComponent>(), Is.InstanceOf<GamePlayEntity>());
             Assert.That(aoiManager.Entries.Count, Is.EqualTo(EXPECTED_HIT_COUNT));
             bullet.Dispose();
+            bulletInfo.Dispose();
             Assert.That(aoiManager.Entries, Is.Empty);
         }
         finally

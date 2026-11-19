@@ -139,7 +139,8 @@ message DTOBulletInfo
   Bliss.ENetRole LocalRole = 5;
   Bliss.ENetRole RemoteRole = 6;
   DTOGameplayTargetInfo TargetInfo = 7;
-  int64 Runtime = 8;
+  int64 RemainingLifetimeMS = 8;
+  int64 ShooterEntityId = 9;
 }
 
 message M2C_CreateBullets : IMessage

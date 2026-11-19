@@ -15,7 +15,34 @@ namespace Bliss.Physics;
 public static unsafe partial class PhysicalSceneSystems
 {
     private const uint NO_PHYSX_ERROR = 0;
+    private const uint QUERY_BLOCKING_FLAG = 1U;
+    private const uint QUERY_ENTITY_EXCLUSION_FLAG = 2U;
+    private const uint QUERY_NO_RESERVED_BITS = 0U;
     private static readonly Action<Entity, float> simulationCallback = simulate;
+    private static readonly DPreFilter queryPreFilter = preFilter;
+    private static readonly DPostFilter queryPostFilter = postFilter;
+    private static readonly DDestructor queryDestructor = destroyQueryFilter;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct QueryFilterCallbackInstance
+    {
+        // PhysX passes this native instance pointer as the callback's first argument.
+        public IntPtr VTable;
+        public IntPtr ContextHandle;
+    }
+
+    private sealed class QueryFilterContext
+    {
+        public PhysicalScene Scene { get; }
+        // These references are scoped to one synchronous query to avoid per-query allocations.
+        public Entity? IgnoredEntityA;
+        public Entity? IgnoredEntityB;
+
+        public QueryFilterContext(PhysicalScene scene)
+        {
+            this.Scene = scene;
+        }
+    }
 
     private static void Awake(this PhysicalScene self, PhysicalWorldComponent pxWorld)
     {
@@ -288,7 +315,7 @@ public static unsafe partial class PhysicalSceneSystems
         PxVec3 pxDirection = direction.ToPxVec3();
         
         bool hasResult = self.InnerRaycastSingle(&pxOrigin, pxDirection, maxDistance, (uint)layerMask, out PxRaycastHit hitResult);
-        hitInfo = self.ConvertRaycastHitResult(hitResult);
+        hitInfo = hasResult ? self.ConvertRaycastHitResult(hitResult) : default;
         return hasResult;
     }
     
@@ -310,8 +337,36 @@ public static unsafe partial class PhysicalSceneSystems
         PxSphereGeometry sphere = PxSphereGeometry_new(radius);
         PxTransform transform = CreatePxTransform(origin);
 
-        bool hasResult = self.InnerSweepSingle((PxGeometry*)&sphere, &transform, direction.ToPxVec3(), maxDistance, (uint)layerMask, out PxSweepHit hitResult);
-        hitInfo = self.ConvertSweepHitResult(hitResult);
+        bool hasResult = self.InnerSweepSingle((PxGeometry*)&sphere, &transform, direction.ToPxVec3(),
+            maxDistance, (uint)layerMask, null, null, out PxSweepHit hitResult);
+        hitInfo = hasResult ? self.ConvertSweepHitResult(hitResult) : default;
+        return hasResult;
+    }
+
+    /// <summary>Finds the first sphere-sweep hit while excluding colliders owned by either supplied entity.</summary>
+    /// <param name="self">The physical scene to query.</param>
+    /// <param name="origin">The sphere's starting position.</param>
+    /// <param name="radius">The sphere radius.</param>
+    /// <param name="direction">The normalized sweep direction.</param>
+    /// <param name="maxDistance">The maximum sweep distance.</param>
+    /// <param name="layerMask">The physics layer mask.</param>
+    /// <param name="ignoredEntityA">The first entity and its descendants to exclude.</param>
+    /// <param name="ignoredEntityB">The second entity and its descendants to exclude.</param>
+    /// <param name="hitInfo">The first remaining hit, when one is found.</param>
+    /// <returns>Whether a non-excluded collider was hit.</returns>
+    /// <exception cref="ArgumentNullException">An ignored entity is null.</exception>
+    public static bool SpereCast(this PhysicalScene self, float3 origin, float radius, float3 direction,
+        float maxDistance, int layerMask, Entity ignoredEntityA, Entity ignoredEntityB,
+        out GameplayRaycastHit hitInfo)
+    {
+        ArgumentNullException.ThrowIfNull(ignoredEntityA);
+        ArgumentNullException.ThrowIfNull(ignoredEntityB);
+        PxSphereGeometry sphere = PxSphereGeometry_new(radius);
+        PxTransform transform = CreatePxTransform(origin);
+
+        bool hasResult = self.InnerSweepSingle((PxGeometry*)&sphere, &transform, direction.ToPxVec3(),
+            maxDistance, (uint)layerMask, ignoredEntityA, ignoredEntityB, out PxSweepHit hitResult);
+        hitInfo = hasResult ? self.ConvertSweepHitResult(hitResult) : default;
         return hasResult;
     }
     
@@ -335,7 +390,7 @@ public static unsafe partial class PhysicalSceneSystems
         PxTransform transform = CreatePxTransform(origin, orientation);
 
         bool hasResult = self.InnerSweepSingle((PxGeometry*)&box, &transform, direction.ToPxVec3(), maxDistance, (uint)layerMask, out PxSweepHit hitResult);
-        hitInfo = self.ConvertSweepHitResult(hitResult);
+        hitInfo = hasResult ? self.ConvertSweepHitResult(hitResult) : default;
         return hasResult;
     }
 
@@ -364,7 +419,7 @@ public static unsafe partial class PhysicalSceneSystems
         PxTransform transform = CreatePxTransform(center, ration);
 
         bool hasResult = self.InnerSweepSingle((PxGeometry*)&capsule, &transform, direction.ToPxVec3(), maxDistance, (uint)layerMask, out PxSweepHit hitResult);
-        hitInfo = self.ConvertSweepHitResult(hitResult);
+        hitInfo = hasResult ? self.ConvertSweepHitResult(hitResult) : default;
         return hasResult;
     }
     
@@ -392,8 +447,33 @@ public static unsafe partial class PhysicalSceneSystems
         PxSphereGeometry sphere = PxSphereGeometry_new(radius);
         PxTransform transform = CreatePxTransform(origin);
 
-        bool hasResult = self.InnerOverlapSingle((PxGeometry*)&sphere, &transform, (uint)layerMask, out PxOverlapHit hitResult);
-        hitInfo = self.ConvertOverlapHitResult(hitResult);
+        bool hasResult = self.InnerOverlapSingle((PxGeometry*)&sphere, &transform, (uint)layerMask, null, null,
+            out PxOverlapHit hitResult);
+        hitInfo = hasResult ? self.ConvertOverlapHitResult(hitResult) : null!;
+        return hasResult;
+    }
+
+    /// <summary>Finds an overlap while excluding colliders owned by either supplied entity.</summary>
+    /// <param name="self">The physical scene to query.</param>
+    /// <param name="origin">The sphere center.</param>
+    /// <param name="radius">The sphere radius.</param>
+    /// <param name="layerMask">The physics layer mask.</param>
+    /// <param name="ignoredEntityA">The first entity and its descendants to exclude.</param>
+    /// <param name="ignoredEntityB">The second entity and its descendants to exclude.</param>
+    /// <param name="hitInfo">The first remaining overlapping entity, when one is found.</param>
+    /// <returns>Whether a non-excluded collider overlaps the sphere.</returns>
+    /// <exception cref="ArgumentNullException">An ignored entity is null.</exception>
+    public static bool OverlapSpere(this PhysicalScene self, float3 origin, float radius, int layerMask,
+        Entity ignoredEntityA, Entity ignoredEntityB, out Entity hitInfo)
+    {
+        ArgumentNullException.ThrowIfNull(ignoredEntityA);
+        ArgumentNullException.ThrowIfNull(ignoredEntityB);
+        PxSphereGeometry sphere = PxSphereGeometry_new(radius);
+        PxTransform transform = CreatePxTransform(origin);
+
+        bool hasResult = self.InnerOverlapSingle((PxGeometry*)&sphere, &transform, (uint)layerMask,
+            ignoredEntityA, ignoredEntityB, out PxOverlapHit hitResult);
+        hitInfo = hasResult ? self.ConvertOverlapHitResult(hitResult) : null!;
         return hasResult;
     }
     
@@ -421,7 +501,7 @@ public static unsafe partial class PhysicalSceneSystems
         PxTransform transform = CreatePxTransform(center, ration);
 
         bool hasResult = self.InnerOverlapSingle((PxGeometry*)&capsule, &transform, (uint)layerMask, out PxOverlapHit hitResult);
-        hitInfo = self.ConvertOverlapHitResult(hitResult);
+        hitInfo = hasResult ? self.ConvertOverlapHitResult(hitResult) : null!;
         return hasResult;
     }
     
@@ -478,7 +558,7 @@ public static unsafe partial class PhysicalSceneSystems
         PxQueryFlags queryFlags = PxQueryFlags.Dynamic | PxQueryFlags.Static | PxQueryFlags.Prefilter;
         PxQueryFilterData queryFilterData = PxQueryFilterData_new_1(&filterData, queryFlags);
 
-        PxRaycastHit hitInfo;
+        PxRaycastHit hitInfo = default;
         bool hasResult = self.PxScene->QueryExtRaycastSingle(origin, &unitDir, maxDistance, outputFlags, &hitInfo, &queryFilterData, self.QueryFilterCallback, null);
         hitResult = hitInfo;
 
@@ -508,17 +588,47 @@ public static unsafe partial class PhysicalSceneSystems
         float maxDistance, uint layerMask,
         out PxSweepHit hitResult)
     {
+        return self.InnerSweepSingle(geometry, pose, unitDir, maxDistance, layerMask, null, null, out hitResult);
+    }
+
+    private static bool InnerSweepSingle(this PhysicalScene self,
+        PxGeometry* geometry,
+        PxTransform* pose, PxVec3 unitDir,
+        float maxDistance, uint layerMask, Entity? ignoredEntityA, Entity? ignoredEntityB,
+        out PxSweepHit hitResult)
+    {
         PxHitFlags outputFlags = PxHitFlags.Default;
-        
-        PxFilterData filterData = PxFilterData_new_2(layerMask, 1 ,0 ,0);
+        bool excludeEntities = ignoredEntityA != null || ignoredEntityB != null;
+        QueryFilterContext? filterContext = excludeEntities ? getQueryFilterContext(self) : null;
+        uint queryFilterFlags = QUERY_BLOCKING_FLAG;
+        if (excludeEntities)
+        {
+            filterContext!.IgnoredEntityA = ignoredEntityA;
+            filterContext.IgnoredEntityB = ignoredEntityB;
+            queryFilterFlags |= QUERY_ENTITY_EXCLUSION_FLAG;
+        }
+
+        PxFilterData filterData = PxFilterData_new_2(layerMask, queryFilterFlags,
+            QUERY_NO_RESERVED_BITS, QUERY_NO_RESERVED_BITS);
         PxQueryFlags queryFlags = PxQueryFlags.Dynamic | PxQueryFlags.Static | PxQueryFlags.Prefilter;
         PxQueryFilterData queryFilterData = PxQueryFilterData_new_1(&filterData, queryFlags);
 
-        PxSweepHit hitInfo;
-        bool hasResult = self.PxScene->QueryExtSweepSingle(geometry, pose, &unitDir, maxDistance, outputFlags, &hitInfo, &queryFilterData, self.QueryFilterCallback, null, 0);
-        hitResult = hitInfo;
-
-        return hasResult;
+        try
+        {
+            PxSweepHit hitInfo = default;
+            bool hasResult = self.PxScene->QueryExtSweepSingle(geometry, pose, &unitDir, maxDistance, outputFlags,
+                &hitInfo, &queryFilterData, self.QueryFilterCallback, null, 0);
+            hitResult = hitInfo;
+            return hasResult;
+        }
+        finally
+        {
+            if (filterContext != null)
+            {
+                filterContext.IgnoredEntityA = null;
+                filterContext.IgnoredEntityB = null;
+            }
+        }
     }
 
     private static int InnerSweepAll(this PhysicalScene self, 
@@ -544,19 +654,46 @@ public static unsafe partial class PhysicalSceneSystems
         uint layerMask,
         out PxOverlapHit hitResult)
     {
-        PxFilterData filterData = PxFilterData_new_2(layerMask, 1 ,0 ,0);
+        return self.InnerOverlapSingle(geometry, pose, layerMask, null, null, out hitResult);
+    }
+
+    private static bool InnerOverlapSingle(this PhysicalScene self,
+        PxGeometry* geometry,
+        PxTransform* pose,
+        uint layerMask, Entity? ignoredEntityA, Entity? ignoredEntityB,
+        out PxOverlapHit hitResult)
+    {
+        bool excludeEntities = ignoredEntityA != null || ignoredEntityB != null;
+        QueryFilterContext? filterContext = excludeEntities ? getQueryFilterContext(self) : null;
+        uint queryFilterFlags = QUERY_BLOCKING_FLAG;
+        if (excludeEntities)
+        {
+            filterContext!.IgnoredEntityA = ignoredEntityA;
+            filterContext.IgnoredEntityB = ignoredEntityB;
+            queryFilterFlags |= QUERY_ENTITY_EXCLUSION_FLAG;
+        }
+
+        PxFilterData filterData = PxFilterData_new_2(layerMask, queryFilterFlags,
+            QUERY_NO_RESERVED_BITS, QUERY_NO_RESERVED_BITS);
         PxQueryFlags queryFlags = PxQueryFlags.Dynamic | PxQueryFlags.Static | PxQueryFlags.Prefilter;
         PxQueryFilterData queryFilterData = PxQueryFilterData_new_1(&filterData, queryFlags);
 
-        PxOverlapHit hitInfo;
-        bool hasResult = self.PxScene->QueryExtOverlapAny(geometry, pose, &hitInfo,  &queryFilterData, self.QueryFilterCallback);
-        hitResult = hitInfo;
-
-        if (hasResult)
+        try
         {
-            Log.Info($"hit name={Marshal.PtrToStringAnsi((IntPtr)hitResult.shape->GetName())}");
+            PxOverlapHit hitInfo = default;
+            bool hasResult = self.PxScene->QueryExtOverlapAny(geometry, pose, &hitInfo, &queryFilterData,
+                self.QueryFilterCallback);
+            hitResult = hitInfo;
+            return hasResult;
         }
-        return hasResult;
+        finally
+        {
+            if (filterContext != null)
+            {
+                filterContext.IgnoredEntityA = null;
+                filterContext.IgnoredEntityB = null;
+            }
+        }
     }
     
     private static int InnerOverlapAll(this PhysicalScene self, 
@@ -664,40 +801,103 @@ public static unsafe partial class PhysicalSceneSystems
     
     private static void ConfigureQueryFilterCallbacks(this PhysicalScene self)
     {
-        //c++ 当类函数调用所以会塞一个对象指针进来, static函数需要在第一个参数上接这个对象指针
-        self.PreFilter = (void* userData, PxFilterData* filterData, PxShape* shape, PxRigidActor* actor, PxHitFlags queryFlags) =>
-        {
-            PxFilterData shapeFilterData = shape->GetQueryFilterData();
-            if ((shapeFilterData.word0 & filterData->word0) != 0U)
-            {
-                if (filterData->word1 == 1)
-                {
-                    return PxQueryHitType.Block;
-                }
+        self.PreFilter = queryPreFilter;
+        self.PostFilter = queryPostFilter;
+        self.Destructor = queryDestructor;
 
-                return PxQueryHitType.Touch;
+        IntPtr callbackMemory = Marshal.AllocHGlobal(Marshal.SizeOf<QueryFilterCallbackInstance>());
+        QueryFilterCallbackInstance* callbackInstance = (QueryFilterCallbackInstance*)callbackMemory;
+        GCHandle contextHandle = GCHandle.Alloc(new QueryFilterContext(self));
+        callbackInstance->ContextHandle = GCHandle.ToIntPtr(contextHandle);
+        callbackInstance->VTable = (IntPtr)PhysicalScene.Native.CreateVTable(
+            self.PreFilter, self.PostFilter, self.Destructor);
+        self.QueryFilterCallback = (PxQueryFilterCallback*)callbackInstance;
+    }
+
+    private static PxQueryHitType preFilter(void* userData, PxFilterData* filterData, PxShape* shape,
+        PxRigidActor* actor, PxHitFlags queryFlags)
+    {
+        if (shape == null)
+        {
+            return PxQueryHitType.None;
+        }
+
+        PxFilterData shapeFilterData = shape->GetQueryFilterData();
+        if ((shapeFilterData.word0 & filterData->word0) == 0U)
+        {
+            return PxQueryHitType.None;
+        }
+
+        if ((filterData->word1 & QUERY_ENTITY_EXCLUSION_FLAG) != 0U)
+        {
+            QueryFilterContext context = getQueryFilterContext(userData);
+            if (context.Scene.ColliderDict.ContainsKey((IntPtr)shape))
+            {
+                GameplayCollider collider = context.Scene.ColliderDict.GetValueByKey((IntPtr)shape);
+                Entity colliderOwner = collider.AttachedRigidbody?.Parent ?? collider.Parent;
+                if (isEntityOrDescendantOf(colliderOwner, context.IgnoredEntityA) ||
+                    isEntityOrDescendantOf(colliderOwner, context.IgnoredEntityB))
+                {
+                    return PxQueryHitType.None;
+                }
+            }
+        }
+
+        return (filterData->word1 & QUERY_BLOCKING_FLAG) != 0U
+            ? PxQueryHitType.Block
+            : PxQueryHitType.Touch;
+    }
+
+    private static PxQueryHitType postFilter(void* userData, PxFilterData* filterData, PxQueryHit* hit) =>
+        PxQueryHitType.Touch;
+
+    private static void destroyQueryFilter(void* userData)
+    {
+    }
+
+    private static QueryFilterContext getQueryFilterContext(PhysicalScene self)
+    {
+        QueryFilterCallbackInstance* callbackInstance = (QueryFilterCallbackInstance*)self.QueryFilterCallback;
+        GCHandle contextHandle = GCHandle.FromIntPtr(callbackInstance->ContextHandle);
+        return (QueryFilterContext)contextHandle.Target!;
+    }
+
+    private static QueryFilterContext getQueryFilterContext(void* userData)
+    {
+        QueryFilterCallbackInstance* callbackInstance = (QueryFilterCallbackInstance*)userData;
+        GCHandle contextHandle = GCHandle.FromIntPtr(callbackInstance->ContextHandle);
+        return (QueryFilterContext)contextHandle.Target!;
+    }
+
+    private static bool isEntityOrDescendantOf(Entity? candidate, Entity? ancestor)
+    {
+        if (ancestor == null)
+        {
+            return false;
+        }
+
+        while (candidate != null)
+        {
+            if (ReferenceEquals(candidate, ancestor))
+            {
+                return true;
             }
 
-            return PxQueryHitType.None;
-        };
+            candidate = candidate.Parent;
+        }
 
-        self.PostFilter = (void* userData, PxFilterData* filterData, PxQueryHit* hit) =>
-        {
-            return PxQueryHitType.Touch;
-        };
-
-        self.Destructor = (void* userData) => { };
-        
-        var reportPtr = Marshal.AllocHGlobal(Marshal.SizeOf<PxQueryFilterCallback>());
-        self.QueryFilterCallback = (PxQueryFilterCallback*)reportPtr;
-        self.QueryFilterCallback->vtable_ = PhysicalScene.Native.CreateVTable(self.PreFilter, self.PostFilter, self.Destructor);
+        return false;
     }
 
     private static void ReleaseQueryFilterCallbacks(this PhysicalScene self)
     {
-        PhysicalScene.Native.FreeVTable(self.QueryFilterCallback->vtable_);
-        Marshal.FreeHGlobal((IntPtr)self.QueryFilterCallback);
-        
+        QueryFilterCallbackInstance* callbackInstance = (QueryFilterCallbackInstance*)self.QueryFilterCallback;
+        PhysicalScene.Native.FreeVTable((void*)callbackInstance->VTable);
+        GCHandle contextHandle = GCHandle.FromIntPtr(callbackInstance->ContextHandle);
+        contextHandle.Free();
+        Marshal.FreeHGlobal((IntPtr)callbackInstance);
+
+        self.QueryFilterCallback = null;
         self.PreFilter = null;
         self.PostFilter = null;
         self.Destructor = null;

@@ -29,6 +29,8 @@ public class MoverIntegrationTests
     private const int UNIT_CONFIG_ID = 1;
     private const long TEST_UNIT_ID = 12001;
     private const long TEST_SCENE_ACTOR_ID = 12002;
+    private const long TEST_SECOND_UNIT_ID = 12003;
+    private const long TEST_THIRD_UNIT_ID = 12004;
     private const long FIRST_SHOOT_TIME = 11000;
     private const long SECOND_SHOOT_TIME = 21000;
     private const long THIRD_SHOOT_TIME = 31000;
@@ -55,6 +57,13 @@ public class MoverIntegrationTests
     private const float INITIAL_CAPSULE_HEIGHT = 2f;
     private const float RAYCAST_DISTANCE = 10f;
     private const float RAYCAST_ORIGIN_X = -5f;
+    private const float BULLET_QUERY_RADIUS = 0.5f;
+    private const float IGNORED_UNIT_POSITION = 0.5f;
+    private const float TARGET_UNIT_POSITION = 3f;
+    private const float PATH_COLLISION_TARGET_POSITION = 1.25f;
+    private const float BULLET_QUERY_DISTANCE = 4f;
+    private const long EXPIRED_LIFETIME_MILLISECONDS = 0;
+    private const int ALL_PHYSICS_LAYERS = -1;
     private const int FIRST_SIMULATION_COUNT = 1;
     private const int FIRST_INDEX = 0;
     private const int SECOND_SIMULATION_COUNT = 2;
@@ -913,33 +922,242 @@ public class MoverIntegrationTests
         Assert.That(transform.Transform.Location.x, Is.EqualTo(EXPECTED_FIRST_POSITION).Within(POSITION_TOLERANCE));
     }
 
-    /// <summary>The existing Bullet factory creates a Mover hierarchy associated with its Level's World.</summary>
+    /// <summary>The Bullet factory uses real World scheduling and excludes its Shooter during the first movement tick.</summary>
     [Test]
-    public void BulletFactoryCreatesWorldOwnedMoverHierarchy()
+    public void BulletFactoryCreatesWorldOwnedBulletWithShooterAndPhysicalScene()
     {
-        LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
-        this.world.AddComponent<AoiManagerComponent>();
-        Bullet bullet = BulletHelper.CreateBullet(
-            this.level, BULLET_CONFIG_ID, BULLET_ID, ENetRole.Authority, ENetRole.SimulatedProxy,
-            float3.zero, quaternion.identity,
-            new GameplayTargetInfo { TargetDir = moveDirection },
-            isRaiseEvent: false);
-        Assert.That(bullet, Is.Not.InstanceOf<GamePlayEntity>());
-        Assert.That(bullet.GetComponent<AOIEntityCmp>(), Is.InstanceOf<GamePlayEntity>());
-        MoverComponent component = bullet.GetComponent<MoverComponent>();
-        Mover mover = (Mover)component.Children.Values.Single();
-        MoverStageRuntime stage = mover.CurrentStage;
-        Assert.That(component.GetLevelGameplayWorld(), Is.SameAs(this.world));
-        Assert.That(mover.GetLevelGameplayWorld(), Is.SameAs(this.world));
-        Assert.That(stage.GetLevelGameplayWorld(), Is.SameAs(this.world));
+        IGameplayPhysicsHandler previousPhysics = GameplayPhysics.GameplayPhysicsHandler;
+        try
+        {
+            GameplayPhysics.GameplayPhysicsHandler = new GameplayPhysicsHandler_Server();
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            PhysicalScene physicalScene = this.createBulletTestServices();
+            Unit shooterHost = this.createPhysicalUnit(TEST_UNIT_ID, float3.zero);
+            ShooterGear shooter = shooterHost.AddComponent<ShooterGear>();
+            Bullet bullet = BulletHelper.CreateBullet(
+                this.level, BULLET_CONFIG_ID, BULLET_ID, ENetRole.Authority, ENetRole.SimulatedProxy,
+                float3.zero, quaternion.identity, new GameplayTargetInfo { TargetDir = moveDirection },
+                shooter, isRaiseEvent: false);
 
-        // Bullet's legacy collision timer is migrated separately and requires server physics.
-        this.root.Scene.GetComponent<TimerComponent>().CancelTimer(ref bullet.LogicUpdateTimer);
-        earlyUpdate(this.root);
-        setServerTime(FIRST_TICK_TIME);
-        update(this.root);
-        Assert.That(bullet.GetComponent<TransformComponent>().Transform.Location.x,
-            Is.EqualTo(EXPECTED_FIRST_POSITION).Within(POSITION_TOLERANCE));
+            Assert.That(bullet, Is.InstanceOf<GamePlayEntity>());
+            Assert.That(bullet.Parent, Is.SameAs(this.world));
+            Assert.That(bullet.GetComponent<AOIEntityCmp>(), Is.InstanceOf<GamePlayEntity>());
+            Assert.That((Entity)bullet.ShooterHost, Is.SameAs(shooterHost));
+            Assert.That((PhysicalScene)bullet.PhysicalScene, Is.SameAs(physicalScene));
+            MoverComponent component = bullet.GetComponent<MoverComponent>();
+            Mover mover = (Mover)component.Children.Values.Single();
+            MoverStageRuntime stage = mover.CurrentStage;
+            Assert.That(component.GetLevelGameplayWorld(), Is.SameAs(this.world));
+            Assert.That(mover.GetLevelGameplayWorld(), Is.SameAs(this.world));
+            Assert.That(stage.GetLevelGameplayWorld(), Is.SameAs(this.world));
+
+            earlyUpdate(this.root);
+            setServerTime(FIRST_TICK_TIME);
+            update(this.root);
+            Assert.That(bullet.IsDisposed, Is.False);
+            Assert.That(bullet.GetComponent<TransformComponent>().Transform.Location.x,
+                Is.EqualTo(EXPECTED_FIRST_POSITION).Within(POSITION_TOLERANCE));
+        }
+        finally
+        {
+            GameplayPhysics.GameplayPhysicsHandler = previousPhysics;
+        }
+    }
+
+    /// <summary>A firing-point overlap with a non-Shooter entity destroys the Bullet before it can move.</summary>
+    [Test]
+    public void BulletSpawnCollisionDestroysBeforeMovement()
+    {
+        IGameplayPhysicsHandler previousPhysics = GameplayPhysics.GameplayPhysicsHandler;
+        try
+        {
+            GameplayPhysics.GameplayPhysicsHandler = new GameplayPhysicsHandler_Server();
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            this.createBulletTestServices();
+            Unit shooterHost = this.createPhysicalUnit(TEST_UNIT_ID, float3.zero);
+            ShooterGear shooter = shooterHost.AddComponent<ShooterGear>();
+            this.createPhysicalUnit(TEST_SECOND_UNIT_ID, float3.zero);
+            Bullet bullet = BulletHelper.CreateBullet(
+                this.level, BULLET_CONFIG_ID, BULLET_ID, ENetRole.Authority, ENetRole.SimulatedProxy,
+                float3.zero, quaternion.identity, new GameplayTargetInfo { TargetDir = moveDirection },
+                shooter, isRaiseEvent: false);
+
+            earlyUpdate(this.root);
+            setServerTime(FIRST_TICK_TIME);
+            update(this.root);
+
+            Assert.That(bullet.IsDisposed, Is.True);
+            Assert.That(this.world.GetComponent<BulletManager>().DicEntityId2Bullet, Does.Not.ContainKey(BULLET_ID));
+        }
+        finally
+        {
+            GameplayPhysics.GameplayPhysicsHandler = previousPhysics;
+        }
+    }
+
+    /// <summary>The first movement step occurs before the swept path detects a collision.</summary>
+    [Test]
+    public void BulletPathCollisionRunsAfterMovement()
+    {
+        IGameplayPhysicsHandler previousPhysics = GameplayPhysics.GameplayPhysicsHandler;
+        try
+        {
+            GameplayPhysics.GameplayPhysicsHandler = new GameplayPhysicsHandler_Server();
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            this.createBulletTestServices();
+            Unit shooterHost = this.createPhysicalUnit(TEST_UNIT_ID, float3.zero);
+            ShooterGear shooter = shooterHost.AddComponent<ShooterGear>();
+            this.createPhysicalUnit(TEST_SECOND_UNIT_ID,
+                new float3(PATH_COLLISION_TARGET_POSITION, ZERO_AXIS, ZERO_AXIS));
+            Bullet bullet = BulletHelper.CreateBullet(
+                this.level, BULLET_CONFIG_ID, BULLET_ID, ENetRole.Authority, ENetRole.SimulatedProxy,
+                float3.zero, quaternion.identity, new GameplayTargetInfo { TargetDir = moveDirection },
+                shooter, isRaiseEvent: false);
+
+            earlyUpdate(this.root);
+            setServerTime(FIRST_TICK_TIME);
+            update(this.root);
+
+            Assert.That(bullet.IsDisposed, Is.True);
+            Assert.That(this.world.GetComponent<BulletManager>().DicEntityId2Bullet, Does.Not.ContainKey(BULLET_ID));
+        }
+        finally
+        {
+            GameplayPhysics.GameplayPhysicsHandler = previousPhysics;
+        }
+    }
+
+    /// <summary>PhysX prefilters exclude both ignored entities and still report the next valid hit.</summary>
+    [Test]
+    public void BulletCollisionQueriesExcludeBulletAndShooterBeforeReturningOtherHits()
+    {
+        IGameplayPhysicsHandler previousPhysics = GameplayPhysics.GameplayPhysicsHandler;
+        try
+        {
+            GameplayPhysics.GameplayPhysicsHandler = new GameplayPhysicsHandler_Server();
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            PhysicalScene physicalScene = this.createBulletTestServices();
+            Unit shooterHost = this.createPhysicalUnit(TEST_UNIT_ID, float3.zero);
+            Unit bulletHost = this.createPhysicalUnit(TEST_SECOND_UNIT_ID,
+                new float3(IGNORED_UNIT_POSITION, ZERO_AXIS, ZERO_AXIS));
+            Unit target = this.createPhysicalUnit(TEST_THIRD_UNIT_ID,
+                new float3(TARGET_UNIT_POSITION, ZERO_AXIS, ZERO_AXIS));
+
+            Assert.That(physicalScene.OverlapSpere(float3.zero, BULLET_QUERY_RADIUS, ALL_PHYSICS_LAYERS,
+                shooterHost, bulletHost, out _), Is.False);
+            Assert.That(physicalScene.SpereCast(float3.zero, BULLET_QUERY_RADIUS, moveDirection,
+                BULLET_QUERY_DISTANCE, ALL_PHYSICS_LAYERS, shooterHost, bulletHost, out GameplayRaycastHit hit),
+                Is.True);
+            Assert.That(((GameplayCollider)hit.Collider).AttachedRigidbody.Parent, Is.SameAs(target));
+        }
+        finally
+        {
+            GameplayPhysics.GameplayPhysicsHandler = previousPhysics;
+        }
+    }
+
+    /// <summary>Empty PhysX queries safely return no hit without converting uninitialized hit data.</summary>
+    [Test]
+    public void EmptyPhysXQueriesReturnNoHit()
+    {
+        IGameplayPhysicsHandler previousPhysics = GameplayPhysics.GameplayPhysicsHandler;
+        try
+        {
+            GameplayPhysics.GameplayPhysicsHandler = new GameplayPhysicsHandler_Server();
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            PhysicalScene physicalScene = this.createBulletTestServices();
+
+            Assert.That(physicalScene.OverlapSpere(float3.zero, BULLET_QUERY_RADIUS, ALL_PHYSICS_LAYERS, out _),
+                Is.False);
+            Assert.That(physicalScene.SpereCast(float3.zero, BULLET_QUERY_RADIUS, moveDirection,
+                BULLET_QUERY_DISTANCE, ALL_PHYSICS_LAYERS, out _), Is.False);
+        }
+        finally
+        {
+            GameplayPhysics.GameplayPhysicsHandler = previousPhysics;
+        }
+    }
+
+    /// <summary>A finite Bullet DTO round-trips its remaining lifetime and Shooter host through the game serializer.</summary>
+    [Test]
+    public void BulletProtocolCarriesRemainingLifetimeAndShooterHost()
+    {
+        IGameplayPhysicsHandler previousPhysics = GameplayPhysics.GameplayPhysicsHandler;
+        try
+        {
+            GameplayPhysics.GameplayPhysicsHandler = new GameplayPhysicsHandler_Server();
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            this.createBulletTestServices();
+            Unit shooterHost = this.createPhysicalUnit(TEST_UNIT_ID, float3.zero);
+            ShooterGear shooter = shooterHost.AddComponent<ShooterGear>();
+            Bullet bullet = BulletHelper.CreateBullet(
+                this.level, BULLET_CONFIG_ID, BULLET_ID, ENetRole.Authority, ENetRole.SimulatedProxy,
+                float3.zero, quaternion.identity, new GameplayTargetInfo { TargetDir = moveDirection },
+                shooter, isRaiseEvent: false);
+            M2C_CreateBullets message = M2C_CreateBullets.Create();
+            message.Bullets.Add(bullet.CreateDTOBulletInfo());
+
+            byte[] serialized = MessageSerializer.Serialize(message);
+            M2C_CreateBullets roundTripped = (M2C_CreateBullets)MessageSerializer.Deserialize(
+                typeof(M2C_CreateBullets), serialized, 0, serialized.Length);
+
+            Assert.That(roundTripped.Bullets, Has.Count.EqualTo(SINGLE_REGISTRATION));
+            Assert.That(roundTripped.Bullets[FIRST_INDEX].ShooterEntityId, Is.EqualTo(TEST_UNIT_ID));
+            Assert.That(roundTripped.Bullets[FIRST_INDEX].RemainingLifetimeMS, Is.GreaterThan(NO_REGISTRATIONS));
+            roundTripped.Dispose();
+        }
+        finally
+        {
+            GameplayPhysics.GameplayPhysicsHandler = previousPhysics;
+        }
+    }
+
+    /// <summary>An expired finite Bullet DTO is ignored before a missing Shooter can be resolved.</summary>
+    [Test]
+    public void ExpiredFiniteBulletDtoIsNotCreated()
+    {
+        DTOBulletInfo dtoBulletInfo = DTOBulletInfo.Create();
+        dtoBulletInfo.ConfigId = BULLET_CONFIG_ID;
+        dtoBulletInfo.RemainingLifetimeMS = EXPIRED_LIFETIME_MILLISECONDS;
+
+        bool created = dtoBulletInfo.TryCreateBullet(this.level, out Bullet bullet);
+
+        Assert.That(created, Is.False);
+        Assert.That(bullet, Is.Null);
+    }
+
+    /// <summary>The World timer expires a finite Bullet and removes its network and manager registrations.</summary>
+    [Test]
+    public void BulletLifetimeExpiresThroughGameplayWorldTimer()
+    {
+        IGameplayPhysicsHandler previousPhysics = GameplayPhysics.GameplayPhysicsHandler;
+        try
+        {
+            GameplayPhysics.GameplayPhysicsHandler = new GameplayPhysicsHandler_Server();
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            this.createBulletTestServices();
+            Unit shooterHost = this.createPhysicalUnit(TEST_UNIT_ID, float3.zero);
+            ShooterGear shooter = shooterHost.AddComponent<ShooterGear>();
+            Bullet bullet = BulletHelper.CreateBullet(
+                this.level, BULLET_CONFIG_ID, BULLET_ID, ENetRole.Authority, ENetRole.SimulatedProxy,
+                float3.zero, quaternion.identity, new GameplayTargetInfo { TargetDir = moveDirection },
+                shooter, isRaiseEvent: false);
+            long expirationTimeMS = bullet.ExpirationTimeMS;
+
+            earlyUpdate(this.root);
+            setServerTime(expirationTimeMS);
+            update(this.root);
+
+            Assert.That(bullet.IsDisposed, Is.True);
+            Assert.That(bullet.TimeoutTimerId, Is.Zero);
+            Assert.That(this.world.GetComponent<BulletManager>().DicEntityId2Bullet, Does.Not.ContainKey(BULLET_ID));
+            Assert.That((Entity)this.root.Scene.GetComponent<NetworkEntityManagerComponent>().GetEntity(BULLET_ID),
+                Is.Null);
+        }
+        finally
+        {
+            GameplayPhysics.GameplayPhysicsHandler = previousPhysics;
+        }
     }
 
     /// <summary>A World-owned Mover runs without a Root Timer component.</summary>
@@ -1727,6 +1945,28 @@ public class MoverIntegrationTests
             new KinematicMoverManagerSettings { AutoSimulation = true });
         manager.Enable = true;
         return manager;
+    }
+
+    private PhysicalScene createBulletTestServices()
+    {
+        if (this.root.Scene.GetComponent<NetworkEntityManagerComponent>() == null)
+        {
+            this.root.Scene.AddComponent<NetworkEntityManagerComponent>();
+        }
+
+        this.world.AddComponent<UnitManager>();
+        this.world.AddComponent<BulletManager>();
+        this.world.AddComponent<AoiManagerComponent>();
+        PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+        return this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+    }
+
+    private Unit createPhysicalUnit(long entityId, float3 position)
+    {
+        Unit unit = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, entityId,
+            ENetRole.Authority, ENetRole.SimulatedProxy, position, quaternion.identity);
+        unit.AddComponent<CharacterController>();
+        return unit;
     }
 
     private static void setServerTime(long time) =>
