@@ -5,6 +5,8 @@ namespace Bliss
     {
         /// <summary>Bullet firing-point overlap checks before movement.</summary>
         public const int BULLET_SPAWN_CHECK = 100;
+        /// <summary>Marks buffered character input as available to the following movement step.</summary>
+        public const int CHARACTER_INPUT = 190;
         /// <summary>Character movement and prediction before shared movement simulation.</summary>
         public const int CHARACTER_MOVEMENT = 200;
         /// <summary>Shared priority for mover and kinematic simulation, ordered by registration.</summary>

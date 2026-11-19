@@ -652,12 +652,14 @@ public static unsafe partial class PhysicalSceneSystems
 
     private static GameplayCollider GetEntityByShapePtr(this PhysicalScene self, PxShape* shape)
     {
-        return null!;
+        return shape != null && self.ColliderDict.ContainsKey((IntPtr)shape)
+            ? self.ColliderDict.GetValueByKey((IntPtr)shape)
+            : null!;
     }
     
     private static PxShape* GetShapePtrByEntity(this PhysicalScene self, GameplayCollider collider)
     {
-        return null!;
+        return collider == null ? null : collider.ShapePtr;
     }
     
     private static void ConfigureQueryFilterCallbacks(this PhysicalScene self)

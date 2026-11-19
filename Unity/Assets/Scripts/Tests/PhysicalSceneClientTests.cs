@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using Bliss;
+using Bliss.CharacterControllers;
 using Bliss.CharacterMovement;
 using Bliss.Core;
 using Bliss.Core.EventSystem;
+using Bliss.Debugger.GameDebugStats;
 using Bliss.Physics;
 using Bliss.Timer;
 using Bliss.ViewLogic.Config;
@@ -43,6 +45,11 @@ public class PhysicalSceneClientTests
     private const long BULLET_ID = 405;
     private const int SUPPRESS_INFO_LOG_LEVEL = 4;
     private const long UNUPDATED_VIEW_TIME = -1;
+    private const long INITIAL_TICK_TIME = 1000;
+    private const long FIRST_TICK_TIME = 1050;
+    private const int FIRST_INPUT_TIME = 1;
+    private const int TWO_INPUT_SAMPLES = 2;
+    private const float UNSIMULATED_POSITION = -10f;
     private TypeManager typeManager;
     private EntitySystemManager entitySystemManager;
     private EventSystem eventSystem;
@@ -247,6 +254,17 @@ public class PhysicalSceneClientTests
             Assert.That(unit.GetComponent<AOIEntityCmp>(), Is.InstanceOf<GamePlayEntity>());
             Assert.That(unit.GetComponent<SmoothTransformComponent>(), Is.InstanceOf<GamePlayEntity>());
             Assert.That(aoiManager.Entries.Count, Is.EqualTo(EXPECTED_HIT_COUNT));
+            var input = character.InputIntentProcessPipeline;
+            var movement = character.MovementComponent;
+            var motor = character.KinematicCharacterComponent;
+            var capsule = motor.Capsule;
+            character.Dispose();
+            Assert.That(input.IsDisposed, Is.True);
+            Assert.That(movement.IsDisposed, Is.True);
+            Assert.That(motor.IsDisposed, Is.True);
+            Assert.That(capsule.IsDisposed, Is.True);
+            Assert.That(unit.GetComponent<GameplayRigidbody>(), Is.Null);
+            Assert.That(world.GetComponent<KinematicMoverManager>().CharacterMotors, Is.Empty);
             unit.Dispose();
             Assert.That(aoiManager.Entries, Is.Empty);
         }
@@ -255,6 +273,77 @@ public class PhysicalSceneClientTests
             configManager.Dispose();
             GameplayPhysics.GameplayPhysicsHandler = previousPhysics;
             Log.LogLevel = previousLogLevel;
+        }
+    }
+
+    /// <summary>Client motor simulation uses the latest sampled input only for eligible network roles.</summary>
+    [TestCase(ENetRole.AutonomousProxy, ENetRole.Authority, true)]
+    [TestCase(ENetRole.Authority, ENetRole.Authority, true)]
+    [TestCase(ENetRole.SimulatedProxy, ENetRole.Authority, false)]
+    public void ClientCharacterUsesWorldInputAndRoleFilteredTicks(
+        ENetRole localRole, ENetRole remoteRole, bool shouldSimulate)
+    {
+        IGameplayPhysicsHandler previousPhysics = GameplayPhysics.GameplayPhysicsHandler;
+        long previousOffset = TimeInfo.Instance.ServerFrameTime() - TimeInfo.Instance.FrameTime;
+        GameDebugStates debugStates = new GameDebugStates();
+        try
+        {
+            debugStates.Init();
+            registerSingleton(debugStates);
+            GameplayPhysics.GameplayPhysicsHandler = new GameplayPhysicsHandler_Client();
+            TimeInfo.Instance.ServerMinusClientTime = INITIAL_TICK_TIME - TimeInfo.Instance.FrameTime;
+            GameplayWorld world = GameplayWorldFactory.Create(
+                this.root.Scene, WORLD_ID, WORLD_INSTANCE_ID, nameof(GameplayWorld));
+            KinematicMoverManager manager = world.AddComponent<KinematicMoverManager, KinematicMoverManagerSettings>(
+                new KinematicMoverManagerSettings { AutoSimulation = true, Interpolate = true, InterpolateMotor = true });
+            manager.Enable = true;
+            Unit unit = UnitHelper.CreateMinimalUnit(world, UNIT_CONFIG_ID, UNIT_ID,
+                localRole, remoteRole, float3.zero, quaternion.identity);
+            unit.AddComponent<SmoothTransformComponent, SmoothTransformComponentInitParam>(
+                new SmoothTransformComponentInitParam(ENetworkSmoothingMode.Linear));
+            Bliss.CharacterControllers.CharacterController controller =
+                unit.AddComponent<Bliss.CharacterControllers.CharacterController>();
+            // This fixture does not start a client session or exercise network transmission.
+            controller.MovementComponent.bReplicateMovement = false;
+            KinematicCharacterComponent motor = controller.KinematicCharacterComponent;
+            motor._solveMovementCollisions = false;
+            motor._solveGrounding = false;
+            motor.InteractiveRigidbodyHandling = false;
+            motor.InitialSimulationPosition = new float3(UNSIMULATED_POSITION, ZERO_AXIS, ZERO_AXIS);
+            motor.InitialTickPosition = motor.InitialSimulationPosition;
+            TestInputSource input = new TestInputSource();
+            controller.InputIntentProcessPipeline.SetInputSource(input);
+
+            Action<Root> earlyUpdate = rootUpdate("EarlyUpdate");
+            Action<Root> update = rootUpdate("Update");
+            earlyUpdate(this.root);
+            input.PressJump = false;
+            earlyUpdate(this.root);
+            Assert.That(input.SampleCount, Is.EqualTo(TWO_INPUT_SAMPLES));
+            Assert.That(controller.RuntimeData.IntentMovement.x, Is.EqualTo(UNIT_AXIS).Within(POSITION_TOLERANCE));
+            Assert.That(controller.RuntimeData.WantsToJump, Is.True);
+
+            TimeInfo.Instance.ServerMinusClientTime = FIRST_TICK_TIME - TimeInfo.Instance.FrameTime;
+            update(this.root);
+            Assert.That(controller.MovementComponent.LogicTimeStamp, Is.EqualTo(GameplayWorldLogicUpdate.STEP_MILLISECONDS));
+            if (shouldSimulate)
+            {
+                Assert.That(motor.InitialSimulationPosition.x, Is.Zero.Within(POSITION_TOLERANCE));
+                Assert.That(motor.InitialTickPosition.x, Is.Zero.Within(POSITION_TOLERANCE));
+                Assert.That(controller.RuntimeData.JumpConsumed, Is.True);
+            }
+            else
+            {
+                Assert.That(motor.InitialSimulationPosition.x, Is.EqualTo(UNSIMULATED_POSITION));
+                Assert.That(motor.InitialTickPosition.x, Is.EqualTo(UNSIMULATED_POSITION));
+                Assert.That(controller.RuntimeData.JumpConsumed, Is.False);
+            }
+        }
+        finally
+        {
+            debugStates.Dispose();
+            GameplayPhysics.GameplayPhysicsHandler = previousPhysics;
+            TimeInfo.Instance.ServerMinusClientTime = previousOffset;
         }
     }
 
@@ -270,6 +359,36 @@ public class PhysicalSceneClientTests
         MethodInfo register = typeof(ASingleton).GetMethod("Register", BindingFlags.Instance | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException("Singleton registration method was not found.");
         register.Invoke(singleton, null);
+    }
+
+    /// <summary>Supplies a deterministic movement sample and a single jump edge.</summary>
+    private sealed class TestInputSource : IInputSource
+    {
+        public bool PressJump = true;
+        public int SampleCount;
+
+        public float3 GetMovementInput()
+        {
+            this.SampleCount++;
+            return new float3(UNIT_AXIS, ZERO_AXIS, ZERO_AXIS);
+        }
+
+        public float3 GetLookInput() => float3.zero;
+        public bool GetActionDown(EGameplayInputAction action) => this.PressJump;
+        public quaternion GetCameraRotation() => quaternion.identity;
+
+        public void GetActionStatus(List<GameplayInputActionStatus> result)
+        {
+            if (this.PressJump)
+            {
+                result.Add(new GameplayInputActionStatus
+                {
+                    TimStamp = FIRST_INPUT_TIME,
+                    Action = EGameplayInputAction.Jump,
+                    Status = EInputActionStatus.Down,
+                });
+            }
+        }
     }
 
     /// <summary>Supplies the external scene-resource preparation boundary for the isolated fixture.</summary>

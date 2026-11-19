@@ -1,4 +1,5 @@
 using Bliss.Core.EventSystem;
+using Bliss.CharacterMovement;
 using Bliss.Id;
 using Bliss.Server;
 using Bliss.Timer;
@@ -42,6 +43,10 @@ namespace Bliss
             gameplayWorld.AddComponent<SceneActorManager>();
             gameplayWorld.AddComponent<AoiManagerComponent>();
             gameplayWorld.AddComponent<ReplicationGraph>();
+            KinematicMoverManager kinematicManager =
+                gameplayWorld.AddComponent<KinematicMoverManager, KinematicMoverManagerSettings>(
+                    new KinematicMoverManagerSettings { AutoSimulation = true });
+            kinematicManager.Enable = true;
             
             
             var levelConfigList = ConfigManager.Instance.Tables.TbLevelConfig.DicSceneId2Level[(int)rootScene.Id];

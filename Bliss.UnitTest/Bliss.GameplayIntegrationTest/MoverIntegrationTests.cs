@@ -1,5 +1,6 @@
 using System.Reflection;
 using Bliss;
+using Bliss.CharacterControllers;
 using Bliss.CharacterMovement;
 using Bliss.Core;
 using Bliss.Core.EventSystem;
@@ -36,6 +37,7 @@ public class MoverIntegrationTests
     private const int BULLET_CONFIG_ID = 1;
     private const long BULLET_ID = 404;
     private const long INITIAL_TIME = 1000;
+    private const long AFTER_JUMP_GRACE_TIME = 1200;
     private const long FIRST_TICK_TIME = 1050;
     private const long DELAYED_TICK_TIME = 1500;
     private const long NO_SERVER_TIME_OFFSET = 0;
@@ -47,7 +49,14 @@ public class MoverIntegrationTests
     private const float UNOBSERVED_POSITION = -1f;
     private const float POSITION_TOLERANCE = 0.0001f;
     private const float EXPECTED_DELTA_SECONDS = 0.05f;
+    private const float NETWORK_MOVE_TIME = 0.1f;
+    private const float RESIZED_CAPSULE_RADIUS = 0.75f;
+    private const float RESIZED_CAPSULE_HEIGHT = 3f;
+    private const float INITIAL_CAPSULE_HEIGHT = 2f;
+    private const float RAYCAST_DISTANCE = 10f;
+    private const float RAYCAST_ORIGIN_X = -5f;
     private const int FIRST_SIMULATION_COUNT = 1;
+    private const int FIRST_INDEX = 0;
     private const int SECOND_SIMULATION_COUNT = 2;
     private const int NO_REGISTRATIONS = 0;
     private const int SINGLE_REGISTRATION = 1;
@@ -74,6 +83,9 @@ public class MoverIntegrationTests
     private static readonly MethodInfo registerSingleton =
         typeof(ASingleton).GetMethod("Register", BindingFlags.Instance | BindingFlags.NonPublic)
         ?? throw new InvalidOperationException("Singleton registration method was not found.");
+    private static readonly PropertyInfo frameTime =
+        typeof(TimeInfo).GetProperty(nameof(TimeInfo.FrameTime))
+        ?? throw new InvalidOperationException("TimeInfo.FrameTime was not found.");
     private static readonly Action<Root> earlyUpdate =
         (typeof(Root).GetMethod("EarlyUpdate", BindingFlags.Instance | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException("Root.EarlyUpdate was not found."))
@@ -182,6 +194,376 @@ public class MoverIntegrationTests
         Assert.That(manager.DicEntityId2Unit, Is.Empty);
     }
 
+    /// <summary>A dedicated movement component advances once per World tick without a Controller update.</summary>
+    [Test]
+    public void CharacterMovementUsesWorldFixedTicks()
+    {
+        LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+        Unit unit = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, TEST_UNIT_ID,
+            ENetRole.SimulatedProxy, ENetRole.Authority, float3.zero, quaternion.identity);
+        CharacterMovementComponent movement = unit.AddComponent<CharacterMovementComponent>();
+        Assert.That(typeof(GamePlayEntity).IsInstanceOfType(movement), Is.True);
+
+        earlyUpdate(this.root);
+        update(this.root);
+        Assert.That(movement.LogicTimeStamp, Is.Zero);
+
+        setServerTime(FIRST_TICK_TIME);
+        earlyUpdate(this.root);
+        update(this.root);
+        Assert.That(movement.LogicTimeStamp, Is.EqualTo(GameplayWorldLogicUpdate.STEP_MILLISECONDS));
+
+        update(this.root);
+        Assert.That(movement.LogicTimeStamp, Is.EqualTo(GameplayWorldLogicUpdate.STEP_MILLISECONDS));
+        unit.Dispose();
+        setServerTime(DELAYED_TICK_TIME);
+        earlyUpdate(this.root);
+        update(this.root);
+        Assert.That(movement.IsDisposed, Is.True);
+    }
+
+    /// <summary>Input is collected independently each frame and retains a buffered jump until the tick.</summary>
+    [Test]
+    public void InputPipelineSamplesEachEarlyUpdateAndRetainsJump()
+    {
+        LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+        Unit unit = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, TEST_UNIT_ID,
+            ENetRole.AutonomousProxy, ENetRole.Authority, float3.zero, quaternion.identity);
+        InputIntentProcessPipeline input = unit.AddComponent<InputIntentProcessPipeline>();
+        CharacterRuntimeData runtimeData = new CharacterRuntimeData();
+        TestInputSource inputSource = new TestInputSource();
+        input.SetRuntimeData(runtimeData);
+        input.SetInputSource(inputSource);
+
+        earlyUpdate(this.root);
+        inputSource.PressJump = false;
+        earlyUpdate(this.root);
+        Assert.That(inputSource.MovementReadCount, Is.EqualTo(SECOND_SIMULATION_COUNT));
+        Assert.That(runtimeData.IntentMovement.x, Is.EqualTo(UNIT_AXIS).Within(POSITION_TOLERANCE));
+        Assert.That(runtimeData.WantsToJump, Is.True);
+
+        setServerTime(FIRST_TICK_TIME);
+        update(this.root);
+        Assert.That(runtimeData.WantsToJump, Is.True);
+    }
+
+    /// <summary>A jump edge survives elapsed grace time until the next due World tick.</summary>
+    [Test]
+    public void JumpInputSurvivesUntilNextWorldTick()
+    {
+        long previousFrameTime = TimeInfo.Instance.FrameTime;
+        try
+        {
+            frameTime.SetValue(TimeInfo.Instance, INITIAL_TIME);
+            setServerTime(INITIAL_TIME);
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            Unit unit = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, TEST_UNIT_ID,
+                ENetRole.AutonomousProxy, ENetRole.Authority, float3.zero, quaternion.identity);
+            InputIntentProcessPipeline input = unit.AddComponent<InputIntentProcessPipeline>();
+            CharacterRuntimeData runtimeData = new CharacterRuntimeData();
+            TestInputSource inputSource = new TestInputSource();
+            input.SetRuntimeData(runtimeData);
+            input.SetInputSource(inputSource);
+            earlyUpdate(this.root);
+
+            inputSource.PressJump = false;
+            frameTime.SetValue(TimeInfo.Instance, AFTER_JUMP_GRACE_TIME);
+            earlyUpdate(this.root);
+            Assert.That(runtimeData.WantsToJump, Is.True);
+            update(this.root);
+            Assert.That(runtimeData.WantsToJump, Is.True);
+            earlyUpdate(this.root);
+            Assert.That(runtimeData.WantsToJump, Is.False);
+        }
+        finally
+        {
+            frameTime.SetValue(TimeInfo.Instance, previousFrameTime);
+        }
+    }
+
+    /// <summary>A jump down followed by cancellation in one sample is retained for the next tick.</summary>
+    [Test]
+    public void JumpEdgeIsRetainedWhenLaterInputRecordCancelsIt()
+    {
+        long previousFrameTime = TimeInfo.Instance.FrameTime;
+        try
+        {
+            frameTime.SetValue(TimeInfo.Instance, INITIAL_TIME);
+            setServerTime(INITIAL_TIME);
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            Unit unit = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, TEST_UNIT_ID,
+                ENetRole.AutonomousProxy, ENetRole.Authority, float3.zero, quaternion.identity);
+            InputIntentProcessPipeline input = unit.AddComponent<InputIntentProcessPipeline>();
+            CharacterRuntimeData data = new CharacterRuntimeData { JumpConsumed = true };
+            TestInputSource source = new TestInputSource { CancelAfterJump = true };
+            input.SetRuntimeData(data);
+            input.SetInputSource(source);
+            earlyUpdate(this.root);
+            Assert.That(data.JumpConsumed, Is.False);
+            source.PressJump = false;
+            frameTime.SetValue(TimeInfo.Instance, AFTER_JUMP_GRACE_TIME);
+            earlyUpdate(this.root);
+            Assert.That(data.WantsToJump, Is.True);
+            update(this.root);
+            Assert.That(data.WantsToJump, Is.True);
+        }
+        finally
+        {
+            frameTime.SetValue(TimeInfo.Instance, previousFrameTime);
+        }
+    }
+
+    /// <summary>The server message handler applies an accepted move immediately, without a World tick.</summary>
+    [Test]
+    public void ServerMoveMessageAppliesBeforeNextWorldTick()
+    {
+        IGameplayPhysicsHandler previousPhysics = GameplayPhysics.GameplayPhysicsHandler;
+        try
+        {
+            GameplayPhysics.GameplayPhysicsHandler = new GameplayPhysicsHandler_Server();
+            PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+            this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            Unit unit = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, TEST_UNIT_ID,
+                ENetRole.Authority, ENetRole.AutonomousProxy, float3.zero, quaternion.identity);
+            KinematicCharacterComponent motor = unit.AddComponent<KinematicCharacterComponent>();
+            CharacterMovementComponent movement = unit.AddComponent<CharacterMovementComponent>();
+            movement.KinematicCharacterCmp = motor;
+            CharacterNetworkMoveData move = new CharacterNetworkMoveData { TimeStamp = NETWORK_MOVE_TIME };
+            move.Location.Value = moveDirection;
+            C2M_CharacterMoveData message = C2M_CharacterMoveData.Create();
+            message.MoveData.Add(move);
+
+            invokeServerMove(unit, message);
+
+            Assert.That(unit.GetComponent<TransformComponent>().Transform.Location.x,
+                Is.EqualTo(UNIT_AXIS).Within(POSITION_TOLERANCE));
+            Assert.That(motor.TransientPosition.x, Is.EqualTo(UNIT_AXIS).Within(POSITION_TOLERANCE));
+            Assert.That(movement.LogicTimeStamp, Is.Zero);
+            Assert.That(movement.ServerData.CurrentClientTimeStamp,
+                Is.EqualTo(NETWORK_MOVE_TIME).Within(POSITION_TOLERANCE));
+        }
+        finally
+        {
+            GameplayPhysics.GameplayPhysicsHandler = previousPhysics;
+        }
+    }
+
+    /// <summary>A Level character owns real PhysX resources that are unregistered when the Unit is destroyed.</summary>
+    [Test]
+    public unsafe void ServerLevelCharacterOwnsNativePhysics()
+    {
+        IGameplayPhysicsHandler previousPhysics = GameplayPhysics.GameplayPhysicsHandler;
+        try
+        {
+            GameplayPhysics.GameplayPhysicsHandler = new GameplayPhysicsHandler_Server();
+            PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+            PhysicalScene physicalScene = this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            Unit unit = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, TEST_UNIT_ID,
+                ENetRole.Authority, ENetRole.AutonomousProxy, float3.zero, quaternion.identity);
+            CharacterController controller = unit.AddComponent<CharacterController>();
+            GameplayRigidbody body = unit.GetComponent<GameplayRigidbody>();
+            GameplayCapsuleCollider capsule = controller.KinematicCharacterComponent.Capsule;
+            Assert.That((IntPtr)body.RigidBodyPtr, Is.Not.EqualTo(IntPtr.Zero));
+            Assert.That((IntPtr)capsule.ShapePtr, Is.Not.EqualTo(IntPtr.Zero));
+            Assert.That(capsule.AttachedRigidbody, Is.SameAs(body));
+            Assert.That(physicalScene.RigidbodyDict.GetValueByKey((IntPtr)body.RigidBodyPtr), Is.SameAs(body));
+            Assert.That(physicalScene.ColliderDict.GetValueByKey((IntPtr)capsule.ShapePtr), Is.SameAs(capsule));
+            Assert.That(((PxRigidActor*)body.RigidBodyPtr)->GetNbShapes(), Is.EqualTo(SINGLE_REGISTRATION));
+            Assert.That((PxRigidBody_getRigidBodyFlags(body.RigidBodyPtr) & PxRigidBodyFlags.Kinematic),
+                Is.EqualTo(PxRigidBodyFlags.Kinematic));
+            float3 capsuleAxis = math.mul(PxShape_getLocalPose(capsule.ShapePtr).q.ToQuaternion(),
+                new float3(UNIT_AXIS, ZERO_AXIS, ZERO_AXIS));
+            Assert.That(math.abs(capsuleAxis.y), Is.EqualTo(UNIT_AXIS).Within(POSITION_TOLERANCE));
+            Assert.That(physicalScene.Raycast(new float3(RAYCAST_ORIGIN_X, UNIT_AXIS, ZERO_AXIS),
+                moveDirection, RAYCAST_DISTANCE, GameplayLayerMask.UnitMask, out GameplayRaycastHit hit), Is.True);
+            Assert.That((GameplayCollider)hit.Collider, Is.SameAs(capsule));
+
+            capsule.Radius = RESIZED_CAPSULE_RADIUS;
+            PxCapsuleGeometry radiusGeometry = *capsule.CapsuleGeometry;
+            Assert.That(radiusGeometry.radius, Is.EqualTo(RESIZED_CAPSULE_RADIUS).Within(POSITION_TOLERANCE));
+            Assert.That(PxTypeHelper.GetUnitCapsuleHeight(radiusGeometry.halfHeight, radiusGeometry.radius),
+                Is.EqualTo(INITIAL_CAPSULE_HEIGHT).Within(POSITION_TOLERANCE));
+            capsule.Height = RESIZED_CAPSULE_HEIGHT;
+            PxCapsuleGeometry heightGeometry = *capsule.CapsuleGeometry;
+            Assert.That(PxTypeHelper.GetUnitCapsuleHeight(heightGeometry.halfHeight, heightGeometry.radius),
+                Is.EqualTo(RESIZED_CAPSULE_HEIGHT).Within(POSITION_TOLERANCE));
+
+            CharacterNetworkMoveData move = new CharacterNetworkMoveData { TimeStamp = NETWORK_MOVE_TIME };
+            move.Location.Value = moveDirection;
+            C2M_CharacterMoveData message = C2M_CharacterMoveData.Create();
+            message.MoveData.Add(move);
+            invokeServerMove(unit, message);
+            Assert.That(PxRigidActor_getGlobalPose((PxRigidActor*)body.RigidBodyPtr).p.x,
+                Is.EqualTo(UNIT_AXIS).Within(POSITION_TOLERANCE));
+
+            IntPtr bodyPointer = (IntPtr)body.RigidBodyPtr;
+            IntPtr shapePointer = (IntPtr)capsule.ShapePtr;
+            unit.Dispose();
+            Assert.That(physicalScene.RigidbodyDict.ContainsKey(bodyPointer), Is.False);
+            Assert.That(physicalScene.ColliderDict.ContainsKey(shapePointer), Is.False);
+        }
+        finally
+        {
+            GameplayPhysics.GameplayPhysicsHandler = previousPhysics;
+        }
+    }
+
+    /// <summary>A missing physical scene leaves no partially initialized controller or scheduled input.</summary>
+    [Test]
+    public void MissingPhysicalSceneRollsBackCharacterInitialization()
+    {
+        LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+        Unit unit = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, TEST_UNIT_ID,
+            ENetRole.Authority, ENetRole.AutonomousProxy, float3.zero, quaternion.identity);
+        Assert.Throws<InvalidOperationException>(() => unit.AddComponent<CharacterController>());
+        Assert.That(unit.GetComponent<CharacterController>(), Is.Null);
+        Assert.That(unit.GetComponent<InputIntentProcessPipeline>(), Is.Null);
+        Assert.That(unit.GetComponent<GameplayRigidbody>(), Is.Null);
+        Assert.That(unit.GetComponent<KinematicCharacterComponent>(), Is.Null);
+        Assert.That(unit.GetComponent<CharacterMovementComponent>(), Is.Null);
+    }
+
+    /// <summary>A failure after native creation releases new resources without removing an existing motor.</summary>
+    [Test]
+    public void CharacterInitializationFailurePreservesExistingMotorAndReleasesPhysics()
+    {
+        IGameplayPhysicsHandler previousPhysics = GameplayPhysics.GameplayPhysicsHandler;
+        try
+        {
+            GameplayPhysics.GameplayPhysicsHandler = new GameplayPhysicsHandler_Server();
+            PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+            PhysicalScene physicalScene = this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            Unit unit = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, TEST_UNIT_ID,
+                ENetRole.Authority, ENetRole.AutonomousProxy, float3.zero, quaternion.identity);
+            KinematicCharacterComponent existingMotor = unit.AddComponent<KinematicCharacterComponent>();
+
+            Assert.Throws<Exception>(() => unit.AddComponent<CharacterController>());
+            Assert.That(unit.GetComponent<CharacterController>(), Is.Null);
+            Assert.That(unit.GetComponent<InputIntentProcessPipeline>(), Is.Null);
+            Assert.That(unit.GetComponent<GameplayRigidbody>(), Is.Null);
+            Assert.That(unit.GetComponent<KinematicCharacterComponent>(), Is.SameAs(existingMotor));
+            Assert.That(physicalScene.RigidbodyDict.Keys, Is.Empty);
+            Assert.That(physicalScene.ColliderDict.Keys, Is.Empty);
+        }
+        finally
+        {
+            GameplayPhysics.GameplayPhysicsHandler = previousPhysics;
+        }
+    }
+
+    /// <summary>A World-driven server motor keeps its real PhysX body at its simulated position.</summary>
+    [Test]
+    public unsafe void ServerWorldMotorSynchronizesNativeBody()
+    {
+        IGameplayPhysicsHandler previousPhysics = GameplayPhysics.GameplayPhysicsHandler;
+        try
+        {
+            GameplayPhysics.GameplayPhysicsHandler = new GameplayPhysicsHandler_Server();
+            PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+            this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+            KinematicMoverManager manager = this.world.AddComponent<KinematicMoverManager, KinematicMoverManagerSettings>(
+                new KinematicMoverManagerSettings { AutoSimulation = true });
+            manager.Enable = true;
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            Unit unit = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, TEST_UNIT_ID,
+                ENetRole.Authority, ENetRole.Authority, float3.zero, quaternion.identity);
+            CharacterController controller = unit.AddComponent<CharacterController>();
+            KinematicCharacterComponent motor = controller.KinematicCharacterComponent;
+            motor._solveMovementCollisions = false;
+            motor._solveGrounding = false;
+            motor.InteractiveRigidbodyHandling = false;
+            controller.InputIntentProcessPipeline.SetInputSource(new TestInputSource());
+
+            earlyUpdate(this.root);
+            setServerTime(FIRST_TICK_TIME);
+            update(this.root);
+
+            float3 position = unit.GetComponent<TransformComponent>().Transform.Location;
+            Assert.That(math.lengthsq(position), Is.GreaterThan(POSITION_TOLERANCE));
+            PxVec3 nativePosition = PxRigidActor_getGlobalPose(
+                (PxRigidActor*)unit.GetComponent<GameplayRigidbody>().RigidBodyPtr).p;
+            Assert.That(nativePosition.x, Is.EqualTo(position.x).Within(POSITION_TOLERANCE));
+            Assert.That(nativePosition.y, Is.EqualTo(position.y).Within(POSITION_TOLERANCE));
+            Assert.That(nativePosition.z, Is.EqualTo(position.z).Within(POSITION_TOLERANCE));
+        }
+        finally
+        {
+            GameplayPhysics.GameplayPhysicsHandler = previousPhysics;
+        }
+    }
+
+    /// <summary>Production Map initialization installs an active World manager before any character is created.</summary>
+    [Test]
+    public void ServerMapInitializationCreatesKinematicManager()
+    {
+        int mapId = ConfigManager.Instance.Tables.TbLevelConfig.DicSceneId2Level.Keys.First();
+        Root mapRoot = (Root)rootConstructor.Invoke(new object[]
+            { mapId, ROOT_ZONE, ELogicSceneType.Map, nameof(ServerMapInitializationCreatesKinematicManager) });
+        int previousLogLevel = Log.LogLevel;
+        ILogger previousLogger = Log.Logger;
+        RecordingLogger logger = new RecordingLogger();
+        ProcessMessageManager messageManager = new ProcessMessageManager();
+        try
+        {
+            Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+            Log.Logger = logger;
+            registerSingleton.Invoke(messageManager, null);
+            new RootInit_Server_Map_Invoke().Handle(new Invoke_RootInit { Root = mapRoot }).GetAwaiter().GetResult();
+            GameplayWorld mapWorld = (GameplayWorld)mapRoot.Scene.GetChild<LogicScene>(GameplayWorldFactory.DEFAULT_WORLD_ID);
+            KinematicMoverManager manager = mapWorld.GetComponent<KinematicMoverManager>();
+            Assert.That(manager, Is.Not.Null);
+            Assert.That(manager.Enable, Is.True);
+            Assert.That(manager.Settings.AutoSimulation, Is.True);
+            TestCargo platform = mapWorld.AddChild<TestCargo>();
+            TransformComponent transform = platform.AddComponent<TransformComponent>();
+            platform.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(default);
+            KinematicRigidbodyMover mover = platform.AddComponent<KinematicRigidbodyMover>();
+            ObservingMoverController controller = new ObservingMoverController(transform);
+            mover.MoverController = controller;
+            earlyUpdate(mapRoot);
+            setServerTime(FIRST_TICK_TIME);
+            update(mapRoot);
+            Assert.That(controller.UpdateCount, Is.EqualTo(FIRST_SIMULATION_COUNT));
+        }
+        finally
+        {
+            mapRoot.Dispose();
+            messageManager.Dispose();
+            Log.LogLevel = previousLogLevel;
+            Log.Logger = previousLogger;
+        }
+        Assert.That(logger.Errors, Is.Empty);
+    }
+
+    /// <summary>Negative and non-finite client timestamps cannot be accepted as server moves.</summary>
+    [TestCase(-NETWORK_MOVE_TIME)]
+    [TestCase(float.NaN)]
+    [TestCase(float.PositiveInfinity)]
+    [TestCase(float.NegativeInfinity)]
+    public void ServerRejectsInvalidMovementTimestamps(float timestamp)
+    {
+        Unit unit = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, TEST_UNIT_ID,
+            ENetRole.Authority, ENetRole.AutonomousProxy, float3.zero, quaternion.identity);
+        CharacterMovementComponent movement = unit.AddComponent<CharacterMovementComponent>();
+        NetworkPredictionData_Server_CharacterMovement serverData = new NetworkPredictionData_Server_CharacterMovement();
+        Assert.That(movement.VerifyClientTimeStamp(timestamp, serverData), Is.False);
+        Assert.That(serverData.CurrentClientTimeStamp, Is.Zero);
+    }
+
+    private static void invokeServerMove(Unit unit, C2M_CharacterMoveData message)
+    {
+        Type handlerType = typeof(CharacterMovementComponentSystems).Assembly.GetType(
+            "Bliss.MessageHandler_C2M_CharacterMoveData")
+            ?? throw new InvalidOperationException("The server movement handler was not found.");
+        MethodInfo handler = handlerType.GetMethod("HandleMessage", BindingFlags.Public | BindingFlags.Static)
+            ?? throw new InvalidOperationException("The server movement handler entry was not found.");
+        ETTask task = (ETTask)handler.Invoke(null, new object[] { unit, message })!;
+        task.GetAwaiter().GetResult();
+    }
+
     /// <summary>Reusable and management entities do not opt into gameplay scheduling.</summary>
     [Test]
     public void OrdinaryManagersAndComponentsRetainEntityOwnership()
@@ -224,6 +606,70 @@ public class MoverIntegrationTests
         Assert.That(received.GetComponent<GameplayLayer>(), Is.InstanceOf<GamePlayEntity>());
         Assert.That(received.GetComponent<GameplayLayer>().Layer, Is.EqualTo(GameplayLayerDefine.Unit));
         received.Dispose();
+    }
+
+    /// <summary>A transferred player mounts in its enabled destination Level before character initialization.</summary>
+    [Test]
+    public void TransitUnitMountsInDestinationLevelAndInitializesCharacter()
+    {
+        IGameplayPhysicsHandler previousPhysics = GameplayPhysics.GameplayPhysicsHandler;
+        try
+        {
+            GameplayPhysics.GameplayPhysicsHandler = new GameplayPhysicsHandler_Server();
+            PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+            this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            UnitManager manager = this.world.AddComponent<UnitManager>();
+            GameplayWorld transit = GameplayWorldFactory.Create(this.root.Scene, HEALTHY_WORLD_ID,
+                HEALTHY_WORLD_INSTANCE_ID, "Transit");
+            Unit source = UnitHelper.CreateMinimalUnit(transit, UNIT_CONFIG_ID, TEST_UNIT_ID,
+                ENetRole.Authority, ENetRole.AutonomousProxy, moveDirection, quaternion.identity);
+            byte[] payload = MongoHelper.Serialize(source);
+            source.Dispose();
+            Unit received = (Unit)MongoHelper.Deserialize<Entity>(payload);
+            UnitHelper.MountTransferredUnit(this.level, received);
+            received.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.OrderedMessage);
+            CharacterController controller = received.AddComponent<CharacterController>();
+
+            Assert.That(received.Scene(), Is.SameAs(this.level));
+            Assert.That(received.GetLevelGameplayWorld(), Is.SameAs(this.world));
+            Assert.That(manager.DicEntityId2Unit.ContainsKey(TEST_UNIT_ID), Is.True);
+            Assert.That(controller.KinematicCharacterComponent.Capsule, Is.Not.Null);
+            Assert.That(received.GetComponent<MailBoxComponent>(), Is.Not.Null);
+            received.Dispose();
+            Assert.That(manager.DicEntityId2Unit, Is.Empty);
+        }
+        finally
+        {
+            GameplayPhysics.GameplayPhysicsHandler = previousPhysics;
+        }
+    }
+
+    /// <summary>A transferred Unit cannot be mounted into a prepared but disabled LevelScene.</summary>
+    [Test]
+    public void TransferRejectsDisabledDestinationLevel()
+    {
+        GameplayWorld transit = GameplayWorldFactory.Create(this.root.Scene, HEALTHY_WORLD_ID,
+            HEALTHY_WORLD_INSTANCE_ID, "Transit");
+        Unit source = UnitHelper.CreateMinimalUnit(transit, UNIT_CONFIG_ID, TEST_UNIT_ID,
+            ENetRole.Authority, ENetRole.AutonomousProxy, moveDirection, quaternion.identity);
+        byte[] payload = MongoHelper.Serialize(source);
+        source.Dispose();
+        Unit received = (Unit)MongoHelper.Deserialize<Entity>(payload);
+        Assert.Throws<InvalidOperationException>(() => UnitHelper.MountTransferredUnit(this.level, received));
+        Assert.That(received.Parent, Is.Null);
+        Assert.That(received.LogicScene, Is.Null);
+    }
+
+    /// <summary>Transferred players remain routable to the offline handler in both supported scene types.</summary>
+    [Test]
+    public void PlayerOfflineHandlerSupportsLevelAndWorld()
+    {
+        MessageHandlerAttribute attribute = typeof(MassageHandler_G2M_PlayerOfflineMessage)
+            .GetCustomAttribute<MessageHandlerAttribute>()
+            ?? throw new InvalidOperationException("The offline handler has no scene routing attribute.");
+        Assert.That(attribute.LogicSceneType.HasSameFlag(ELogicSceneType.GameplayWorld), Is.True);
+        Assert.That(attribute.LogicSceneType.HasSameFlag(ELogicSceneType.Level), Is.True);
     }
 
     /// <summary>Smoothing is dispatched by its World and stops when the World faults.</summary>
@@ -1021,6 +1467,150 @@ public class MoverIntegrationTests
         Assert.That(controller.UpdateCount, Is.EqualTo(FIRST_SIMULATION_COUNT));
     }
 
+    /// <summary>A World-owned manager does not simulate or interpolate a prepared Level's mover.</summary>
+    [Test]
+    public void WorldKinematicManagerWaitsForParticipantLevel()
+    {
+        KinematicMoverManager manager = this.world.AddComponent<KinematicMoverManager, KinematicMoverManagerSettings>(
+            new KinematicMoverManagerSettings { AutoSimulation = true, Interpolate = true, InterpolateMover = true });
+        manager.Enable = true;
+        TestCargo platform = this.level.AddChild<TestCargo>();
+        TransformComponent transform = platform.AddComponent<TransformComponent>();
+        platform.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(default);
+        KinematicRigidbodyMover mover = platform.AddComponent<KinematicRigidbodyMover>();
+        ObservingMoverController controller = new ObservingMoverController(transform);
+        mover.MoverController = controller;
+        mover.TransientPosition = moveDirection;
+        manager.LastCustomInterpolationStartTime = TimeInfo.Instance.ClientNow() - ELAPSED_INTERPOLATION_MILLISECONDS;
+        manager.LastCustomInterpolationDeltaTime = EXPECTED_DELTA_SECONDS;
+
+        earlyUpdate(this.root);
+        setServerTime(FIRST_TICK_TIME);
+        update(this.root);
+        lateUpdate(this.root);
+        Assert.That(controller.UpdateCount, Is.Zero);
+        Assert.That(transform.Transform.Location.x, Is.Zero.Within(POSITION_TOLERANCE));
+        Assert.That(mover.InitialTickPosition.x, Is.Zero.Within(POSITION_TOLERANCE));
+        Assert.That(mover.LatestInterpolationPosition.x, Is.Zero.Within(POSITION_TOLERANCE));
+
+        LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+        setServerTime(DELAYED_TICK_TIME);
+        update(this.root);
+        Assert.That(controller.UpdateCount, Is.EqualTo(FIRST_SIMULATION_COUNT));
+    }
+
+    /// <summary>Disposing one mover unregisters it without disturbing another live mover.</summary>
+    [Test]
+    public void DestroyedMoverUnregistersAndLeavesOtherMoverActive()
+    {
+        KinematicMoverManager manager = this.createKinematicManager();
+        TestCargo first = this.world.AddChild<TestCargo>();
+        TransformComponent firstTransform = first.AddComponent<TransformComponent>();
+        first.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(default);
+        KinematicRigidbodyMover firstMover = first.AddComponent<KinematicRigidbodyMover>();
+        ObservingMoverController firstController = new ObservingMoverController(firstTransform);
+        firstMover.MoverController = firstController;
+
+        TestCargo second = this.world.AddChild<TestCargo>();
+        TransformComponent secondTransform = second.AddComponent<TransformComponent>();
+        second.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(default);
+        KinematicRigidbodyMover secondMover = second.AddComponent<KinematicRigidbodyMover>();
+        ObservingMoverController secondController = new ObservingMoverController(secondTransform);
+        secondMover.MoverController = secondController;
+        Assert.That(manager.PhysicsMovers.Count, Is.EqualTo(TWO_REGISTRATIONS));
+
+        firstMover.Dispose();
+        Assert.That(manager.PhysicsMovers.Count, Is.EqualTo(SINGLE_REGISTRATION));
+        Assert.That((KinematicRigidbodyMover)manager.PhysicsMovers[FIRST_INDEX], Is.SameAs(secondMover));
+        earlyUpdate(this.root);
+        setServerTime(FIRST_TICK_TIME);
+        update(this.root);
+        Assert.That(firstController.UpdateCount, Is.Zero);
+        Assert.That(secondController.UpdateCount, Is.EqualTo(FIRST_SIMULATION_COUNT));
+        secondMover.Dispose();
+        Assert.That(manager.PhysicsMovers, Is.Empty);
+    }
+
+    /// <summary>Removing a mover during its callback does not skip other live snapshot participants.</summary>
+    [TestCase(true)]
+    [TestCase(false)]
+    public void MoverRemovalDuringSimulationKeepsOtherParticipants(bool removeSelf)
+    {
+        KinematicMoverManager manager = this.createKinematicManager();
+        TestCargo first = this.world.AddChild<TestCargo>();
+        first.AddComponent<TransformComponent>();
+        first.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(default);
+        KinematicRigidbodyMover firstMover = first.AddComponent<KinematicRigidbodyMover>();
+        TestCargo second = this.world.AddChild<TestCargo>();
+        TransformComponent secondTransform = second.AddComponent<TransformComponent>();
+        second.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(default);
+        KinematicRigidbodyMover secondMover = second.AddComponent<KinematicRigidbodyMover>();
+        ObservingMoverController secondController = new ObservingMoverController(secondTransform);
+        secondMover.MoverController = secondController;
+        TestCargo third = this.world.AddChild<TestCargo>();
+        TransformComponent thirdTransform = third.AddComponent<TransformComponent>();
+        third.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(default);
+        KinematicRigidbodyMover thirdMover = third.AddComponent<KinematicRigidbodyMover>();
+        ObservingMoverController thirdController = new ObservingMoverController(thirdTransform);
+        thirdMover.MoverController = thirdController;
+        firstMover.MoverController = new DisposingMoverController(removeSelf ? firstMover : secondMover);
+
+        earlyUpdate(this.root);
+        setServerTime(FIRST_TICK_TIME);
+        update(this.root);
+
+        Assert.That(manager.PhysicsMovers.Count, Is.EqualTo(TWO_REGISTRATIONS));
+        Assert.That(secondController.UpdateCount, Is.EqualTo(removeSelf ? FIRST_SIMULATION_COUNT : NO_REGISTRATIONS));
+        Assert.That(thirdController.UpdateCount, Is.EqualTo(FIRST_SIMULATION_COUNT));
+        Assert.That(thirdTransform.Transform.Location.x, Is.EqualTo(UNIT_AXIS).Within(POSITION_TOLERANCE));
+    }
+
+    /// <summary>A mover registered inside a callback first runs on the following tick.</summary>
+    [Test]
+    public void MoverAddedDuringSimulationStartsOnNextTick()
+    {
+        this.createKinematicManager();
+        TestCargo first = this.world.AddChild<TestCargo>();
+        first.AddComponent<TransformComponent>();
+        first.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(default);
+        KinematicRigidbodyMover mover = first.AddComponent<KinematicRigidbodyMover>();
+        AddingMoverController controller = new AddingMoverController(this.world);
+        mover.MoverController = controller;
+        earlyUpdate(this.root);
+        setServerTime(FIRST_TICK_TIME);
+        update(this.root);
+        Assert.That(controller.AddedController, Is.Not.Null);
+        Assert.That(controller.AddedController!.UpdateCount, Is.Zero);
+        setServerTime(DELAYED_TICK_TIME);
+        update(this.root);
+        Assert.That(controller.AddedController.UpdateCount, Is.EqualTo(FIRST_SIMULATION_COUNT));
+    }
+
+    /// <summary>A live mover unregistered and re-registered during dispatch waits for the next tick.</summary>
+    [Test]
+    public void MoverReregisteredDuringSimulationStartsOnNextTick()
+    {
+        KinematicMoverManager manager = this.createKinematicManager();
+        TestCargo first = this.world.AddChild<TestCargo>();
+        first.AddComponent<TransformComponent>();
+        first.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(default);
+        KinematicRigidbodyMover firstMover = first.AddComponent<KinematicRigidbodyMover>();
+        TestCargo second = this.world.AddChild<TestCargo>();
+        TransformComponent secondTransform = second.AddComponent<TransformComponent>();
+        second.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(default);
+        KinematicRigidbodyMover secondMover = second.AddComponent<KinematicRigidbodyMover>();
+        ObservingMoverController observer = new ObservingMoverController(secondTransform);
+        secondMover.MoverController = observer;
+        firstMover.MoverController = new ReregisteringMoverController(manager, secondMover);
+        earlyUpdate(this.root);
+        setServerTime(FIRST_TICK_TIME);
+        update(this.root);
+        Assert.That(observer.UpdateCount, Is.Zero);
+        setServerTime(DELAYED_TICK_TIME);
+        update(this.root);
+        Assert.That(observer.UpdateCount, Is.EqualTo(FIRST_SIMULATION_COUNT));
+    }
+
     /// <summary>A shared static callback receives each live owner and the fixed delta.</summary>
     [Test]
     public void PrimaryLogicUpdatePassesOwnerToSharedStaticCallback()
@@ -1310,5 +1900,141 @@ public class MoverIntegrationTests
             Count++;
             await ETTask.CompletedTask;
         }
+    }
+
+    /// <summary>Supplies a deterministic movement input and one buffered jump edge.</summary>
+    public sealed class TestInputSource : IInputSource
+    {
+        /// <summary>Whether the next sample contains a jump edge.</summary>
+        public bool PressJump = true;
+        /// <summary>Whether to add a later cancellation after the jump edge.</summary>
+        public bool CancelAfterJump;
+        /// <summary>Number of movement-input samples.</summary>
+        public int MovementReadCount;
+
+        /// <inheritdoc />
+        public float3 GetMovementInput()
+        {
+            this.MovementReadCount++;
+            return moveDirection;
+        }
+
+        /// <inheritdoc />
+        public float3 GetLookInput() => float3.zero;
+        /// <inheritdoc />
+        public bool GetActionDown(EGameplayInputAction action) => this.PressJump;
+        /// <inheritdoc />
+        public void GetActionStatus(List<GameplayInputActionStatus> result)
+        {
+            if (this.PressJump)
+            {
+                result.Add(new GameplayInputActionStatus
+                {
+                    TimStamp = NO_SERVER_TIME_OFFSET,
+                    Action = EGameplayInputAction.Jump,
+                    Status = EInputActionStatus.Down,
+                });
+                if (this.CancelAfterJump)
+                {
+                    result.Add(new GameplayInputActionStatus
+                    {
+                        TimStamp = FIRST_TICK_TIME,
+                        Action = EGameplayInputAction.Jump,
+                        Status = EInputActionStatus.Cancel,
+                    });
+                }
+            }
+
+        }
+        /// <inheritdoc />
+        public quaternion GetCameraRotation() => quaternion.identity;
+    }
+
+    /// <summary>Disposes a chosen mover from within a real manager callback.</summary>
+    public sealed class DisposingMoverController : IMoverController
+    {
+        private readonly KinematicRigidbodyMover target;
+
+        /// <summary>Creates a controller that disposes the given mover.</summary>
+        public DisposingMoverController(KinematicRigidbodyMover target) => this.target = target;
+
+        /// <inheritdoc />
+        public void UpdateMovement(out float3 goalPosition, out quaternion goalRotation, float deltaTime)
+        {
+            this.target.Dispose();
+            goalPosition = moveDirection;
+            goalRotation = quaternion.identity;
+        }
+    }
+
+    /// <summary>Registers a platform from a manager callback.</summary>
+    public sealed class AddingMoverController : IMoverController
+    {
+        private readonly GameplayWorld world;
+        /// <summary>The controller created on the first update.</summary>
+        public ObservingMoverController? AddedController { get; private set; }
+
+        /// <summary>Creates a controller that registers a platform in the given World.</summary>
+        public AddingMoverController(GameplayWorld world) => this.world = world;
+
+        /// <inheritdoc />
+        public void UpdateMovement(out float3 goalPosition, out quaternion goalRotation, float deltaTime)
+        {
+            if (this.AddedController == null)
+            {
+                TestCargo platform = this.world.AddChild<TestCargo>();
+                TransformComponent transform = platform.AddComponent<TransformComponent>();
+                platform.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(default);
+                KinematicRigidbodyMover mover = platform.AddComponent<KinematicRigidbodyMover>();
+                this.AddedController = new ObservingMoverController(transform);
+                mover.MoverController = this.AddedController;
+            }
+            goalPosition = moveDirection;
+            goalRotation = quaternion.identity;
+        }
+    }
+
+    /// <summary>Re-registers one live mover during the first manager callback.</summary>
+    public sealed class ReregisteringMoverController : IMoverController
+    {
+        private readonly KinematicMoverManager manager;
+        private readonly KinematicRigidbodyMover mover;
+        private bool completed;
+
+        /// <summary>Creates a controller for the given manager and mover.</summary>
+        public ReregisteringMoverController(KinematicMoverManager manager, KinematicRigidbodyMover mover)
+        {
+            this.manager = manager;
+            this.mover = mover;
+        }
+
+        /// <inheritdoc />
+        public void UpdateMovement(out float3 goalPosition, out quaternion goalRotation, float deltaTime)
+        {
+            if (!this.completed)
+            {
+                this.completed = true;
+                this.manager.UnregisterPhysicsMover(this.mover);
+                this.manager.RegisterPhysicsMover(this.mover);
+            }
+            goalPosition = moveDirection;
+            goalRotation = quaternion.identity;
+        }
+    }
+
+    private sealed class RecordingLogger : ILogger
+    {
+        internal readonly List<string> Errors = new List<string>();
+        public void Trace(string message) { }
+        public void Warning(string message) { }
+        public void Info(string message) { }
+        public void Debug(string message) { }
+        public void Error(string message) => this.Errors.Add(message);
+        public void Error(Exception exception) => this.Errors.Add(exception.ToString());
+        public void Trace(ref System.Runtime.CompilerServices.DefaultInterpolatedStringHandler message) { }
+        public void Warning(ref System.Runtime.CompilerServices.DefaultInterpolatedStringHandler message) { }
+        public void Info(ref System.Runtime.CompilerServices.DefaultInterpolatedStringHandler message) { }
+        public void Debug(ref System.Runtime.CompilerServices.DefaultInterpolatedStringHandler message) { }
+        public void Error(ref System.Runtime.CompilerServices.DefaultInterpolatedStringHandler message) => this.Errors.Add(message.ToStringAndClear());
     }
 }

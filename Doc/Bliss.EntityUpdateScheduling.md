@@ -79,19 +79,26 @@ UpdateGroup
 - System 在 Awake 中通过 `self.RegisterLogicUpdate(priority, callback)` 注册一个主入口；`GamePlayEntity` 以实体完整类型名作为入口名，保存注册时的 World，并在 `Entity.Dispose` 清空 InstanceId 前统一注销。业务实体无需覆写 Dispose。重复注册主入口会报错；通过 World 接口直接删除该入口后可重新注册，替代的不同回调不会被误删。其他命名入口仍需调用方主动注销。
 - World 同时支持原有 `Action<float>` 和新的 `Action<Entity, float>` 回调，后者显式接收已验证的实体，不使用闭包包装旧接口。两种入口共享顺序、快照和池化规则，回收时同时清空两种回调引用。Mover 与 Kinematic System 各缓存一个静态回调，并转发到各自的扩展方法。
 - `MoverComponent`、`Mover` 和 `MoverStageRuntime` 归属于 GameplayWorld。每个 MoverComponent 以 `MOVEMENT` 优先级注册一个入口，使用固定 50ms 推进其所有 Mover；所属 LevelScene 尚未启用时不推进。组件销毁前主动注销，派发中销毁后的替代组件从下个 tick 开始运行。
-- `KinematicMoverManager` 也注册到 `MOVEMENT`，使用固定 50ms 并与 Mover 按实际注册顺序执行；销毁前主动注销，普通 LateUpdate 插值仍由 World 驱动。管理器属于 LevelScene 时，场景启用前既不模拟也不插值。此处只提前实现 #13 的管理器调度部分，角色筛选、角色组件及输入处理仍由 #13 完成。Bullet 的独立 Timer 和碰撞顺序由 #15 处理，迁移期间 Mover 已先于 Root 常规 Timer 驱动，不能视为完整 Bullet 固定步长方案。
-- 当前客户端的 Kinematic 管理器属于 World，Mover 和角色在创建时直接注册到该管理器；因此已启用的 World 管理器仍可能处理尚未启用的 LevelScene 参与者。此问题不由管理器自身的 LevelScene 启用检查解决，参与者的场景筛选留待 #13。
+- `KinematicMoverManager` 注册到 `MOVEMENT`，使用固定 50ms 并与 Mover 按实际注册顺序执行；普通 LateUpdate 插值仍由 World 驱动。服务端 Map 初始化时创建并启用 World 管理器。管理器及各参与者所属的 LevelScene 必须已启用才能模拟或插值；客户端模拟 `AutonomousProxy` 与 `Authority`，跳过 `SimulatedProxy`。管理器在每次派发前复制可复用的参与者快照；回调中销毁或注销的参与者跳过，新注册的参与者从下次派发开始。Bullet 的独立 Timer 和碰撞顺序由 #15 处理，不能将当前路径视为完整 Bullet 固定步长方案。
+- `CharacterController` 负责角色专用组件的初始化及销毁；`CharacterMovementComponent` 自行注册固定 tick，输入组件独立在每帧 EarlyUpdate 采样最新移动与视角数据。跳跃边缘至少保留到所属 Level 启用后的下一次 World tick，其后继续遵守原有缓冲时间与消费状态。角色和 Kinematic 专用组件均属于 GameplayWorld；派发中销毁的实体由 World 注销机制处理。
+- `InputIntentProcessPipelineSystems.collectInput` 只采集原始移动、视角、相机旋转及动作状态，并整理输入记录；`EarlyUpdate` 按顺序调用采集和 `ProcessInputIntent`。相机平面移动转换、当前批次跳跃边缘识别、消费状态重置及宽限期判断统一由 `ProcessInputIntent` 处理，不把历史 Down 当作新的按下。
 - 服务端和客户端 `PhysicalScene` 均属于 `GamePlayEntity`，并在 LevelScene 准备时创建。服务端在启用流程注册 `PHYSICS` 最终优先级，传入固定 0.05 秒；尚未启用的 LevelScene 不模拟，启用失败时注销，销毁前通过 `GamePlayEntity` 注销。缺失 native 场景、PhysX fetch 失败或物理模拟抛出异常时，记录故障原因并向上传播。此优先级只保证排在 **World LogicUpdate** 内的其他业务逻辑之后；尚未迁移的 Bullet Root Timer 不受此顺序约束，留待 #15。
 - 物理失败后，`GameplayWorld.IsFaulted` 为 true，`Failure` 保存首次异常；World 自身的 Timer、LogicUpdate 和常规 Early/Update/Late 驱动停止，不自动恢复，已消费的 tick 不重试。现有待处理 Timer 和等待保留，新的未来 Timer 和 LogicUpdate 注册会显式失败；等待可能一直挂起，直到 World 被显式销毁或取消。Root 和子 Root 在异常传播时仍保留调度资格，其他 World 在后续帧继续运行。本次只对物理模拟失败标记 World 故障；其他持续抛错的 Root 更新仍可能在后续帧重复报错并中断当前帧，需单独制定故障策略。此隔离不阻止旧 Root Timer、外部消息或调用方直接操作实体，因此故障状态不是完整的不可变快照。Bullet 的旧 Timer 留待 #15。
 - 客户端查询仍通过既有 Unity 物理适配器，不手动驱动 Unity 物理模拟；现有适配器使用 Unity 全局物理查询，并未实现各 LevelScene 的独立 Unity 物理场景隔离。现有查询适配器未限制向调用方数组复制的命中数，小于命中数的结果数组可能越界，此次未改造该既有路径。
 - 真实服务端地图资源加载仍将物理材质存入 Root 级 `PhysicalWorldComponent.MaterialsRef`，Level 销毁不会移除对应项；重复加载相同材质 ID 或失败后重试可能发生重复键错误。此次测试替换了地图资源加载处理器，未覆盖该既有资源生命周期问题。
+
+### 输入管线测试待办
+
+- [ ] 在 Unity 工程的 Test 环境中构建模拟输入，测试 `InputIntentProcessPipeline`：通过生产 `PlayerInputComponent` 采集与真实 World 帧调度，覆盖移动及视角意图、同批次相同/不同时间戳的 Down 与 Cancel、跳跃消费与再次按下、跨固定 tick 缓冲和 Level 启停。区分管线意图断言与角色实际起跳断言；当前直接提供 `IInputSource` 的测试不能替代这项覆盖。
 
 ## 游戏实体与专用组件归属
 
 - `Unit`、`SceneActor`、`ASceneActorCmp` 及其派生类型、`AOIEntityCmp`、`AbilitySystemComponent`、`GameplayLayer` 和 `SmoothTransformComponent` 归属于创建它们的 GameplayWorld 或关联 LevelScene。普通管理器、网络角色、通用 Transform、RemoteGhost、ReplicationGraph 和 LevelScene 管理组件仍是普通 `Entity`。Bullet 自身及其独立调度留待 #15；其 AOI 和客户端平滑组件已走 World。
 - Gate Root 为登录中转创建一个默认 GameplayWorld；临时 Unit 在该 World 创建，ActorAddress、BSON 和传送协议保持原有路径。`GameplayLayer` 不参与 BSON 序列化，目标 Map World 挂载反序列化 Unit 后重新建立 Unit 层；其他序列化组件仍通过原有反序列化和挂载流程恢复。此处未启动网络服务验证跨进程传送。
 - Map 在解除位置锁之前已经为转移的 Unit 安装有序邮箱，后续完成 Unit 初始化时不重复添加。客户端 World 工厂初始化 AOI 管理器，并以 `LogicScene` 事件类型通知 World 创建处理器。
-- 服务端 Map 延续原有的 World 直属 Unit 归属，但 `KinematicCharacterComponent` 初始化时从 Unit 所属场景查询 `PhysicalScene`，而当前 `PhysicalScene` 位于 LevelScene，不在 World 上。原有重复邮箱错误曾更早阻断该路径；去除该错误后角色初始化仍不能完成，相关场景归属和角色物理处理留待 #13。当前 BSON 测试只验证挂载，不覆盖真实消息处理器、完整角色初始化或跨进程登录；不能据此认为服务端完整进图可用。
+- 服务端 Map 初次转移将 Unit 挂载到已启用的默认 LevelScene，角色从该 Level 的 PhysicalScene 创建真实 PhysX 运动学刚体和胶囊；材质为静摩擦 0.6、动摩擦 0.6、弹性 0。服务端即时移动消息、固定 tick 和 motor 直接设置姿态时同步物理刚体；查询通过形状映射找到游戏碰撞体。失败时清理角色已拥有的组件和 native 资源。集成测试覆盖 BSON 初次挂载、角色初始化、射线查询、尺寸修改及销毁，但没有启动网络服务运行完整转移处理器或跨进程登录。
+- 原有时间戳条件错误地拒绝正常有限时间戳，本次修正后有效移动消息会立即处理；既有处理器仍直接采用客户端提供的位置，尚无距离或速度校验，客户端可能提交任意位置。按当前约定保留该信任模型，服务端校验方案另行讨论。
+- 已挂载 Unit 不能通过初次挂载接口冒充跨 Level 迁移；保留玩家在卸载前的原子迁移及卸载保护留待 #14，当前卸载仍会销毁未迁出的 Unit。
 - 客户端 EditMode 测试调用生产 World、Unit 和 Bullet 工厂，并检查角色初始化、AOI 及平滑组件；测试替换了外部资源准备和视图刚体、胶囊体创建/销毁，不验证真实视图资源或这些 Unity 物理对象的生命周期。
 - `SmoothTransformComponent` 保持逐帧视觉更新，而不是固定 50ms LogicUpdate；它现在由 World 驱动，故障 World 不再更新。普通 Root 更新与 World 更新的相对阶段可能不同，不能假设其旧注册顺序。
 - `ShooterGear` 在场景初始化时创建 10 秒 World Timer，销毁时取消；LevelScene 未启用或 World 故障时不发射。未启用时到期仍按原间隔重新计时，启用不会立即补发；延迟帧不追补。注册回调是绑定实体的 System 扩展方法，没有 lambda 或闭包；Timer 和实体存活期由 World 与销毁流程管理。
@@ -178,6 +185,25 @@ macOS 26.6.2、Apple M1 Pro、.NET 8.0.19、BenchmarkDotNet ShortRun；每项 3 
 
 ### Kinematic 管理器迁移基准
 
+#### IndexList 注销修复基准
+
+Kinematic 参与者使用 `IndexList` 按实例 ID 注销。原实现只移除键映射，未正确缩减底层列表；删除非末尾元素时还留下重复的末尾值。修复后将末尾值及其键映射移到空位，再移除末尾元素；删除顺序仍不稳定，复杂度保持均摊 O(1)。单元测试覆盖首、中、末尾按键和索引删除、按值删除、缺失键及清空后的复用。
+
+`BlissBenchMark/Benchmarks/IndexListRemovalBenchmark.cs` 对每次操作准备 64 个独立的真实 `IndexList<int, long>`，在计时外各装入 100 或 1,000 项，在计时内删除首、中或末尾键；计时外验证键映射确实被移除。由于旧实现未移除列表元素，前后工作语义不等价，这只能作为修复前调用成本参考，不能作为正确实现间的性能比较。该基准不覆盖重复键、按值/索引删除、参与者销毁或完整帧。
+
+macOS 26.6.2、Apple M1 Pro、.NET 8.0.19、BenchmarkDotNet 0.15.2 ShortRun；每项 3 次测量，误差为 99.9% 置信区间半宽，单次删除无可测托管分配：
+
+| 元素数 | 删除位置 | 修复前 | 修复后 |
+|---:|---|---:|---:|
+| 100 | 首 | 180.6 ± 175.15 ns | 151.7 ± 145.88 ns |
+| 100 | 中 | 177.1 ± 120.66 ns | 154.3 ± 83.22 ns |
+| 100 | 末 | 105.9 ± 75.46 ns | 101.0 ± 24.72 ns |
+| 1,000 | 首 | 243.5 ± 590.18 ns | 278.2 ± 867.11 ns |
+| 1,000 | 中 | 313.1 ± 2,079.31 ns | 278.4 ± 1,762.67 ns |
+| 1,000 | 末 | 237.8 ± 769.21 ns | 196.7 ± 848.79 ns |
+
+迭代耗时远低于 BenchmarkDotNet 建议的 100ms，样本少、置信区间宽且前后语义不同，不能据此判断性能改善或回归。
+
 使用 `BlissBenchMark/Benchmarks/KinematicSimulationBenchmark.cs` 测量真实 Root 和 KinematicMoverManager 调度；一个启用的管理器驱动 0、100 或 1,000 个 KinematicRigidbodyMover，每个使用固定目标的测试控制器和真实 Transform、GameplayRigidbody。实体准备不计时；旧版在计时外将管理器上次帧时间设为当前帧时间减 50ms，确保两版均传入 0.05 秒，基准校验每个平台的实际移动。刚体没有 native 物理对象，因此这个基准不测量物理引擎、角色、插值或真实场景负载。
 
 同上环境和 ShortRun 配置，每项 3 次测量，误差为 99.9% 置信区间半宽：
@@ -189,6 +215,29 @@ macOS 26.6.2、Apple M1 Pro、.NET 8.0.19、BenchmarkDotNet ShortRun；每项 3 
 | 1,000 | 1,193.694 ± 38.627 µs | 1,163.090 ± 120.407 µs | 856 B | 568 B |
 
 测得每 tick 分配均减少 288 B；迭代时间低于 BenchmarkDotNet 建议的 100ms，样本仅 3 次，计时置信区间重叠，不能据此判断耗时改善或退化。同优先级的实际 Mover 与 Kinematic 顺序、固定 delta 和销毁边界由集成测试覆盖。
+
+### #13 角色调度及 native 生命周期基准
+
+`CharacterSchedulingBenchmark` 使用真实 Root、World 和 PhysX 角色，计时外准备 100 或 1,000 个角色并校验调度与 native 位姿同步。`Frame` 测量 EarlyUpdate 与固定角色入口，不启用 motor 模拟；`FrameWithMotors` 启用 Kinematic 管理器、输入和跳跃，包含服务端 native 位姿同步，但关闭碰撞及落地求解。`CreateAndDispose` 在已有同等数量角色时逐个创建、销毁完整角色，并校验物理映射清理；准备阶段不计时。负载未模拟物理场景、实际碰撞、网络、资源加载或完整游戏帧。
+
+macOS 26.6.2、Apple M1 Pro、.NET 8.0.19、BenchmarkDotNet 0.15.2 ShortRun；每项仅 3 次，误差为 99.9% 置信区间半宽，分配只包含托管内存：
+
+| 操作 | 数量 | 耗时 | 托管分配 |
+|---|---:|---:|---:|
+| Frame | 100 | 121.0 ± 37.93 µs | 25.09 KB |
+| Frame | 1,000 | 1,199.8 ± 1,747.68 µs | 229 KB |
+| FrameWithMotors | 100 | 445.9 ± 386.43 µs | 53.45 KB |
+| FrameWithMotors | 1,000 | 4,499.0 ± 3,235.63 µs | 510.48 KB |
+| CreateAndDispose | 100 | 2,712.7 ± 209.13 µs | 1,101.56 KB |
+| CreateAndDispose | 1,000 | 32,713.9 ± 29,897.79 µs | 10,983.16 KB |
+
+早期调度基线使用无 native 刚体的替身、没有 Kinematic 管理器：100/1,000 角色分别为 134.6 ± 53.26 µs、1,212.4 ± 480.19 µs，分配 19.27/173.96 KB；与最终版本准备的对象和调度入口不同，不能作为等价前后比较。原真实服务端角色初始化会在 native 路径崩溃，因此没有有效的真实创建或 motor 基线。所有迭代低于建议的 100ms，样本少、置信区间宽，不据此判断性能改善或回归。
+
+输入采集与意图分析职责分离另用同一 `CharacterSchedulingBenchmark.Frame` 负载、上述环境与 ShortRun 配置实测前后基线：100 角色为 136.3 ± 215.1 → 139.1 ± 155.6 µs，1,000 角色为 1,190.5 ± 1,352.5 → 1,243.8 ± 1,497.0 µs；分配分别保持 25.09 KB、229 KB。此次仅调整职责，将当前批次动作的跳跃判断移至意图分析，未增加输入容器或改变缓冲策略；不是热点优化。每项仍仅 3 次、迭代短、置信区间重叠，不能判断耗时改善或回归；该负载不代表 Unity Input System 或复杂动作批次。
+
+参与者场景筛选变更前后，同一 Kinematic 平台负载 100 项为 125.99 ± 118.26 → 125.847 ± 54.187 µs，1,000 项为 1,213.99 ± 638.62 → 1,218.764 ± 221.017 µs，均为 568 B；该负载使用 World 直属平台和无 native 对象的刚体，不覆盖角色及未启用 Level 的运行时成本。
+
+随后为安全处理派发中注册与注销加入快照，平台负载复测 100 项为 125.597 ± 36.183 µs、2,192 B，1,000 项为 1,251.070 ± 432.743 µs、16,592 B；每次迭代创建新管理器，因此包括快照首次扩容，后续派发复用容量而非每 tick 重新分配。复测控制器额外检查是否需要在回调内注销。第一位控制器注销末尾活跃参与者的负载分别为 126.347 ± 18.386 µs、1,247.291 ± 344.364 µs，托管分配相同；它扫描快照以使旧注册失效，不代表批量注销。测量置信区间重叠，不能判断耗时变化。
 
 ### 静态回调与共享生命周期复测
 

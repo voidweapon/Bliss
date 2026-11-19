@@ -50,9 +50,13 @@ public static unsafe partial class GameplayCapsuleColliderSystems_Server
         public override void Handle(SetCapsuleColliderRadiusParams param)
         {
             var capsuleCollider = param.Collider;
-            if(capsuleCollider.CapsuleGeometry == null) return;
-            
-            capsuleCollider.CapsuleGeometry->radius =  param.Radius;
+            if(capsuleCollider.ShapePtr == null) return;
+
+            PxCapsuleGeometry geometry = *capsuleCollider.CapsuleGeometry;
+            float height = PxTypeHelper.GetUnitCapsuleHeight(geometry.halfHeight, geometry.radius);
+            geometry.radius = param.Radius;
+            geometry.halfHeight = PxTypeHelper.GetPxCapsuleHalfHeight(height, param.Radius);
+            PxShape_setGeometry_mut(capsuleCollider.ShapePtr, (PxGeometry*)&geometry);
         }
     }
     
@@ -62,10 +66,11 @@ public static unsafe partial class GameplayCapsuleColliderSystems_Server
         public override void Handle(SetCapsuleColliderHeightParams param)
         {
             var capsuleCollider = param.Collider;
-            if(capsuleCollider.CapsuleGeometry == null) return;
-            
-            var radius = capsuleCollider.CapsuleGeometry->radius;
-            capsuleCollider.CapsuleGeometry->halfHeight = PxTypeHelper.GetPxCapsuleHalfHeight(param.Height, radius);
+            if(capsuleCollider.ShapePtr == null) return;
+
+            PxCapsuleGeometry geometry = *capsuleCollider.CapsuleGeometry;
+            geometry.halfHeight = PxTypeHelper.GetPxCapsuleHalfHeight(param.Height, geometry.radius);
+            PxShape_setGeometry_mut(capsuleCollider.ShapePtr, (PxGeometry*)&geometry);
         }
     }
     

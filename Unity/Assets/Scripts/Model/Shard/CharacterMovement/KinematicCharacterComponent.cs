@@ -4,8 +4,12 @@ using Unity.Mathematics;
 
 namespace Bliss.CharacterMovement
 {
-    public class KinematicCharacterComponent : Entity, IAwake, IDestroy
+    /// <summary>Stores the state of a character motor owned by a GameplayWorld.</summary>
+    public class KinematicCharacterComponent : GamePlayEntity, IAwake, IDestroy
     {
+        /// <summary>Instance identifier used to unregister the motor during destruction.</summary>
+        public long RegisteredInstanceId;
+
         #region Capsule Setting
         /// <summary>
         /// The height is the actual height including the half-spheres at each end.

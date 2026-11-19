@@ -1,3 +1,4 @@
+using System;
 using Bliss.Core;
 using Bliss.Mathematics;
 using Bliss.Pool;
@@ -8,13 +9,34 @@ namespace Bliss.CharacterControllers
     [EntitySystemOf(typeof(InputIntentProcessPipeline))]
     public static partial class InputIntentProcessPipelineSystems
     {
+        private static readonly Action<Entity, float> logicUpdateCallback = dispatchLogicUpdate;
+
         private static void Awake(this InputIntentProcessPipeline self)
         {
             self.InputRecords.Clear();
+            self.PendingJump = false;
+            self.RegisterLogicUpdate(GameplayWorldLogicPriority.CHARACTER_INPUT, logicUpdateCallback);
         }
         private static void Destroy(this InputIntentProcessPipeline self)
         {
             self.InputRecords.Clear();
+            self.InputSource = null;
+            self.RuntimeDataRef = null;
+            self.PendingJump = false;
+        }
+
+        private static void dispatchLogicUpdate(Entity entity, float deltaTime)
+        {
+            InputIntentProcessPipeline self = (InputIntentProcessPipeline)entity;
+            LogicScene scene = self.Scene();
+            if (scene.SceneType == ELogicSceneType.Level &&
+                !scene.GetComponent<LevelGameWorldComponent>().IsEnabled)
+            {
+                return;
+            }
+
+            // Keep WantsToJump intact for movement callbacks later in this tick.
+            self.PendingJump = false;
         }
         
         public static void SetInputSource(this InputIntentProcessPipeline self, IInputSource inputSource)
@@ -27,31 +49,29 @@ namespace Bliss.CharacterControllers
             self.RuntimeDataRef =  runtimeData;
         }
 
-        public static void LogicUpdate(this InputIntentProcessPipeline self, float deltaTime)
+        private static void EarlyUpdate(this InputIntentProcessPipeline self)
         {
-
-        }
-
-        public static void ViewEarlyUpdate(this InputIntentProcessPipeline self, float deltaTime)
-        {
+            LogicScene scene = self.Scene();
+            if (scene.SceneType == ELogicSceneType.Level &&
+                !scene.GetComponent<LevelGameWorldComponent>().IsEnabled)
+            {
+                return;
+            }
             if (self.InputSource == null)
             {
                 return;
             }
-            
+
+            long timeStamp = TimeInfo.Instance.ClientFrameTime();
+            quaternion cameraRotation = self.collectInput(timeStamp);
+            self.ProcessInputIntent(timeStamp, cameraRotation);
+        }
+
+        private static quaternion collectInput(this InputIntentProcessPipeline self, long timeStamp)
+        {
             float3 inputMovement = self.InputSource.GetMovementInput();
             float3 inputLook = self.InputSource.GetLookInput();
             quaternion cameraRotation = self.InputSource.GetCameraRotation();
-            long timeStamp = TimeInfo.Instance.ClientFrameTime();
-            
-            // Calculate camera direction and rotation on the character plane
-            float3 cameraPlanarDirection = math.normalizesafe(mathEx.ProjectOnPlane(math.mul(cameraRotation, mathEx.Forward), self.RuntimeDataRef.CharacterUp));
-            if (math.lengthsq(cameraPlanarDirection) == 0f)
-            {
-                cameraPlanarDirection = math.normalizesafe(mathEx.ProjectOnPlane(math.mul(cameraRotation , mathEx.Up), self.RuntimeDataRef.CharacterUp));
-            }
-            quaternion cameraPlanarRotation = quaternion.LookRotation(cameraPlanarDirection, self.RuntimeDataRef.CharacterUp);
-            var adjustedMovement = math.mul(cameraPlanarRotation, inputMovement);
             
             self.TempList.Clear();
             self.InputSource.GetActionStatus(self.TempList);
@@ -61,13 +81,13 @@ namespace Bliss.CharacterControllers
                 InputRecord oldRecord = null;
                 foreach (GameplayInputActionStatus status in self.TempList)
                 {
-                    if (previousInputTimeStamp != status.TimStamp)
+                    if (oldRecord == null || previousInputTimeStamp != status.TimStamp)
                     {
                         previousInputTimeStamp = status.TimStamp;
                         oldRecord = ObjectPool.Instance.Fetch<InputRecord>();
                         oldRecord.Clear();
                         oldRecord.StartTimestamp = timeStamp;
-                        oldRecord.Movement = adjustedMovement;
+                        oldRecord.Movement = inputMovement;
                         oldRecord.Look = inputLook;
                         self.InputRecords.Add(oldRecord, out var remove);
                         if (remove != null)
@@ -92,7 +112,7 @@ namespace Bliss.CharacterControllers
                 newRecord.Clear();
                 
                 newRecord.StartTimestamp = timeStamp;
-                newRecord.Movement = adjustedMovement;
+                newRecord.Movement = inputMovement;
                 newRecord.Look = inputLook;
                 
                 self.InputRecords.Add(newRecord, out var removedItem);
@@ -102,39 +122,46 @@ namespace Bliss.CharacterControllers
                     ObjectPool.Instance.Recycle(removedItem);
                 }
             }
-            self.ProcessInputIntent(timeStamp);
+            return cameraRotation;
         }
         
 
-        private static void ProcessInputIntent(this InputIntentProcessPipeline self, long timeStamp)
+        private static void ProcessInputIntent(this InputIntentProcessPipeline self, long timeStamp, quaternion cameraRotation)
         {
             var latestInputRecord = self.InputRecords.TailItem();
 
-            //movement intent
-            //if (la3ewtestInputRecord.StartTimestamp == timeStamp)
+            float3 cameraPlanarDirection = math.normalizesafe(mathEx.ProjectOnPlane(math.mul(cameraRotation, mathEx.Forward), self.RuntimeDataRef.CharacterUp));
+            if (math.lengthsq(cameraPlanarDirection) == 0f)
             {
-                self.RuntimeDataRef.IntentMovement = latestInputRecord.Movement;
-                self.RuntimeDataRef.IntentLook = latestInputRecord.Look;
+                cameraPlanarDirection = math.normalizesafe(mathEx.ProjectOnPlane(math.mul(cameraRotation, mathEx.Up), self.RuntimeDataRef.CharacterUp));
             }
-            
-            
-            // self.RuntimeDataRef.WantsToEvade = self.IsActionPress(EGameplayInputAction.Evade, timeStamp, 100);
-            // self.RuntimeDataRef.WantsToCrouch = self.IsActionPress(EGameplayInputAction.Crouch, timeStamp, 100);
+            quaternion cameraPlanarRotation = quaternion.LookRotation(cameraPlanarDirection, self.RuntimeDataRef.CharacterUp);
+            self.RuntimeDataRef.IntentMovement = math.mul(cameraPlanarRotation, latestInputRecord.Movement);
+            self.RuntimeDataRef.IntentLook = latestInputRecord.Look;
 
-#pragma warning disable CS0219 // Variable is assigned but its value is never used
             bool jumpInput = false;
-#pragma warning restore CS0219 // Variable is assigned but its value is never used
-            if (latestInputRecord.HasActionDown(EGameplayInputAction.Jump))
+            // Only inspect the new batch: replaying historical Down records would reset consumed jumps.
+            foreach (GameplayInputActionStatus status in self.TempList)
             {
-                jumpInput = true;
+                if (status.Action == EGameplayInputAction.Jump &&
+                    (status.Status & EInputActionStatus.Down) != 0)
+                {
+                    jumpInput = true;
+                    break;
+                }
+            }
+
+            if (jumpInput)
+            {
+                self.PendingJump = true;
                 self.RuntimeDataRef.JumpConsumed = false;
                 self.RuntimeDataRef.JumpConsumedTimeStamp = 0;
             }
-            
+
             long jumpInputGraceTime = self.JumpInputGraceTimeMS;
             if (self.RuntimeDataRef.JumpConsumed)
             {
-                  jumpInputGraceTime = math.min(self.JumpInputGraceTimeMS, timeStamp - self.RuntimeDataRef.JumpConsumedTimeStamp);
+                jumpInputGraceTime = math.min(self.JumpInputGraceTimeMS, timeStamp - self.RuntimeDataRef.JumpConsumedTimeStamp);
             }
             
 #if Client
@@ -143,7 +170,8 @@ namespace Bliss.CharacterControllers
             Bliss.Debugger.GameDebugStats.GameDebugStates.Instance.SetDebugStat($"Input", "ConsumeDtMS", timeStamp - self.RuntimeDataRef.JumpConsumedTimeStamp, new float4(0, 0, 0, 1));
 #endif
             
-            self.RuntimeDataRef.WantsToJump = self.IsActionStatus(EGameplayInputAction.Jump, EInputActionStatus.Down, timeStamp, jumpInputGraceTime);
+            self.RuntimeDataRef.WantsToJump = self.PendingJump ||
+                self.IsActionStatus(EGameplayInputAction.Jump, EInputActionStatus.Down, timeStamp, jumpInputGraceTime);
         }
 
         private static bool IsActionStatus(this InputIntentProcessPipeline self, EGameplayInputAction inputAction, EInputActionStatus matchStatus, long timeStamp, long graceTime)

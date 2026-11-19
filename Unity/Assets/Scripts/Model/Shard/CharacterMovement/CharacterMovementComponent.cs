@@ -22,7 +22,8 @@ namespace Bliss.CharacterMovement
         public static float NetServerMoveTimestampExpiredWarningThreshold = 1f;
     }
     
-    public class CharacterMovementComponent : Entity, IAwake, IDestroy
+    /// <summary>Stores character movement and prediction state for its GameplayWorld.</summary>
+    public class CharacterMovementComponent : GamePlayEntity, IAwake, IDestroy
     {
         public EMovementMode MovementMode;
         public EMovementMode GroundMovementMode; 

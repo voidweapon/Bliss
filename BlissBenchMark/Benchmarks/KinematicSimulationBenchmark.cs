@@ -48,6 +48,7 @@ public class KinematicSimulationBenchmark
     private EventSystem eventSystem = null!;
     private Root root = null!;
     private KinematicMoverManager manager = null!;
+    private KinematicRigidbodyMover? lastMover;
     private readonly List<TransformComponent> transforms = new();
     private readonly List<BenchmarkController> controllers = new();
 
@@ -92,6 +93,14 @@ public class KinematicSimulationBenchmark
                 throw new InvalidOperationException("The Root-driven manager did not move every platform.");
             }
         }
+
+        this.Setup();
+        this.TickWithRemoval();
+        int expectedCount = this.ParticipantCount == EMPTY ? EMPTY : this.ParticipantCount - 1;
+        if (this.manager.PhysicsMovers.Count != expectedCount)
+        {
+            throw new InvalidOperationException("The callback did not unregister the expected mover.");
+        }
     }
 
     /// <summary>Creates a manager and Kinematic platforms outside the measured tick.</summary>
@@ -101,6 +110,7 @@ public class KinematicSimulationBenchmark
         this.root?.Dispose();
         this.transforms.Clear();
         this.controllers.Clear();
+        this.lastMover = null;
         setServerTime(INITIAL_TIME);
         this.root = (Root)rootConstructor.Invoke(new object[]
             { ROOT_ID, ROOT_ZONE, ELogicSceneType.Main, nameof(KinematicSimulationBenchmark) });
@@ -116,6 +126,7 @@ public class KinematicSimulationBenchmark
             this.transforms.Add(platform.AddComponent<TransformComponent>());
             platform.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(default);
             KinematicRigidbodyMover mover = platform.AddComponent<KinematicRigidbodyMover>();
+            this.lastMover = mover;
             BenchmarkController controller = new BenchmarkController();
             mover.MoverController = controller;
             this.controllers.Add(controller);
@@ -129,6 +140,18 @@ public class KinematicSimulationBenchmark
     /// <summary>Runs a due manager simulation through the production Root driver.</summary>
     [Benchmark]
     public void Tick() => update(this.root);
+
+    /// <summary>Runs a tick that unregisters a live mover from the first participant callback.</summary>
+    [Benchmark]
+    public void TickWithRemoval()
+    {
+        if (this.ParticipantCount != EMPTY)
+        {
+            this.controllers[0].Manager = this.manager;
+            this.controllers[0].MoverToRemove = this.lastMover;
+        }
+        update(this.root);
+    }
 
     /// <summary>Releases benchmark-owned entities and singleton registries.</summary>
     [GlobalCleanup]
@@ -154,11 +177,20 @@ public class KinematicSimulationBenchmark
     {
         /// <summary>The delta observed by the most recent simulation.</summary>
         public float LastDelta { get; private set; }
+        /// <summary>Manager used to unregister the selected participant.</summary>
+        public KinematicMoverManager? Manager;
+        /// <summary>Live participant to unregister during the next callback.</summary>
+        public KinematicRigidbodyMover? MoverToRemove;
 
         /// <inheritdoc />
         public void UpdateMovement(out float3 goalPosition, out quaternion goalRotation, float deltaTime)
         {
             this.LastDelta = deltaTime;
+            if (this.MoverToRemove != null)
+            {
+                this.Manager!.UnregisterPhysicsMover(this.MoverToRemove);
+                this.MoverToRemove = null;
+            }
             goalPosition = new float3(UNIT_AXIS, ZERO_AXIS, ZERO_AXIS);
             goalRotation = quaternion.identity;
         }

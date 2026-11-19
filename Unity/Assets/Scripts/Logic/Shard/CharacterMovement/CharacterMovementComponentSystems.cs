@@ -1,3 +1,4 @@
+using System;
 using Bliss.CharacterControllers;
 using Bliss.Core;
 using Bliss.Mathematics;
@@ -8,6 +9,8 @@ namespace Bliss.CharacterMovement
     [EntitySystemOf(typeof(CharacterMovementComponent))]
     public static partial class CharacterMovementComponentSystems
     {
+        private static readonly Action<Entity, float> logicUpdateCallback = dispatchLogicUpdate;
+
         private static void Awake(this CharacterMovementComponent self)
         {
             self.MovementMode = EMovementMode.None;
@@ -48,6 +51,20 @@ namespace Bliss.CharacterMovement
             self.NetworkNoSmoothUpdateDistance = 3.84f;
 
             self.NetworkMoveDataContainer.Clear();
+            self.RegisterLogicUpdate(GameplayWorldLogicPriority.CHARACTER_MOVEMENT, logicUpdateCallback);
+        }
+
+        private static void dispatchLogicUpdate(Entity entity, float deltaTime)
+        {
+            CharacterMovementComponent self = (CharacterMovementComponent)entity;
+            LogicScene scene = self.Scene();
+            if (scene.SceneType == ELogicSceneType.Level &&
+                !scene.GetComponent<LevelGameWorldComponent>().IsEnabled)
+            {
+                return;
+            }
+
+            self.LogicUpdate(GameplayWorldLogicUpdate.STEP_MILLISECONDS, deltaTime);
         }
         private static void Destroy(this CharacterMovementComponent self)
         {
@@ -596,7 +613,7 @@ namespace Bliss.CharacterMovement
         private static bool IsClientTimeStampValid(this CharacterMovementComponent self, float timeStamp, NetworkPredictionData_Server_CharacterMovement serverData, out bool bTimeStampResetDetected)
         {
             bTimeStampResetDetected = false;
-            if (timeStamp < 0f || math.isfinite(timeStamp))
+            if (timeStamp < 0f || !math.isfinite(timeStamp))
             {
                 return false;
             }

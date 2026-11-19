@@ -139,49 +139,57 @@ namespace Bliss.CharacterMovement
         #endregion
 
         #region Transform Utilities
-        /// <summary>
-        /// Sets the character's position directly
-        /// </summary>
-        /// <param name="self"></param>
-        /// <param name="position"></param>
-        /// <param name="bypassInterpolation"></param>
+        /// <summary>Sets the character's position directly, including its server physics body.</summary>
+        /// <param name="self">The character motor.</param>
+        /// <param name="position">The new world position.</param>
+        /// <param name="bypassInterpolation">Whether to reset the interpolation starting position.</param>
         public static void SetPosition(this KinematicCharacterComponent self, float3 position, bool bypassInterpolation = true)
         {
             self.TransformComponent.SetPosition(position);
             self._transientPosition = position;
             self.InitialSimulationPosition = position;
 
+#if DOTNET
+            GameplayRigidbody body = self.Parent.GetComponent<GameplayRigidbody>();
+            if (body != null)
+            {
+                body.Position = position;
+            }
+#endif
             if (bypassInterpolation)
             {
                 self.InitialTickPosition =  position;
             }
         }
         
-        /// <summary>
-        /// Sets the character's rotation directl
-        /// </summary>
-        /// <param name="self"></param>
-        /// <param name="rotation"></param>
-        /// <param name="bypassInterpolation"></param>
+        /// <summary>Sets the character's rotation directly, including its server physics body.</summary>
+        /// <param name="self">The character motor.</param>
+        /// <param name="rotation">The new world rotation.</param>
+        /// <param name="bypassInterpolation">Whether to reset the interpolation starting rotation.</param>
         public static void SetRotation(this KinematicCharacterComponent self, quaternion rotation, bool bypassInterpolation = true)
         {
             self.TransformComponent.SetRotation(rotation);
             self.TransientRotation = rotation;
             self.InitialSimulationRotation = rotation;
 
+#if DOTNET
+            GameplayRigidbody body = self.Parent.GetComponent<GameplayRigidbody>();
+            if (body != null)
+            {
+                body.Rotation = rotation;
+            }
+#endif
             if (bypassInterpolation)
             {
                 self.InitialTickRotation = rotation;
             }
         }
 
-        /// <summary>
-        /// Sets the character's position and rotation directly
-        /// </summary>
-        /// <param name="self"></param>
-        /// <param name="position"></param>
-        /// <param name="rotation"></param>
-        /// <param name="bypassInterpolation"></param>
+        /// <summary>Sets the character's world pose directly, including its server physics body.</summary>
+        /// <param name="self">The character motor.</param>
+        /// <param name="position">The new world position.</param>
+        /// <param name="rotation">The new world rotation.</param>
+        /// <param name="bypassInterpolation">Whether to reset the interpolation starting pose.</param>
         public static void SetPositionAndRotation(this KinematicCharacterComponent self, float3 position, quaternion rotation, bool bypassInterpolation = true)
         {
             self.TransformComponent.SetPositionAndRotation(position, rotation);
@@ -190,12 +198,27 @@ namespace Bliss.CharacterMovement
             self.InitialSimulationPosition = position;
             self.InitialSimulationRotation = rotation;
 
+#if DOTNET
+            self.syncPhysicsPose(position, rotation);
+#endif
             if (bypassInterpolation)
             {
                 self.InitialTickPosition = position;
                 self.InitialTickRotation = rotation;
             }
         }
+
+#if DOTNET
+        internal static void syncPhysicsPose(this KinematicCharacterComponent self, float3 position, quaternion rotation)
+        {
+            GameplayRigidbody body = self.Parent.GetComponent<GameplayRigidbody>();
+            if (body != null)
+            {
+                body.Rotation = rotation;
+                body.Position = position;
+            }
+        }
+#endif
 
         /// <summary>
         /// Moves the character position, taking all movement collision solving int account. The actual move is done the next time the motor updates are called

@@ -1,5 +1,6 @@
 using Bliss.Base.Collections;
 using Bliss.Core;
+using System.Collections.Generic;
 
 namespace Bliss.CharacterMovement
 {
@@ -11,6 +12,13 @@ namespace Bliss.CharacterMovement
         
         public IndexList<long, EntityRef<KinematicCharacterComponent>> CharacterMotors = new IndexList<long, EntityRef<KinematicCharacterComponent>>();
         public IndexList<long, EntityRef<KinematicRigidbodyMover>> PhysicsMovers = new IndexList<long, EntityRef<KinematicRigidbodyMover>>();
+
+        /// <summary>Reusable motor references captured at the start of the current simulation.</summary>
+        public readonly List<EntityRef<KinematicCharacterComponent>> MotorSnapshot = new List<EntityRef<KinematicCharacterComponent>>();
+        /// <summary>Reusable mover references captured at the start of the current simulation.</summary>
+        public readonly List<EntityRef<KinematicRigidbodyMover>> MoverSnapshot = new List<EntityRef<KinematicRigidbodyMover>>();
+        /// <summary>Whether the manager is currently using its reusable participant snapshots.</summary>
+        public bool IsDispatching;
         
         // public Queue<EntityRef<KinematicCharacterComponent>> CharacterMotors = new Queue<EntityRef<KinematicCharacterComponent>>();
         // public Queue<EntityRef<KinematicCharacterComponent>> PhysicsMovers = new Queue<EntityRef<KinematicCharacterComponent>>();

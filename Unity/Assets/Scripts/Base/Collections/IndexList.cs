@@ -31,26 +31,27 @@ namespace Bliss.Base.Collections
             base.Add(value);
         }
 
+        /// <summary>
+        /// Removes a keyed value by moving the last value into its slot; order is not preserved.
+        /// A key that is not present is ignored.
+        /// </summary>
+        /// <param name="key">The key of the value to remove.</param>
         public void Remove(TKey key)
         {
             if (_key2IndexMap.TryGetValue(key, out var index))
             {
-                if (index == Count - 1)
+                int lastIndex = Count - 1;
+                if (index != lastIndex)
                 {
-                    _key2IndexMap.Remove(key);
-                    _index2KeyMap.Remove(index);
+                    TKey lastKey = _index2KeyMap[lastIndex];
+                    this[index] = this[lastIndex];
+                    _index2KeyMap[index] = lastKey;
+                    _key2IndexMap[lastKey] = index;
+                }
 
-                    RemoveAt(index);
-                }
-                else
-                {
-                    _index2KeyMap[index] = _index2KeyMap[Count - 1];
-                    _key2IndexMap[_index2KeyMap[Count - 1]] = index;
-                    _key2IndexMap.Remove(key);
-                    _index2KeyMap.Remove(Count - 1);
-                    
-                    this[index] = this[Count - 1];
-                }
+                _key2IndexMap.Remove(key);
+                _index2KeyMap.Remove(lastIndex);
+                base.RemoveAt(lastIndex);
             }
         }
 

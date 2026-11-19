@@ -1,10 +1,13 @@
 using System.Collections.Generic;
 using Bliss.Base.Collections;
+using Bliss.Core;
 using Unity.Mathematics;
 
 namespace Bliss.CharacterControllers
 {
-    public class InputIntentProcessPipeline : Entity, IAwake, IDestroy
+    /// <summary>Collects character input during the owning GameplayWorld's EarlyUpdate.</summary>
+    [SystemPriority(typeof(IEarlyUpdate), 1000)]
+    public class InputIntentProcessPipeline : GamePlayEntity, IAwake, IDestroy, IEarlyUpdate
     {
         public IInputSource InputSource;
         public FixedCircularArray<InputRecord> InputRecords = new FixedCircularArray<InputRecord>(64);
@@ -13,6 +16,9 @@ namespace Bliss.CharacterControllers
         public long JumpInputGraceTimeMS = 100;
         
         public CharacterRuntimeData  RuntimeDataRef;
+
+        /// <summary>Whether a jump edge is still waiting for an enabled World tick.</summary>
+        public bool PendingJump;
     }
 
     public class InputRecord

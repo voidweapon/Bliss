@@ -2,8 +2,12 @@ using Unity.Mathematics;
 
 namespace Bliss.CharacterMovement
 {
-    public class KinematicRigidbodyMover : Entity, IAwake, IDestroy
+    /// <summary>Stores the state of a Kinematic platform owned by a GameplayWorld.</summary>
+    public class KinematicRigidbodyMover : GamePlayEntity, IAwake, IDestroy
     {
+        /// <summary>Instance identifier used to unregister the mover during destruction.</summary>
+        public long RegisteredInstanceId;
+
         /// <summary>
         /// The mover's Rigidbody
         /// </summary>

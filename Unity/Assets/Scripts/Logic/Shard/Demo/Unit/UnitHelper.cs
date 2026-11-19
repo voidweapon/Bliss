@@ -44,14 +44,36 @@ namespace Bliss
             }
         }
 
-        /// <summary>Mounts a transferred Unit and restores its non-serialized gameplay layer.</summary>
-        /// <param name="world">Destination GameplayWorld.</param>
+        /// <summary>Mounts an unmounted transferred Unit and restores its non-serialized gameplay layer.</summary>
+        /// <param name="destination">The destination GameplayWorld or an enabled LevelScene within it.</param>
         /// <param name="unit">Deserialized Unit to mount.</param>
-        public static void MountTransferredUnit(GameplayWorld world, Unit unit)
+        /// <exception cref="InvalidOperationException">The destination is invalid or the Unit is already mounted.</exception>
+        public static void MountTransferredUnit(LogicScene destination, Unit unit)
         {
-            world.AddChild(unit);
+            if (destination == null || destination.IsDisposed || unit == null ||
+                unit.Parent != null || unit.LogicScene != null)
+            {
+                throw new InvalidOperationException("A live destination and an unmounted transferred Unit are required.");
+            }
+
+            if (destination.SceneType == ELogicSceneType.Level)
+            {
+                LevelGameWorldComponent association = destination.GetComponent<LevelGameWorldComponent>();
+                if (association == null || !association.IsEnabled || association.GameplayWorld == null ||
+                    association.GameplayWorld.IsDisposed)
+                {
+                    throw new InvalidOperationException("The destination LevelScene must be enabled and owned by a live GameplayWorld.");
+                }
+                association.ValidateOwnership(association.GameplayWorld);
+            }
+            else if (destination is not GameplayWorld)
+            {
+                throw new InvalidOperationException("The destination must be a GameplayWorld or an enabled LevelScene.");
+            }
+
             try
             {
+                destination.AddChild(unit);
                 if (unit.GetComponent<GameplayLayer>() == null)
                 {
                     unit.AddComponent<GameplayLayer, int>(GameplayLayerDefine.Unit);

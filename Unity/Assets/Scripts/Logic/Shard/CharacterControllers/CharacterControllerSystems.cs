@@ -3,6 +3,9 @@ using Bliss.Core;
 using Bliss.Pool;
 using ET;
 using Unity.Mathematics;
+#if DOTNET
+using Bliss.Physics;
+#endif
 
 namespace Bliss.CharacterControllers
 {
@@ -11,30 +14,58 @@ namespace Bliss.CharacterControllers
     {
         private static void Awake(this CharacterController self)
         {
+            Entity parent = self.Parent;
+            bool hadInput = parent.GetComponent<InputIntentProcessPipeline>() != null;
+            bool hadMovement = parent.GetComponent<CharacterMovementComponent>() != null;
+            bool hadMotor = parent.GetComponent<KinematicCharacterComponent>() != null;
+            bool hadRigidbody = parent.GetComponent<GameplayRigidbody>() != null;
+            try
+            {
+                self.initialize();
+            }
+            catch
+            {
+                // AddComponent attaches before Awake, so recover partially attached components too.
+                self.InputIntentProcessPipeline ??= hadInput ? null : parent.GetComponent<InputIntentProcessPipeline>();
+                self.MovementComponent ??= hadMovement ? null : parent.GetComponent<CharacterMovementComponent>();
+                self.KinematicCharacterComponent ??= hadMotor ? null : parent.GetComponent<KinematicCharacterComponent>();
+                self.OwnedRigidbody ??= hadRigidbody ? null : parent.GetComponent<GameplayRigidbody>();
+                self.Dispose();
+                throw;
+            }
+        }
+
+        private static void initialize(this CharacterController self)
+        {
             self.RuntimeData = ObjectPool.Instance.Fetch<CharacterRuntimeData>();
 
             //Input
             self.InputIntentProcessPipeline = self.Parent.AddComponent<InputIntentProcessPipeline>();
             self.InputIntentProcessPipeline.SetRuntimeData(self.RuntimeData);
 
-            //Time
-            self.PreviousTimeStamp = TimeInfo.Instance.ClientFrameTime();
-
             //Movement
-            self.Parent.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(new GameplayRigidbodyInitParams()
-            {
-                IsStatic = false,
-                IsKinematic = true,
-            });
-            
-            var gameplayCapsuleCollider = self.Parent.AddChild<GameplayCapsuleCollider, CapsuleColliderInitParams>(new CapsuleColliderInitParams()
+            CapsuleColliderInitParams capsuleParams = new CapsuleColliderInitParams()
             {
                 Center = new float3(0f, 1f, 0f),
                 Radius = 0.5f,
                 Height = 2f,
                 Direction = 1,
                 IsTrigger = false,
+            };
+#if DOTNET
+            PhysicalScene physicalScene = self.Scene().GetComponent<PhysicalScene>()
+                ?? throw new System.InvalidOperationException("The character's scene has no PhysicalScene.");
+            var gameplayCapsuleCollider = physicalScene.CreateCharacterPhysics(self.Parent, capsuleParams);
+            self.OwnedRigidbody = self.Parent.GetComponent<GameplayRigidbody>();
+#else
+            self.OwnedRigidbody = self.Parent.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(new GameplayRigidbodyInitParams()
+            {
+                IsStatic = false,
+                IsKinematic = true,
             });
+            var gameplayCapsuleCollider = self.Parent.AddChild<GameplayCapsuleCollider, CapsuleColliderInitParams>(capsuleParams);
+#endif
+            self.OwnedCapsule = gameplayCapsuleCollider;
 
             self.KinematicCharacterComponent = self.Parent.AddComponent<KinematicCharacterComponent>();
             self.KinematicCharacterComponent.SetCharacterCapsule(gameplayCapsuleCollider);
@@ -52,6 +83,15 @@ namespace Bliss.CharacterControllers
         }
         private static void Destroy(this CharacterController self)
         {
+            if (!self.Parent.IsDisposed)
+            {
+                self.InputIntentProcessPipeline?.Dispose();
+                self.MovementComponent?.Dispose();
+                self.OwnedCapsule?.Dispose();
+                self.KinematicCharacterComponent?.Dispose();
+                self.OwnedRigidbody?.Dispose();
+            }
+
             if (self.RuntimeData != null)
             {
                 self.RuntimeData.Dispose();
@@ -60,22 +100,13 @@ namespace Bliss.CharacterControllers
             }
 
             self.InitComponentCancellationToken.Cancel();
+            self.InputIntentProcessPipeline = null;
+            self.MovementComponent = null;
+            self.KinematicCharacterComponent = null;
+            self.OwnedCapsule = null;
+            self.OwnedRigidbody = null;
         }
         
-        private static void EarlyUpdate(this CharacterController self)
-        {
-            var frameTime = TimeInfo.Instance.ClientFrameTime();
-            self.CurrentDeltaTimeMS = frameTime - self.PreviousTimeStamp;
-            self.CurrentDeltaTime = self.CurrentDeltaTimeMS / 1000f;
-            self.PreviousTimeStamp = frameTime;
-            self.ViewEarlyUpdate(self.CurrentDeltaTime);
-        }
-
-        private static void Update(this CharacterController self)
-        {
-            self.ViewUpdate(self.CurrentDeltaTimeMS, self.CurrentDeltaTime);
-        }
-
         /*
         private static async ETTask InitComponentWaitResourceLoaded(this CharacterController self, ETCancellationToken cancellationToken)
         {
@@ -109,26 +140,5 @@ namespace Bliss.CharacterControllers
         }
         */
         
-        public static void LogicUpdate(this CharacterController self, float deltaTime)
-        {
-
-        }
-        
-        private static void ViewEarlyUpdate(this CharacterController self, float deltaTime)
-        {
-            if (self.InputIntentProcessPipeline != null)
-            {
-                self.InputIntentProcessPipeline.ViewEarlyUpdate(deltaTime);
-            }
-        }
-
-        private static void ViewUpdate(this CharacterController self, long deltaTimeMS, float deltaTime)
-        {
-            if (self.MovementComponent != null)
-            {
-                self.MovementComponent.LogicUpdate(deltaTimeMS, deltaTime);
-            }
-        }
-
     }
 }

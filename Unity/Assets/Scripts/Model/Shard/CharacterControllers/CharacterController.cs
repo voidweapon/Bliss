@@ -8,18 +8,20 @@ using Unity.Mathematics;
 
 namespace Bliss.CharacterControllers
 {
-    [SystemPriority(typeof(IEarlyUpdate), 1000)]
-    public class CharacterController : Entity, IAwake, IDestroy, IEarlyUpdate, IUpdate
+    /// <summary>Owns initialization and cleanup of a character's dedicated components.</summary>
+    public class CharacterController : GamePlayEntity, IAwake, IDestroy
     {
         public InputIntentProcessPipeline InputIntentProcessPipeline;
         
         public KinematicCharacterComponent KinematicCharacterComponent;
         public CharacterMovementComponent MovementComponent;
 
+        /// <summary>The capsule created for this controller, including during partial initialization.</summary>
+        public GameplayCapsuleCollider OwnedCapsule;
+        /// <summary>The rigidbody created for this controller, including during partial initialization.</summary>
+        public GameplayRigidbody OwnedRigidbody;
+
         public CharacterRuntimeData RuntimeData;
-        public long PreviousTimeStamp;
-        public float CurrentDeltaTime;   
-        public long CurrentDeltaTimeMS;   
         public ETCancellationToken InitComponentCancellationToken =  new ETCancellationToken();
     }
 
