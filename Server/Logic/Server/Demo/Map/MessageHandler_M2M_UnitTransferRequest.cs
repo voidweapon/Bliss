@@ -30,7 +30,7 @@ public class MessageHandler_M2M_UnitTransferRequest : MessageHandler<LogicScene,
         }
         
         Entity entity = MongoHelper.Deserialize<Entity>(request.RawEntity);
-        gameplayWorld.AddChild(entity);
+        UnitHelper.MountTransferredUnit((GameplayWorld)gameplayWorld, (Unit)entity);
         entity.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.OrderedMessage);
         entity.GetComponent<TransformComponent>()?.SetPositionAndRotation(spawnPoint, spawnRotation);
         
@@ -49,7 +49,8 @@ public class MessageHandler_M2M_UnitTransferRequest : MessageHandler<LogicScene,
 
         await MapTransferHelper.FinishTransferUnit(entity, request.FromAddress);
         
-        UnitHelper.CreateUnit(gameplayWorld, (Unit)entity, true);
+        // The ordered mailbox was attached before the location was unlocked.
+        UnitHelper.CreateUnit(gameplayWorld, (Unit)entity, false);
         entity.AddComponent<RemoteGhost>();
         
         /*

@@ -3,7 +3,9 @@ using Bliss;
 using Bliss.CharacterMovement;
 using Bliss.Core;
 using Bliss.Core.EventSystem;
+using Bliss.Gameplay.GameplayAbilitySystem;
 using Bliss.Physics;
+using Bliss.Server;
 using Bliss.Timer;
 using ET;
 using MagicPhysX;
@@ -23,6 +25,14 @@ public class MoverIntegrationTests
     private const long WORLD_INSTANCE_ID = 10001;
     private const int LEVEL_ID = 303;
     private const int MOVER_CONFIG_ID = 1;
+    private const int UNIT_CONFIG_ID = 1;
+    private const long TEST_UNIT_ID = 12001;
+    private const long TEST_SCENE_ACTOR_ID = 12002;
+    private const long FIRST_SHOOT_TIME = 11000;
+    private const long SECOND_SHOOT_TIME = 21000;
+    private const long THIRD_SHOOT_TIME = 31000;
+    private const long BEFORE_FIRST_SHOOT_TIME = 10999;
+    private const long UNUPDATED_VIEW_TIME = -1;
     private const int BULLET_CONFIG_ID = 1;
     private const long BULLET_ID = 404;
     private const long INITIAL_TIME = 1000;
@@ -111,13 +121,16 @@ public class MoverIntegrationTests
         // The server handlers require external physics assets; the fixture supplies empty Level resource handlers.
         this.typeManager.GetTypes(typeof(EventAttribute)).Remove(typeof(EventHandler_AfterCreateLevelScene_Server));
         this.typeManager.GetTypes(typeof(EventAttribute)).Remove(typeof(EventHandler_EnableLevelScene_Server));
+        this.typeManager.GetTypes(typeof(EventAttribute)).Remove(typeof(GameplayEventHandler_ShootBullet_Server));
         registerSingleton.Invoke(this.typeManager, null);
+        MongoRegister.Init();
         this.entitySystemManager = new EntitySystemManager();
         this.entitySystemManager.Init();
         registerSingleton.Invoke(this.entitySystemManager, null);
         this.eventSystem = new EventSystem();
         this.eventSystem.Init();
         registerSingleton.Invoke(this.eventSystem, null);
+        RecordShot.Count = 0;
         this.configManager = new ConfigManager();
         this.configManager.Init();
         registerSingleton.Invoke(this.configManager, null);
@@ -146,6 +159,182 @@ public class MoverIntegrationTests
         this.typeManager?.Dispose();
         TimeInfo.Instance.ServerMinusClientTime = NO_SERVER_TIME_OFFSET;
         Directory.SetCurrentDirectory(this.previousDirectory);
+    }
+
+    /// <summary>A minimally created Unit and its dedicated layer belong to the owning World.</summary>
+    [Test]
+    public void MinimalLevelUnitUsesGameplayWorldOwnership()
+    {
+        UnitManager manager = this.world.AddComponent<UnitManager>();
+        Unit unit = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, TEST_UNIT_ID,
+            ENetRole.Authority, ENetRole.SimulatedProxy, float3.zero, quaternion.identity);
+        GameplayLayer layer = unit.GetComponent<GameplayLayer>();
+        Assert.That(typeof(GamePlayEntity).IsInstanceOfType(unit), Is.True);
+        Assert.That(typeof(GamePlayEntity).IsInstanceOfType(layer), Is.True);
+        Assert.That(unit.GetLevelGameplayWorld(), Is.SameAs(this.world));
+        Assert.That(layer.GetLevelGameplayWorld(), Is.SameAs(this.world));
+        Assert.That(manager.DicEntityId2Unit.ContainsKey(TEST_UNIT_ID), Is.True);
+        Assert.That(typeof(GamePlayEntity).IsInstanceOfType(unit.GetComponent<TransformComponent>()), Is.False);
+        Assert.That(typeof(GamePlayEntity).IsInstanceOfType(unit.GetComponent<NetRoleComponent>()), Is.False);
+        unit.Dispose();
+        Assert.That(unit.IsDisposed, Is.True);
+        Assert.That(layer.IsDisposed, Is.True);
+        Assert.That(manager.DicEntityId2Unit, Is.Empty);
+    }
+
+    /// <summary>Reusable and management entities do not opt into gameplay scheduling.</summary>
+    [Test]
+    public void OrdinaryManagersAndComponentsRetainEntityOwnership()
+    {
+        Type[] ordinaryTypes =
+        {
+            typeof(UnitManager), typeof(BulletManager), typeof(SceneActorManager),
+            typeof(AoiManagerComponent), typeof(LevelPlayerSpawnPointMgr),
+            typeof(LevelPlayerMgrComponent), typeof(LevelNetworkObjectCollectionComponent),
+            typeof(NetRoleComponent), typeof(TransformComponent), typeof(RemoteGhost),
+            typeof(ReplicationGraph), typeof(DemoGameMode), typeof(LevelGameWorldComponent),
+        };
+        foreach (Type type in ordinaryTypes)
+        {
+            Assert.That(typeof(GamePlayEntity).IsAssignableFrom(type), Is.False, type.FullName);
+        }
+
+        Assert.That(typeof(GamePlayEntity).IsAssignableFrom(typeof(AbilitySystemComponent)), Is.True);
+    }
+
+    /// <summary>A login transit Unit survives the production BSON transfer and mounts in the destination World.</summary>
+    [Test]
+    public void TransitUnitRoundTripsAndMountsInMapWorld()
+    {
+        GameplayWorld transit = GameplayWorldFactory.Create(this.root.Scene, HEALTHY_WORLD_ID,
+            HEALTHY_WORLD_INSTANCE_ID, "Transit");
+        Unit source = UnitHelper.CreateMinimalUnit(transit, UNIT_CONFIG_ID, TEST_UNIT_ID,
+            ENetRole.Authority, ENetRole.AutonomousProxy, moveDirection, quaternion.identity);
+        byte[] payload = MongoHelper.Serialize(source);
+        source.Dispose();
+
+        Unit received = (Unit)MongoHelper.Deserialize<Entity>(payload);
+        UnitHelper.MountTransferredUnit(this.world, received);
+
+        Assert.That(received.GetLevelGameplayWorld(), Is.SameAs(this.world));
+        Assert.That(received.Id, Is.EqualTo(TEST_UNIT_ID));
+        Assert.That(received.UnitConfigId, Is.EqualTo(UNIT_CONFIG_ID));
+        Assert.That(received.GetComponent<TransformComponent>().Transform.Location.x, Is.EqualTo(UNIT_AXIS));
+        Assert.That(received.GetComponent<NetRoleComponent>(), Is.Not.Null);
+        Assert.That(received.GetComponent<GameplayLayer>(), Is.InstanceOf<GamePlayEntity>());
+        Assert.That(received.GetComponent<GameplayLayer>().Layer, Is.EqualTo(GameplayLayerDefine.Unit));
+        received.Dispose();
+    }
+
+    /// <summary>Smoothing is dispatched by its World and stops when the World faults.</summary>
+    [Test]
+    public void SmoothingUpdatesThroughWorldAndStopsOnFailure()
+    {
+        Unit unit = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, TEST_UNIT_ID,
+            ENetRole.Authority, ENetRole.SimulatedProxy, float3.zero, quaternion.identity);
+        SmoothTransformComponent smoothing = unit.AddComponent<SmoothTransformComponent, SmoothTransformComponentInitParam>(
+            new SmoothTransformComponentInitParam(ENetworkSmoothingMode.Linear));
+        smoothing.ViewTimeStamp = UNUPDATED_VIEW_TIME;
+        earlyUpdate(this.root);
+        update(this.root);
+        Assert.That(smoothing.ViewTimeStamp, Is.Not.EqualTo(UNUPDATED_VIEW_TIME));
+
+        this.world.StopWithFailure(new InvalidOperationException("test failure"));
+        smoothing.ViewTimeStamp = UNUPDATED_VIEW_TIME;
+        earlyUpdate(this.root);
+        update(this.root);
+        Assert.That(smoothing.ViewTimeStamp, Is.EqualTo(UNUPDATED_VIEW_TIME));
+    }
+
+    /// <summary>The ShooterGear timer follows World updates, Level activation and entity disposal.</summary>
+    [Test]
+    public void ShooterGearTimerRunsOnlyForEnabledLiveWorld()
+    {
+        this.root.Scene.RemoveComponent<TimerComponent>();
+        AoiManagerComponent aoiManager = this.world.AddComponent<AoiManagerComponent>();
+        SceneActorManager actorManager = this.world.AddComponent<SceneActorManager>();
+        SceneActorDataTypeManager typeRegistry = new SceneActorDataTypeManager();
+        int previousLogLevel = Log.LogLevel;
+        try
+        {
+            Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+            typeRegistry.Init();
+            registerSingleton.Invoke(typeRegistry, null);
+            ShooterGearConfig config = new ShooterGearConfig
+            {
+                BulletConfigId = BULLET_CONFIG_ID,
+                Rotation = quaternion.identity,
+            };
+            List<Entity> actors = new List<Entity>();
+            LogicSceneFactory.CreateSceneActor(this.level, new List<SceneActorData>
+            {
+                new SceneActorData
+                {
+                    NetworkIdentity = TEST_SCENE_ACTOR_ID,
+                    TypeIdentifier = typeof(ShooterGearConfig).FullName!.GetStableHashCode(),
+                    Data = Serializer.Serialize(config),
+                },
+            }, ENetRole.Authority, ENetRole.SimulatedProxy, actors);
+            SceneActor actor = (SceneActor)actors.Single();
+            ShooterGear gear = actor.GetComponent<ShooterGear>();
+            AOIEntityCmp aoi = actor.GetComponent<AOIEntityCmp>();
+            Assert.That(actor, Is.InstanceOf<GamePlayEntity>());
+            Assert.That(gear, Is.InstanceOf<GamePlayEntity>());
+            Assert.That(aoi, Is.InstanceOf<GamePlayEntity>());
+            Assert.That(actorManager.DicEntityId2SceneActor.ContainsKey(TEST_SCENE_ACTOR_ID), Is.True);
+            Assert.That(aoiManager.Entries.Count, Is.EqualTo(TWO_REGISTRATIONS));
+            Assert.That(gear.UpdateTimer, Is.Not.Zero);
+
+            earlyUpdate(this.root);
+            setServerTime(BEFORE_FIRST_SHOOT_TIME);
+            update(this.root);
+            Assert.That(RecordShot.Count, Is.Zero);
+            setServerTime(FIRST_SHOOT_TIME);
+            update(this.root);
+            Assert.That(RecordShot.Count, Is.Zero);
+
+            LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+            setServerTime(SECOND_SHOOT_TIME);
+            update(this.root);
+            Assert.That(RecordShot.Count, Is.EqualTo(FIRST_SIMULATION_COUNT));
+
+            long timerId = gear.UpdateTimer;
+            actor.Dispose();
+            Assert.That(gear.UpdateTimer, Is.Zero);
+            Assert.That(this.world.Timer.Cancel(ref timerId), Is.False);
+            Assert.That(timerId, Is.Zero);
+            Assert.That(actorManager.DicEntityId2SceneActor, Is.Empty);
+            Assert.That(aoiManager.Entries, Is.Empty);
+            setServerTime(THIRD_SHOOT_TIME);
+            update(this.root);
+            Assert.That(RecordShot.Count, Is.EqualTo(FIRST_SIMULATION_COUNT));
+        }
+
+        finally
+        {
+            typeRegistry.Dispose();
+            Log.LogLevel = previousLogLevel;
+        }
+    }
+
+    /// <summary>A faulted World does not dispatch its active ShooterGear timer.</summary>
+    [Test]
+    public void ShooterGearTimerStopsWhenWorldFaults()
+    {
+        LevelSceneFactory.Enable(this.level).GetAwaiter().GetResult();
+        SceneActor actor = this.level.AddChild<SceneActor>();
+        actor.AddComponent<TransformComponent>().SetPositionAndRotation(float3.zero, quaternion.identity);
+        ShooterGear gear = actor.AddComponent<ShooterGear>();
+        gear.SetConfig(new ShooterGearConfig { BulletConfigId = BULLET_CONFIG_ID });
+        gear.EndSceneInit();
+        Assert.That(gear.UpdateTimer, Is.Not.Zero);
+
+        this.world.StopWithFailure(new InvalidOperationException("test failure"));
+        earlyUpdate(this.root);
+        setServerTime(FIRST_SHOOT_TIME);
+        update(this.root);
+        Assert.That(RecordShot.Count, Is.Zero);
+        actor.Dispose();
     }
 
     /// <summary>Delayed Root updates advance a LevelScene Mover once with a 50 ms step.</summary>
@@ -289,6 +478,8 @@ public class MoverIntegrationTests
             float3.zero, quaternion.identity,
             new GameplayTargetInfo { TargetDir = moveDirection },
             isRaiseEvent: false);
+        Assert.That(bullet, Is.Not.InstanceOf<GamePlayEntity>());
+        Assert.That(bullet.GetComponent<AOIEntityCmp>(), Is.InstanceOf<GamePlayEntity>());
         MoverComponent component = bullet.GetComponent<MoverComponent>();
         Mover mover = (Mover)component.Children.Values.Single();
         MoverStageRuntime stage = mover.CurrentStage;
@@ -1104,5 +1295,20 @@ public class MoverIntegrationTests
     {
         protected override async ETTask Run(LogicScene scene, Event_EnableLevelScene data) =>
             await ETTask.CompletedTask;
+    }
+
+    /// <summary>Observes the real ShooterGear event without spawning networked Bullets.</summary>
+    [Event(ELogicSceneType.Level)]
+    public sealed class RecordShot : AEvent<LogicScene, GameplayEvent_ShootBullet>
+    {
+        /// <summary>Number of observed shot events in the current test.</summary>
+        public static int Count;
+
+        /// <inheritdoc />
+        protected override async ETTask Run(LogicScene scene, GameplayEvent_ShootBullet data)
+        {
+            Count++;
+            await ETTask.CompletedTask;
+        }
     }
 }

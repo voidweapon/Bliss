@@ -1,6 +1,7 @@
 namespace Bliss
 {
-    public class GameplayLayer : Entity,IAwake<int>
+    /// <summary>Stores the collision layer of a GameplayWorld-owned entity.</summary>
+    public class GameplayLayer : GamePlayEntity, IAwake<int>
     {
         public int Layer;
     }

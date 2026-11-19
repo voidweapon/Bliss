@@ -9,7 +9,8 @@ namespace Bliss.Gameplay.GameplayAbilitySystem
 {
     public delegate bool GameplayEffectApplicationQuery(ActiveGameplayEffectsContainer activeGEContainer, ref GameplayEffectSpec geSpecToConsider);
     
-    public partial class AbilitySystemComponent : Entity
+    /// <summary>Manages gameplay abilities and effects within an owning GameplayWorld.</summary>
+    public partial class AbilitySystemComponent : GamePlayEntity
     {
         /// <summary>
         /// Cached off data about the owning actor that abilities will need to frequently access (movement component, mesh component, anim instance, etc)

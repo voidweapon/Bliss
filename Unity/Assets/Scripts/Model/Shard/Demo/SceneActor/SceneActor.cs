@@ -2,7 +2,8 @@ using Bliss.Mathematics;
 
 namespace Bliss
 {
-    public class SceneActor : Entity, IAwake, IDestroy
+    /// <summary>An actor owned by a GameplayWorld or its LevelScene.</summary>
+    public class SceneActor : GamePlayEntity, IAwake, IDestroy
     {
       
     }

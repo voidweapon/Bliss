@@ -45,6 +45,9 @@ namespace Bliss
 
         }
         
+        /// <summary>Creates the client GameplayWorld and its gameplay managers.</summary>
+        /// <param name="clientScene">The client scene that owns the World.</param>
+        /// <returns>The initialized GameplayWorld.</returns>
         public static async ETTask<GameplayWorld> CreateGameplayWorld(LogicScene clientScene)
         {
             var gameplayWorld = GameplayWorldFactory.Create(
@@ -55,6 +58,7 @@ namespace Bliss
             gameplayWorld.AddComponent<UnitManager>();
             gameplayWorld.AddComponent<BulletManager>();
             gameplayWorld.AddComponent<SceneActorManager>();
+            gameplayWorld.AddComponent<AoiManagerComponent>();
             gameplayWorld.AddComponent<KinematicMoverManager, KinematicMoverManagerSettings>(new KinematicMoverManagerSettings()
             {
                 AutoSimulation = true,
@@ -62,7 +66,7 @@ namespace Bliss
                 InterpolateMotor = true,
                 InterpolateMover = true,
             });
-            await EventSystem.Instance.PushAsync(gameplayWorld, new Event_AfterCreateGameplayWorld());
+            await EventSystem.Instance.PushAsync((LogicScene)gameplayWorld, new Event_AfterCreateGameplayWorld());
                 
             var currentSceneCmp = clientScene.AddComponent<CurrentSceneComponent>();
             currentSceneCmp.GameplayWorld = gameplayWorld;

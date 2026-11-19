@@ -1,6 +1,5 @@
 using Bliss.Core;
-using Bliss.Core.EventSystem;
-using Bliss.Timer;
+using System;
 using Unity.Mathematics;
 
 namespace Bliss
@@ -8,24 +7,41 @@ namespace Bliss
     [EntitySystemOf(typeof(ShooterGear))]
     public static partial class ShooterGearSystems
     {
+        private const long SHOOT_INTERVAL_MILLISECONDS = 10000;
+
         private static void AfterSceneInit(this ShooterGear self)
         {
-            self.UpdateTimer = self.RootTimerComponent().NewRepeatedTimer(10000, TimerInvokeType.ShoterGearUpdate, self);
-        }
-        private static void Destroy(this ShooterGear self)
-        {
-            self.RootTimerComponent().CancelTimer(ref self.UpdateTimer);
-        }
-        
-        [Invoke(TimerInvokeType.ShoterGearUpdate)]
-        private class UpdateTimer : ATimer<ShooterGear>
-        {
-            protected override void Run(ShooterGear self)
-            {
-                self.Shoot();
-            }
+            GameplayWorld world = self.GetLevelGameplayWorld()
+                ?? throw new InvalidOperationException("ShooterGear must belong to a GameplayWorld.");
+            self.UpdateTimer = world.Timer.ScheduleRepeated(SHOOT_INTERVAL_MILLISECONDS, self.shootIfEnabled, self);
         }
 
+        private static void Destroy(this ShooterGear self)
+        {
+            GameplayWorld world = self.GetLevelGameplayWorld();
+            if (world == null)
+            {
+                self.UpdateTimer = default;
+                return;
+            }
+
+            world.Timer.Cancel(ref self.UpdateTimer);
+        }
+
+        private static void shootIfEnabled(this ShooterGear self)
+        {
+            LogicScene scene = self.Scene();
+            if (scene.SceneType == ELogicSceneType.Level &&
+                !scene.GetComponent<LevelGameWorldComponent>().IsEnabled)
+            {
+                return;
+            }
+
+            self.Shoot();
+        }
+
+        /// <summary>Raises a shot event from the configured scene actor's transform.</summary>
+        /// <param name="self">The configured, live ShooterGear.</param>
         public static void Shoot(this ShooterGear self)
         {
             var transformCmp = self.Parent.GetComponent<TransformComponent>();

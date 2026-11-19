@@ -43,6 +43,26 @@ namespace Bliss
                 throw;
             }
         }
+
+        /// <summary>Mounts a transferred Unit and restores its non-serialized gameplay layer.</summary>
+        /// <param name="world">Destination GameplayWorld.</param>
+        /// <param name="unit">Deserialized Unit to mount.</param>
+        public static void MountTransferredUnit(GameplayWorld world, Unit unit)
+        {
+            world.AddChild(unit);
+            try
+            {
+                if (unit.GetComponent<GameplayLayer>() == null)
+                {
+                    unit.AddComponent<GameplayLayer, int>(GameplayLayerDefine.Unit);
+                }
+            }
+            catch (Exception exception)
+            {
+                disposeFailedUnit(unit, exception);
+                throw;
+            }
+        }
         
         /// <summary>
         /// Completes Unit setup and removes the partially created Unit if setup fails.

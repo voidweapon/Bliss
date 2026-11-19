@@ -45,7 +45,8 @@ namespace Bliss
         public quaternion Rotation;
     }
 
-    public abstract class ASceneActorCmp : Entity, ISupportSerialize
+    /// <summary>Base for configured scene actor components owned by a GameplayWorld.</summary>
+    public abstract class ASceneActorCmp : GamePlayEntity, ISupportSerialize
     {
         public SceneActorData RawConfigData { get; private set; }
         public ASceneActorConfig Config { get; private set; }

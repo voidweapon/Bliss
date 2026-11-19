@@ -107,11 +107,19 @@ namespace Bliss
         }
 
         /// <summary>
-        /// Cancels an active timer. A pending wait completes with <see langword="false"/>.
+        /// Cancels an active timer and clears the caller's identifier. A pending wait completes with <see langword="false"/>.
         /// </summary>
-        /// <param name="timerId">Identifier returned when the timer was scheduled.</param>
+        /// <param name="timerId">Identifier returned when the timer was scheduled; cleared even if no active timer exists.</param>
         /// <returns><see langword="true"/> if an active timer was cancelled; otherwise, <see langword="false"/>.</returns>
-        public bool Cancel(long timerId)
+        public bool Cancel(ref long timerId)
+        {
+            long cancelledTimerId = timerId;
+            // Cancellation can resume a wait synchronously and replace the caller's identifier.
+            timerId = INVALID_TIMER_ID;
+            return this.cancel(cancelledTimerId);
+        }
+
+        private bool cancel(long timerId)
         {
             if (timerId == INVALID_TIMER_ID ||
                 !this.timerEntries.TryGetValue(timerId, out GameplayWorldTimerEntry? timerEntry) ||
@@ -273,7 +281,7 @@ namespace Bliss
             if (cancellationToken != null)
             {
                 timerEntry.CancellationToken = cancellationToken;
-                timerEntry.CancellationAction = () => this.Cancel(timerId);
+                timerEntry.CancellationAction = () => this.cancel(timerId);
                 cancellationToken.Add(timerEntry.CancellationAction);
             }
         }
@@ -311,7 +319,7 @@ namespace Bliss
 
                 if (timerEntry.HasOwner && !this.ownerIsValid(timerEntry))
                 {
-                    this.Cancel(timerEntry.TimerId);
+                    this.cancel(timerEntry.TimerId);
                     continue;
                 }
 
@@ -357,7 +365,7 @@ namespace Bliss
                 GameplayWorldTimerEntry timerEntry = this.ownedTimerEntries[entryIndex];
                 if (!this.ownerIsValid(timerEntry))
                 {
-                    this.Cancel(timerEntry.TimerId);
+                    this.cancel(timerEntry.TimerId);
                 }
             }
         }
@@ -375,7 +383,7 @@ namespace Bliss
             var pendingEntries = new List<GameplayWorldTimerEntry>(this.timerEntries.Values);
             foreach (GameplayWorldTimerEntry timerEntry in pendingEntries)
             {
-                this.Cancel(timerEntry.TimerId);
+                this.cancel(timerEntry.TimerId);
             }
         }
 

@@ -71,6 +71,7 @@ UpdateGroup
 ## GameplayWorld 固定步长
 
 - World 创建时启动一个 50ms 的 World Timer；到期时只标记待处理 tick。同一 Root 的独立模拟驱动先处理该 Root 下所有 World Timer，再派发 LogicUpdate；常规 World Update 不驱动 Timer 或 LogicUpdate。阶段顺序为 `EarlyUpdate → GameplayWorld Timer → LogicUpdate → Update → LateUpdate`。模拟及常规 World 驱动占用 Update 区间首组的最低三个优先级，其他系统不得使用这些保留优先级。
+- `GameplayWorldTimer.Cancel(ref timerId)` 在尝试取消前将调用方保存的 ID 清零；无论计时器仍然活跃、已经触发、已经取消还是 World 已销毁，ID 都会被清零。返回值仅表示是否取消了活跃计时器；其他位置保存的 ID 副本不会被清除。内部等待、失效 owner 和 World 销毁仍使用原有取消流程。
 - 延迟时只产生一次 tick，并从当前 Timer 处理时刻安排下次，固定 delta 为 0.05 秒；不追补。派发开始时消费 tick，回调失败包装并传播，后续入口不运行，已消费的 tick 不重试。销毁 World 会取消 Timer、完成等待并清除待处理 tick。
 - 通过 `world.LogicUpdate.Register(entity, entryName, priority, callback)` 注册；身份是活跃实体实例和入口名，重复注册报错。参与者必须属于该 World；注销使用 `Unregister(entity, entryName)`。优先级按数值升序，同优先级按注册顺序。共享顺序使用 `GameplayWorldLogicPriority`：发射点检测、角色移动、共享移动模拟、弹道检测、物理模拟；最终物理优先级保留给服务端物理模拟。
 - 派发开始时确定快照；期间新增或注销后重注册的入口从下次 tick 开始，已注销、销毁、复用或脱离 World 的参与者跳过。World 销毁会中止快照内剩余入口。调用方仍应在自身销毁时主动注销。
@@ -81,9 +82,57 @@ UpdateGroup
 - `KinematicMoverManager` 也注册到 `MOVEMENT`，使用固定 50ms 并与 Mover 按实际注册顺序执行；销毁前主动注销，普通 LateUpdate 插值仍由 World 驱动。管理器属于 LevelScene 时，场景启用前既不模拟也不插值。此处只提前实现 #13 的管理器调度部分，角色筛选、角色组件及输入处理仍由 #13 完成。Bullet 的独立 Timer 和碰撞顺序由 #15 处理，迁移期间 Mover 已先于 Root 常规 Timer 驱动，不能视为完整 Bullet 固定步长方案。
 - 当前客户端的 Kinematic 管理器属于 World，Mover 和角色在创建时直接注册到该管理器；因此已启用的 World 管理器仍可能处理尚未启用的 LevelScene 参与者。此问题不由管理器自身的 LevelScene 启用检查解决，参与者的场景筛选留待 #13。
 - 服务端和客户端 `PhysicalScene` 均属于 `GamePlayEntity`，并在 LevelScene 准备时创建。服务端在启用流程注册 `PHYSICS` 最终优先级，传入固定 0.05 秒；尚未启用的 LevelScene 不模拟，启用失败时注销，销毁前通过 `GamePlayEntity` 注销。缺失 native 场景、PhysX fetch 失败或物理模拟抛出异常时，记录故障原因并向上传播。此优先级只保证排在 **World LogicUpdate** 内的其他业务逻辑之后；尚未迁移的 Bullet Root Timer 不受此顺序约束，留待 #15。
-- 物理失败后，`GameplayWorld.IsFaulted` 为 true，`Failure` 保存首次异常；World 自身的 Timer、LogicUpdate 和常规 Early/Update/Late 驱动停止，不自动恢复，已消费的 tick 不重试。现有待处理 Timer 和等待保留，新的未来 Timer 和 LogicUpdate 注册会显式失败；等待可能一直挂起，直到 World 被显式销毁或取消。Root 和子 Root 在异常传播时仍保留调度资格，其他 World 在后续帧继续运行。本次只对物理模拟失败标记 World 故障；其他持续抛错的 Root 更新仍可能在后续帧重复报错并中断当前帧，需单独制定故障策略。此隔离不阻止旧 Root Timer、外部消息或调用方直接操作实体，因此故障状态不是完整的不可变快照。Bullet 的旧 Timer 留待 #15；#12 涵盖 ShooterGear 所属游戏实体的迁移，其当前描述未单独列出 ShooterGear Timer 迁移。
+- 物理失败后，`GameplayWorld.IsFaulted` 为 true，`Failure` 保存首次异常；World 自身的 Timer、LogicUpdate 和常规 Early/Update/Late 驱动停止，不自动恢复，已消费的 tick 不重试。现有待处理 Timer 和等待保留，新的未来 Timer 和 LogicUpdate 注册会显式失败；等待可能一直挂起，直到 World 被显式销毁或取消。Root 和子 Root 在异常传播时仍保留调度资格，其他 World 在后续帧继续运行。本次只对物理模拟失败标记 World 故障；其他持续抛错的 Root 更新仍可能在后续帧重复报错并中断当前帧，需单独制定故障策略。此隔离不阻止旧 Root Timer、外部消息或调用方直接操作实体，因此故障状态不是完整的不可变快照。Bullet 的旧 Timer 留待 #15。
 - 客户端查询仍通过既有 Unity 物理适配器，不手动驱动 Unity 物理模拟；现有适配器使用 Unity 全局物理查询，并未实现各 LevelScene 的独立 Unity 物理场景隔离。现有查询适配器未限制向调用方数组复制的命中数，小于命中数的结果数组可能越界，此次未改造该既有路径。
 - 真实服务端地图资源加载仍将物理材质存入 Root 级 `PhysicalWorldComponent.MaterialsRef`，Level 销毁不会移除对应项；重复加载相同材质 ID 或失败后重试可能发生重复键错误。此次测试替换了地图资源加载处理器，未覆盖该既有资源生命周期问题。
+
+## 游戏实体与专用组件归属
+
+- `Unit`、`SceneActor`、`ASceneActorCmp` 及其派生类型、`AOIEntityCmp`、`AbilitySystemComponent`、`GameplayLayer` 和 `SmoothTransformComponent` 归属于创建它们的 GameplayWorld 或关联 LevelScene。普通管理器、网络角色、通用 Transform、RemoteGhost、ReplicationGraph 和 LevelScene 管理组件仍是普通 `Entity`。Bullet 自身及其独立调度留待 #15；其 AOI 和客户端平滑组件已走 World。
+- Gate Root 为登录中转创建一个默认 GameplayWorld；临时 Unit 在该 World 创建，ActorAddress、BSON 和传送协议保持原有路径。`GameplayLayer` 不参与 BSON 序列化，目标 Map World 挂载反序列化 Unit 后重新建立 Unit 层；其他序列化组件仍通过原有反序列化和挂载流程恢复。此处未启动网络服务验证跨进程传送。
+- Map 在解除位置锁之前已经为转移的 Unit 安装有序邮箱，后续完成 Unit 初始化时不重复添加。客户端 World 工厂初始化 AOI 管理器，并以 `LogicScene` 事件类型通知 World 创建处理器。
+- 服务端 Map 延续原有的 World 直属 Unit 归属，但 `KinematicCharacterComponent` 初始化时从 Unit 所属场景查询 `PhysicalScene`，而当前 `PhysicalScene` 位于 LevelScene，不在 World 上。原有重复邮箱错误曾更早阻断该路径；去除该错误后角色初始化仍不能完成，相关场景归属和角色物理处理留待 #13。当前 BSON 测试只验证挂载，不覆盖真实消息处理器、完整角色初始化或跨进程登录；不能据此认为服务端完整进图可用。
+- 客户端 EditMode 测试调用生产 World、Unit 和 Bullet 工厂，并检查角色初始化、AOI 及平滑组件；测试替换了外部资源准备和视图刚体、胶囊体创建/销毁，不验证真实视图资源或这些 Unity 物理对象的生命周期。
+- `SmoothTransformComponent` 保持逐帧视觉更新，而不是固定 50ms LogicUpdate；它现在由 World 驱动，故障 World 不再更新。普通 Root 更新与 World 更新的相对阶段可能不同，不能假设其旧注册顺序。
+- `ShooterGear` 在场景初始化时创建 10 秒 World Timer，销毁时取消；LevelScene 未启用或 World 故障时不发射。未启用时到期仍按原间隔重新计时，启用不会立即补发；延迟帧不追补。注册回调是绑定实体的 System 扩展方法，没有 lambda 或闭包；Timer 和实体存活期由 World 与销毁流程管理。
+
+### 游戏归属及 AOI 生命周期基准
+
+使用 `BlissBenchMark/Benchmarks/GameplayOwnershipBenchmark.cs` 在真实 Root/World 下测量。创建负载每批创建指定数量的最小 Unit（带 GameplayLayer、空 AOI 与 SmoothTransformComponent）和 SceneActor（带空 AOI）；空闲更新负载每帧驱动已完成平滑的组件，活跃更新负载在计时外准备尚未完成的平移和旋转插值，测量实际更新并检查插值时间推进。AOI 负载逐个创建 Unit、注册 Visibility 与 NetworkVisibility 球形 AOI、销毁 Unit 并检查条目已清空；每次仅一个 Unit 存活，不代表密集交互。AOI 基线在迁移后将 Unit、GameplayLayer、AOIEntityCmp 的继承临时还原为原有 `Entity` 后测量；活跃更新基线还还原了 SceneActor 和 SmoothTransformComponent 的继承。其他迁移代码保留但不参与上述基准。
+
+macOS 26.6.2、Apple M1 Pro、.NET 8.0.19、BenchmarkDotNet 0.15.2 ShortRun；每项 3 次测量，误差为 99.9% 置信区间半宽：
+
+| 操作 | 数量 | 迁移前耗时 | 迁移后耗时 | 迁移前分配 | 迁移后分配 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 批量创建 | 100 | 623.861 ± 62.197 µs | 609.652 ± 355.869 µs | 323,280 B | 333,816 B |
+| 批量创建 | 1,000 | 6,664.472 ± 1,411.453 µs | 6,763.319 ± 1,737.314 µs | 3,312,760 B | 3,416,896 B |
+| 平滑更新 | 100 | 2.288 ± 0.328 µs | 2.273 ± 0.125 µs | 168 B | 168 B |
+| 平滑更新 | 1,000 | 22.282 ± 1.769 µs | 22.330 ± 3.043 µs | 168 B | 168 B |
+| 活跃平滑更新 | 100 | 98.01 ± 109.36 µs | 87.68 ± 28.05 µs | 2.51 KB | 2.51 KB |
+| 活跃平滑更新 | 1,000 | 825.86 ± 381.65 µs | 826.50 ± 277.07 µs | 23.60 KB | 23.60 KB |
+| AOI 生命周期 | 100 | 2.150 ± 1.561 ms | 2.179 ± 0.566 ms | 823.84 KB | 828.52 KB |
+| AOI 生命周期 | 1,000 | 21.259 ± 5.885 ms | 21.280 ± 3.573 ms | 8,208.27 KB | 8,255.15 KB |
+
+批量创建的测得分配增加约 3%，平滑更新分配不变；AOI 生命周期分配增加约 0.6%。创建负载的迁移前运行没有初始化 EventSystem，迁移后初始化了 EventSystem；该负载初始位置不发生变化，不触发 Transform 事件，AOI 前后则均初始化 EventSystem。样本量少、部分迭代短于建议的 100ms，耗时置信区间重叠，不能据此判定耗时变化。以上不覆盖真实地图资源、密集 AOI 可见关系、网络、碰撞或完整帧。
+
+### World Timer 取消基准
+
+使用 `BlissBenchMark/Benchmarks/GameplayWorldTimerCancellationBenchmark.cs` 比较实际 `GameplayWorldTimer` 的批量取消：取消前调用方自行清零，取消后使用 `Cancel(ref timerId)` 清零。每批分别准备活跃 ID 或已取消但未清零的旧 ID，覆盖单个和 100 个到期时间桶；准备工作不计时，并检查取消结果和 ID 已清零。使用无 Root 的 World 构造接缝和无 owner 的计时器，包含 World 固定步长标记 Timer，不覆盖 owner 检查、回调、等待、并发或完整帧。
+
+同上环境和 BenchmarkDotNet ShortRun，每项 3 次测量；误差为 99.9% 置信区间半宽：
+
+| 数量 | 时间桶 | ID 状态 | 修改前耗时 | 修改后耗时 | 修改前/后分配 |
+| ---: | ---: | --- | ---: | ---: | ---: |
+| 100 | 1 | 活跃 | 8.027 ± 10.869 µs | 7.625 ± 1.514 µs | 24 B / 24 B |
+| 100 | 1 | 已取消 | 1.069 ± 0.442 µs | 1.403 ± 2.191 µs | 0 B / 0 B |
+| 100 | 100 | 活跃 | 35.348 ± 48.561 µs | 36.000 ± 2.290 µs | 2,400 B / 2,400 B |
+| 100 | 100 | 已取消 | 1.097 ± 0.432 µs | 1.389 ± 2.453 µs | 0 B / 0 B |
+| 5,000 | 1 | 活跃 | 138.361 ± 30.254 µs | 154.805 ± 237.855 µs | 0 B / 0 B |
+| 5,000 | 1 | 已取消 | 35.319 ± 111.360 µs | 31.195 ± 1.910 µs | 0 B / 0 B |
+| 5,000 | 100 | 活跃 | 175.388 ± 221.509 µs | 171.680 ± 101.294 µs | 0 B / 0 B |
+| 5,000 | 100 | 已取消 | 33.542 ± 71.776 µs | 36.333 ± 95.007 µs | 0 B / 0 B |
+
+这次是接口语义变更而非性能优化；取消仍使用原有字典和时间桶，复杂度不变。测得分配相同；样本少、全部迭代短于建议的 100ms，耗时置信区间重叠，无法判断耗时变化。
 
 ### 服务端物理场景迁移基准
 

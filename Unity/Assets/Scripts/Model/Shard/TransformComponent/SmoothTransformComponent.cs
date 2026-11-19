@@ -5,7 +5,7 @@ namespace Bliss
     /// <summary>
     /// 负责将逻辑侧离散的Transform,在视图侧进行平滑
     /// </summary>
-    public class SmoothTransformComponent : Entity, IAwake<SmoothTransformComponentInitParam>, IUpdate
+    public class SmoothTransformComponent : GamePlayEntity, IAwake<SmoothTransformComponentInitParam>, IUpdate
     {
         public long ViewTimeStamp;
         

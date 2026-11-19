@@ -28,7 +28,6 @@ public class GameplayWorldTimerTests
     private const int LATER_LOGIC_PRIORITY = 200;
     private const long IMMEDIATE_DELAY_MILLISECONDS = 0;
     private const long INVALID_DELAY_MILLISECONDS = -1;
-    private const long INVALID_TIMER_ID = 0;
     private const int EXPECTED_CALLBACK_COUNT = 1;
     private const int CANCELLED_CALLBACK_INCREMENT = 100;
     private const int OWNER_INVALID_WARNING_COUNT = 3;
@@ -453,9 +452,14 @@ public class GameplayWorldTimerTests
         long timerId = _gameplayWorld.Timer.ScheduleOnceAt(
             OWNER_TIMER_FUTURE_DEADLINE,
             () => callbackCount++);
+        long copiedTimerId = timerId;
 
-        Assert.That(_gameplayWorld.Timer.Cancel(timerId), Is.True);
-        Assert.That(_gameplayWorld.Timer.Cancel(timerId), Is.False);
+        Assert.That(_gameplayWorld.Timer.Cancel(ref timerId), Is.True);
+        Assert.That(timerId, Is.Zero);
+        Assert.That(_gameplayWorld.Timer.Cancel(ref timerId), Is.False);
+        Assert.That(copiedTimerId, Is.Not.Zero);
+        Assert.That(_gameplayWorld.Timer.Cancel(ref copiedTimerId), Is.False);
+        Assert.That(copiedTimerId, Is.Zero);
         Assert.Throws<ArgumentOutOfRangeException>(
             () => _gameplayWorld.Timer.ScheduleOnce(INVALID_DELAY_MILLISECONDS, () => { }));
         Assert.Throws<ArgumentOutOfRangeException>(
@@ -467,6 +471,55 @@ public class GameplayWorldTimerTests
         Assert.That(callbackCount, Is.EqualTo(0));
     }
 
+    /// <summary>Stale timer identifiers are cleared even after the timer's World is disposed.</summary>
+    [Test]
+    public void CancellingAfterWorldDisposalClearsTheIdentifier()
+    {
+        GameplayWorldTimer timer = _gameplayWorld.Timer;
+        long timerId = timer.ScheduleOnceAt(OWNER_TIMER_FUTURE_DEADLINE, () => { });
+        _gameplayWorld.Dispose();
+
+        Assert.That(timer.Cancel(ref timerId), Is.False);
+        Assert.That(timerId, Is.Zero);
+    }
+
+    /// <summary>A completed one-shot timer still has its caller-owned identifier cleared on cancellation.</summary>
+    [Test]
+    public void CancellingAnAlreadyFiredTimerClearsTheIdentifier()
+    {
+        int callbackCount = 0;
+        long timerId = _gameplayWorld.Timer.ScheduleOnce(IMMEDIATE_DELAY_MILLISECONDS, () => callbackCount++);
+        _root.EarlyUpdate();
+        _root.Update();
+
+        Assert.That(callbackCount, Is.EqualTo(EXPECTED_CALLBACK_COUNT));
+        Assert.That(_gameplayWorld.Timer.Cancel(ref timerId), Is.False);
+        Assert.That(timerId, Is.Zero);
+    }
+
+    /// <summary>A repeated callback can cancel itself and clear its caller-owned identifier.</summary>
+    [Test]
+    public void RepeatedTimerCanCancelItself()
+    {
+        int callbackCount = 0;
+        long timerId = default;
+        setServerTime(FIRST_TEST_TIME);
+        timerId = _gameplayWorld.Timer.ScheduleRepeated(REPEATED_INTERVAL_MILLISECONDS, () =>
+        {
+            callbackCount++;
+            Assert.That(_gameplayWorld.Timer.Cancel(ref timerId), Is.True);
+            Assert.That(timerId, Is.Zero);
+        });
+
+        _root.EarlyUpdate();
+        setServerTime(WAIT_DEADLINE);
+        _root.Update();
+        setServerTime(NEXT_REPEATED_DUE_TIME);
+        _root.Update();
+
+        Assert.That(callbackCount, Is.EqualTo(EXPECTED_CALLBACK_COUNT));
+    }
+
     [Test]
     public void TimersAddedDuringCallbacksWaitUntilNextUpdateAndCancelledCallbacksAreSkipped()
     {
@@ -474,14 +527,14 @@ public class GameplayWorldTimerTests
         _root.EarlyUpdate();
         setServerTime(FIRST_TEST_TIME);
 
-        long cancelledTimerId = INVALID_TIMER_ID;
+        long cancelledTimerId = default;
         _gameplayWorld.Timer.ScheduleOnce(IMMEDIATE_DELAY_MILLISECONDS, () =>
         {
             callbackCount += FIRST_CALLBACK_INCREMENT;
             _gameplayWorld.Timer.ScheduleOnce(
                 IMMEDIATE_DELAY_MILLISECONDS,
                 () => callbackCount += DEFERRED_CALLBACK_INCREMENT);
-            _gameplayWorld.Timer.Cancel(cancelledTimerId);
+            _gameplayWorld.Timer.Cancel(ref cancelledTimerId);
         });
         cancelledTimerId = _gameplayWorld.Timer.ScheduleOnce(
             IMMEDIATE_DELAY_MILLISECONDS,
@@ -654,8 +707,10 @@ public class GameplayWorldTimerTests
         _root.Update();
 
         Assert.That(callbackCount, Is.EqualTo(0));
-        Assert.That(_gameplayWorld.Timer.Cancel(timerId), Is.False);
-        Assert.That(_gameplayWorld.Timer.Cancel(repeatedTimerId), Is.False);
+        Assert.That(_gameplayWorld.Timer.Cancel(ref timerId), Is.False);
+        Assert.That(_gameplayWorld.Timer.Cancel(ref repeatedTimerId), Is.False);
+        Assert.That(timerId, Is.Zero);
+        Assert.That(repeatedTimerId, Is.Zero);
         Assert.That(await ownerWait, Is.False);
         Assert.That(_logger.Warnings, Has.Count.EqualTo(OWNER_INVALID_WARNING_COUNT));
     }
