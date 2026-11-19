@@ -356,8 +356,9 @@ public class GameplayWorldLifecycleTests
         }
     }
 
+    /// <summary>Preparation rejects direct LevelScene reparenting and cleans up the incomplete scene.</summary>
     [Test]
-    public void LevelCommitRejectsSceneMovedOutsideOwningWorldAndCleansItUp()
+    public void LevelPreparationRejectsDirectSceneReparentAndCleansItUp()
     {
         GameplayWorld gameplayWorld = GameplayWorldFactory.Create(
             _root.Scene,
@@ -379,7 +380,7 @@ public class GameplayWorldLifecycleTests
                     LEVEL_SCENE_ID,
                     nameof(LEVEL_SCENE_ID)).GetAwaiter().GetResult());
 
-            Assert.That(exception.Message, Does.Contain("within its GameplayWorld subtree"));
+            Assert.That(exception.Message, Does.Contain("must use gameplay subtree migration"));
             Assert.That(gameplayWorld.GetChild<LogicScene>(LEVEL_SCENE_ID), Is.Null);
             Assert.That(_root.Scene.GetChild<LogicScene>(LEVEL_SCENE_ID), Is.Null);
         }

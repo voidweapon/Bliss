@@ -98,10 +98,25 @@ UpdateGroup
 - Map 在解除位置锁之前已经为转移的 Unit 安装有序邮箱，后续完成 Unit 初始化时不重复添加。客户端 World 工厂初始化 AOI 管理器，并以 `LogicScene` 事件类型通知 World 创建处理器。
 - 服务端 Map 初次转移将 Unit 挂载到已启用的默认 LevelScene，角色从该 Level 的 PhysicalScene 创建真实 PhysX 运动学刚体和胶囊；材质为静摩擦 0.6、动摩擦 0.6、弹性 0。服务端即时移动消息、固定 tick 和 motor 直接设置姿态时同步物理刚体；查询通过形状映射找到游戏碰撞体。失败时清理角色已拥有的组件和 native 资源。集成测试覆盖 BSON 初次挂载、角色初始化、射线查询、尺寸修改及销毁，但没有启动网络服务运行完整转移处理器或跨进程登录。
 - 原有时间戳条件错误地拒绝正常有限时间戳，本次修正后有效移动消息会立即处理；既有处理器仍直接采用客户端提供的位置，尚无距离或速度校验，客户端可能提交任意位置。按当前约定保留该信任模型，服务端校验方案另行讨论。
-- 已挂载 Unit 不能通过初次挂载接口冒充跨 Level 迁移；保留玩家在卸载前的原子迁移及卸载保护留待 #14，当前卸载仍会销毁未迁出的 Unit。
+- 已挂载 Unit 不能通过初次挂载接口冒充跨 Level 迁移；迁移使用下述 `GameplaySubtreeMigration.MigrateAsync`，卸载仍会销毁未迁出的 Unit，调用方必须在卸载前等待迁移完成。
 - 客户端 EditMode 测试调用生产 World、Unit 和 Bullet 工厂，并检查角色初始化、AOI 及平滑组件；测试替换了外部资源准备和视图刚体、胶囊体创建/销毁，不验证真实视图资源或这些 Unity 物理对象的生命周期。
 - `SmoothTransformComponent` 保持逐帧视觉更新，而不是固定 50ms LogicUpdate；它现在由 World 驱动，故障 World 不再更新。普通 Root 更新与 World 更新的相对阶段可能不同，不能假设其旧注册顺序。
 - `ShooterGear` 在场景初始化时创建 10 秒 World Timer，销毁时取消；LevelScene 未启用或 World 故障时不发射。未启用时到期仍按原间隔重新计时，启用不会立即补发；延迟帧不追补。注册回调是绑定实体的 System 扩展方法，没有 lambda 或闭包；Timer 和实体存活期由 World 与销毁流程管理。
+
+### LevelScene 子树迁移
+
+- 使用 `GameplaySubtreeMigration.MigrateAsync(subtree, destination)` 将已挂载的子节点迁移至同一 World 的另一个已准备 LevelScene；不能迁移组件本身或 LevelScene，嵌套 LogicScene 保留自身场景归属。已挂载实体不能用 `Parent` 或重新挂接组件绕过跨 LevelScene 的边界；Core 仅提供内部层级机制，不依赖 Model、Logic 或视图程序集。
+- LogicUpdate 派发中请求在 tick 后按序执行，其余安全时刻立即执行。请求和执行时均验证 World、Root、场景生命周期与层级，执行时还验证资源；排队子树与祖先或后代重叠时拒绝。源场景或 World 销毁取消排队请求，目标销毁则使请求失败；调用方必须等待任务并处理异常。任务完成回调同步执行，回调异常会传播，并取消剩余排队请求。
+- 服务端移动子树中的完整 PhysX actor、shape 和场景映射，拒绝跨子树的刚体与形状或不一致的资源；失败时尝试恢复原映射及 actor。若 PhysX 回滚本身失败，异常同时保留原始失败和恢复失败，并标记 World 故障；此时不能保证原状态完整，必须停止使用该 World。
+- 客户端现有 `PhysicalScene` 仍使用 Unity 全局物理查询，不创建隔离的 Unity PhysicsScene，也不搬运 Unity GameObject。只有视图及物理对象位于常驻 Global 实体节点且关联完整的子树可迁移；旧 Unity Scene 中的对象或不完整的物理资源会被拒绝。调用方负责 Global 对象及其加载资源的生命周期；迁移后实体或物理对象丢失属于业务生命周期错误。
+
+#### 子树迁移与实体挂载基准
+
+使用 `BlissBenchMark/Benchmarks/GameplaySubtreeMigrationBenchmark.cs` 测量真实迁移入口：Root 下的 World 含两个已准备的 PhysX LevelScene，迁移根节点及其 100 或 1,000 个普通子节点；场景、物理世界和子树准备不计时。没有旧的等价迁移接口，因此没有可比基线。macOS 26.6.2、Apple M1 Pro、.NET 8.0.19、BenchmarkDotNet 0.15.2，in-process ShortRun、预热 2 次、测量 5 次：100 节点为 43.99 ± 9.35 µs、2.93 KB；1,000 节点为 364.92 ± 63.82 µs、3.07 KB。
+
+同条件复测 `EntityRegistrationBenchmark`：普通场景 100 节点从 84.26 µs/25.55 KB 到 88.85 µs/25.55 KB，LevelScene 从 81.30 µs/26.69 KB 到 86.62 µs/26.69 KB；1,000 节点普通场景从 1,075.85 µs/237.7 KB 到 1,048.13 µs/236.44 KB（剔除一次离群值，实际 4 个样本），LevelScene 从 1,095.55 µs/236.3 KB 到 1,162.54 µs/237.57 KB。所有迭代均短于建议的 100ms，样本少、置信区间较宽且无法提高进程优先级，不能据此判定耗时变化。上述迁移基准不覆盖 PhysX actor/shape 移动、客户端 Unity 资源校验、排队重叠、异常回滚或完整帧；服务端形状校验目前对刚体和碰撞体使用嵌套遍历，客户端有刚体时会遍历源场景检查外部绑定，密集场景成本尚未测量。
+
+新增迁移队列后的空队列固定 tick 使用 `GameplayWorldLogicBenchmark.Dispatch` 测量，参数和环境同上，0、100、1,000 参与者分别为 1.106 ± 0.244 µs/472 B、3.306 ± 0.152 µs/505 B、24.485 ± 0.915 µs/505 B；1,000 参与者剔除一次离群值，实际 4 个样本。每次测量包含 1,000 tick，不包含迁移请求。此次调度路径修改没有在相同条件下记录修改前基线；较早的池化基准使用不同运行配置，不能当作可比基线，因此无法判断此次调度性能变化。
 
 ### 游戏归属及 AOI 生命周期基准
 

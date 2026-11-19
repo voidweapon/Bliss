@@ -1,8 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 
 namespace Bliss
 {
+    internal interface IGameplayWorldDeferredWork
+    {
+        /// <summary>Gets the subtree used to reject overlapping requests.</summary>
+        Entity Owner { get; }
+        /// <summary>Executes the request after a successful tick.</summary>
+        void Execute();
+        /// <summary>Cancels a request when its World cannot execute it.</summary>
+        void Cancel();
+    }
+
     /// <summary>Owns gameplay updates, timers and fixed-step simulation within a Root.</summary>
     public class GameplayWorld : LogicScene
     {
@@ -183,9 +194,47 @@ namespace Bliss
         private readonly List<LogicUpdateEntry> dispatchSnapshot = new List<LogicUpdateEntry>();
         private readonly Stack<LogicUpdateEntry> availableEntries = new Stack<LogicUpdateEntry>();
         private readonly Stack<LogicUpdateEntry> retiredEntries = new Stack<LogicUpdateEntry>();
+        private readonly Queue<IGameplayWorldDeferredWork> deferredWork = new Queue<IGameplayWorldDeferredWork>();
         private bool hasPendingTick;
         private bool isDisposed;
         private bool isDispatching;
+
+        internal bool deferUntilAfterTick(IGameplayWorldDeferredWork work)
+        {
+            if (this.isDisposed)
+            {
+                throw new ObjectDisposedException(nameof(GameplayWorldLogicUpdate));
+            }
+
+            foreach (IGameplayWorldDeferredWork pending in this.deferredWork)
+            {
+                if (isAncestor(pending.Owner, work.Owner) || isAncestor(work.Owner, pending.Owner))
+                {
+                    throw new InvalidOperationException("A migration is already pending for an overlapping subtree.");
+                }
+            }
+
+            if (!this.isDispatching)
+            {
+                return false;
+            }
+
+            this.deferredWork.Enqueue(work);
+            return true;
+        }
+
+        private static bool isAncestor(Entity ancestor, Entity descendant)
+        {
+            for (Entity current = descendant; current != null; current = current.Parent)
+            {
+                if (ReferenceEquals(current, ancestor))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         internal GameplayWorldLogicUpdate(GameplayWorld world, GameplayWorldTimer timer)
         {
@@ -329,6 +378,8 @@ namespace Bliss
 
             this.hasPendingTick = false;
             this.isDispatching = true;
+            bool completed = false;
+            Exception dispatchFailure = null;
             // Reuse the snapshot buffer; registration changes cannot affect the current tick.
             try
             {
@@ -364,6 +415,11 @@ namespace Bliss
                         }
                     }
                 }
+                completed = true;
+            }
+            catch (Exception exception)
+            {
+                dispatchFailure = exception;
             }
             finally
             {
@@ -374,12 +430,26 @@ namespace Bliss
                     this.recycleEntry(this.retiredEntries.Pop());
                 }
             }
+
+            Exception deferredFailure = this.drainDeferredWork(completed);
+            if (dispatchFailure != null && deferredFailure != null)
+            {
+                throw new AggregateException("LogicUpdate and deferred work completion failed.",
+                    dispatchFailure, deferredFailure);
+            }
+
+            Exception failure = dispatchFailure ?? deferredFailure;
+            if (failure != null)
+            {
+                ExceptionDispatchInfo.Capture(failure).Throw();
+            }
         }
 
         internal void dispose()
         {
             this.isDisposed = true;
             this.hasPendingTick = false;
+            Exception deferredFailure = this.drainDeferredWork(false);
             foreach (LogicUpdateEntry entry in this.entriesByKey.Values)
             {
                 entry.Active = false;
@@ -397,6 +467,44 @@ namespace Bliss
             this.entriesByKey.Clear();
             this.bucketsByPriority.Clear();
             this.availableEntries.Clear();
+            if (deferredFailure != null)
+            {
+                ExceptionDispatchInfo.Capture(deferredFailure).Throw();
+            }
+        }
+
+        private Exception drainDeferredWork(bool execute)
+        {
+            List<Exception> failures = null;
+            while (this.deferredWork.Count > 0)
+            {
+                IGameplayWorldDeferredWork work = this.deferredWork.Dequeue();
+                try
+                {
+                    if (execute && !this.isDisposed && !this.world.IsFaulted)
+                    {
+                        work.Execute();
+                    }
+                    else
+                    {
+                        work.Cancel();
+                    }
+                }
+                catch (Exception exception)
+                {
+                    (failures ??= new List<Exception>()).Add(exception);
+                    execute = false;
+                }
+            }
+
+            if (failures == null)
+            {
+                return null;
+            }
+
+            return failures.Count == 1
+                ? failures[0]
+                : new AggregateException("Deferred work completion failed.", failures);
         }
 
         private void removeEntry(LogicUpdateEntry entry)

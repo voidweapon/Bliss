@@ -12,6 +12,7 @@ using Bliss.Physics;
 using Bliss.Timer;
 using Bliss.ViewLogic.Config;
 using Bliss.ViewLogic.Physics;
+using Bliss.ViewModel;
 using ET;
 using NUnit.Framework;
 using Unity.Mathematics;
@@ -25,6 +26,7 @@ public class PhysicalSceneClientTests
     private const long WORLD_ID = 202;
     private const long WORLD_INSTANCE_ID = 10001;
     private const int LEVEL_ID = 303;
+    private const int DESTINATION_LEVEL_ID = 304;
     private const int TEST_LAYER = 30;
     private const int OTHER_LAYER = 29;
     private const int TEST_LAYER_MASK = 1 << TEST_LAYER;
@@ -135,6 +137,200 @@ public class PhysicalSceneClientTests
             float3.zero, CAST_RADIUS, new float3(UNIT_AXIS, ZERO_AXIS, ZERO_AXIS), MAX_DISTANCE, OTHER_LAYER_MASK, hits), Is.Zero);
         Assert.That(physicalScene.SpereCastNonAlloc(
             float3.zero, CAST_RADIUS, new float3(UNIT_AXIS, ZERO_AXIS, ZERO_AXIS), SHORT_DISTANCE, TEST_LAYER_MASK, hits), Is.Zero);
+    }
+
+    /// <summary>Core's Unity assembly has no runtime references to gameplay or view assemblies.</summary>
+    [Test]
+    public void CoreAssemblyDoesNotReferenceGameplayOrViewAssemblies()
+    {
+        string modelName = typeof(GameplayWorld).Assembly.GetName().Name;
+        string logicName = typeof(GameplaySubtreeMigration).Assembly.GetName().Name;
+        string viewModelName = typeof(GameObjectViewComponent).Assembly.GetName().Name;
+        string viewLogicName = typeof(GameplaySubtreeMigrationClientResources).Assembly.GetName().Name;
+        foreach (AssemblyName reference in typeof(Entity).Assembly.GetReferencedAssemblies())
+        {
+            Assert.That(reference.Name, Is.Not.EqualTo(modelName).And.Not.EqualTo(logicName)
+                .And.Not.EqualTo(viewModelName).And.Not.EqualTo(viewLogicName));
+        }
+    }
+
+    /// <summary>A client collider cannot migrate separately from its gameplay rigidbody.</summary>
+    [Test]
+    public void MigrationRejectsColliderWithoutItsRigidbody()
+    {
+        GameplayWorld world = GameplayWorldFactory.Create(
+            this.root.Scene, WORLD_ID, WORLD_INSTANCE_ID, nameof(GameplayWorld));
+        LogicScene source = LevelSceneFactory.Create(
+            world, world, LEVEL_ID, LEVEL_ID, nameof(LEVEL_ID)).GetAwaiter().GetResult();
+        LogicScene destination = LevelSceneFactory.Create(
+            world, world, DESTINATION_LEVEL_ID, DESTINATION_LEVEL_ID, nameof(DESTINATION_LEVEL_ID))
+            .GetAwaiter().GetResult();
+        Unit unit = UnitHelper.CreateMinimalUnit(source, UNIT_CONFIG_ID, UNIT_ID,
+            ENetRole.Authority, ENetRole.SimulatedProxy, float3.zero, quaternion.identity);
+        GameplayRigidbody body = unit.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(
+            new GameplayRigidbodyInitParams());
+        GameplayCapsuleCollider collider = unit.AddChild<GameplayCapsuleCollider, CapsuleColliderInitParams>(
+            new CapsuleColliderInitParams());
+
+        Assert.That(collider.AttachedRigidbody, Is.SameAs(body));
+        Assert.Throws<InvalidOperationException>(
+            () => GameplaySubtreeMigration.MigrateAsync(collider, destination).GetAwaiter().GetResult());
+        Assert.That(collider.Parent, Is.SameAs(unit));
+        Assert.That(collider.Scene(), Is.SameAs(source));
+    }
+
+    /// <summary>A scene-owned Unity view and its collider are not silently left behind during migration.</summary>
+    [Test]
+    public void MigrationRejectsSceneOwnedUnityView()
+    {
+        GameplayWorld world = GameplayWorldFactory.Create(
+            this.root.Scene, WORLD_ID, WORLD_INSTANCE_ID, nameof(GameplayWorld));
+        LogicScene source = LevelSceneFactory.Create(
+            world, world, LEVEL_ID, LEVEL_ID, nameof(LEVEL_ID)).GetAwaiter().GetResult();
+        LogicScene destination = LevelSceneFactory.Create(
+            world, world, DESTINATION_LEVEL_ID, DESTINATION_LEVEL_ID, nameof(DESTINATION_LEVEL_ID))
+            .GetAwaiter().GetResult();
+        Unit unit = UnitHelper.CreateMinimalUnit(source, UNIT_CONFIG_ID, UNIT_ID,
+            ENetRole.Authority, ENetRole.SimulatedProxy, float3.zero, quaternion.identity);
+        GameObjectViewComponent view = unit.AddComponent<GameObjectViewComponent, GameObjectViewComponentInitParam>(
+            new GameObjectViewComponentInitParam { View = this.target });
+        try
+        {
+            Assert.Throws<InvalidOperationException>(
+                () => GameplaySubtreeMigration.MigrateAsync(unit, destination).GetAwaiter().GetResult());
+            Assert.That(unit.Parent, Is.SameAs(source));
+            Assert.That(unit.Scene(), Is.SameAs(source));
+            GameplayRaycastHit[] hits = new GameplayRaycastHit[RESULT_CAPACITY];
+            Assert.That(source.GetComponent<PhysicalScene>().SpereCastNonAlloc(
+                float3.zero, CAST_RADIUS, new float3(UNIT_AXIS, ZERO_AXIS, ZERO_AXIS),
+                MAX_DISTANCE, TEST_LAYER_MASK, hits), Is.EqualTo(EXPECTED_HIT_COUNT));
+        }
+        finally
+        {
+            view.View = null;
+        }
+    }
+
+    /// <summary>A Global-hosted client body and collider survive migration and source LevelScene disposal.</summary>
+    [Test]
+    public void MigrationPreservesGlobalUnityPhysics()
+    {
+        GameObject globalRoot = new GameObject(nameof(MigrationPreservesGlobalUnityPhysics));
+        GameObject entitiesRoot = new GameObject(nameof(ViewGlobalComponent.EntitiesTransform));
+        ViewEntityMapManager viewMap = new ViewEntityMapManager();
+        GameObjectViewComponent view = null;
+        try
+        {
+            entitiesRoot.transform.SetParent(globalRoot.transform);
+            this.target.transform.SetParent(entitiesRoot.transform);
+            this.target.GetComponent<BoxCollider>().enabled = false;
+            Rigidbody unityBody = this.target.AddComponent<Rigidbody>();
+            unityBody.isKinematic = true;
+            CapsuleCollider unityCollider = this.target.AddComponent<CapsuleCollider>();
+            UnityEngine.Physics.SyncTransforms();
+            viewMap.Init();
+            registerSingleton(viewMap);
+            ViewGlobalComponent global = new ViewGlobalComponent
+            {
+                GlobalTransform = globalRoot.transform,
+                EntitiesTransform = entitiesRoot.transform,
+            };
+            this.root.Scene.AddComponent(global);
+
+            GameplayWorld world = GameplayWorldFactory.Create(
+                this.root.Scene, WORLD_ID, WORLD_INSTANCE_ID, nameof(GameplayWorld));
+            LogicScene source = LevelSceneFactory.Create(
+                world, world, LEVEL_ID, LEVEL_ID, nameof(LEVEL_ID)).GetAwaiter().GetResult();
+            LogicScene destination = LevelSceneFactory.Create(
+                world, world, DESTINATION_LEVEL_ID, DESTINATION_LEVEL_ID, nameof(DESTINATION_LEVEL_ID))
+                .GetAwaiter().GetResult();
+            Unit unit = UnitHelper.CreateMinimalUnit(source, UNIT_CONFIG_ID, UNIT_ID,
+                ENetRole.Authority, ENetRole.SimulatedProxy, float3.zero, quaternion.identity);
+            view = unit.AddComponent<GameObjectViewComponent, GameObjectViewComponentInitParam>(
+                new GameObjectViewComponentInitParam { View = this.target });
+            GameplayRigidbody body = unit.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(
+                new GameplayRigidbodyInitParams { IsKinematic = true });
+            GameplayCapsuleCollider collider = unit.AddChild<GameplayCapsuleCollider, CapsuleColliderInitParams>(
+                new CapsuleColliderInitParams());
+            viewMap.MapCollider(collider, unityCollider);
+
+            GameplaySubtreeMigration.MigrateAsync(unit, destination).GetAwaiter().GetResult();
+            source.Dispose();
+
+            Assert.That(unit.Parent, Is.SameAs(destination));
+            Assert.That(body.IsDisposed, Is.False);
+            Assert.That(collider.IsDisposed, Is.False);
+            Assert.That(unityCollider.attachedRigidbody, Is.SameAs(unityBody));
+            GameplayRaycastHit[] hits = new GameplayRaycastHit[RESULT_CAPACITY];
+            Assert.That(destination.GetComponent<PhysicalScene>().SpereCastNonAlloc(
+                float3.zero, CAST_RADIUS, new float3(UNIT_AXIS, ZERO_AXIS, ZERO_AXIS),
+                MAX_DISTANCE, TEST_LAYER_MASK, hits), Is.EqualTo(EXPECTED_HIT_COUNT));
+        }
+        finally
+        {
+            if (view != null)
+            {
+                view.View = null;
+            }
+
+            this.target.transform.SetParent(null);
+            UnityEngine.Object.DestroyImmediate(globalRoot);
+            viewMap.Dispose();
+        }
+    }
+
+    /// <summary>A collider whose Unity rigidbody disagrees with gameplay ownership cannot migrate.</summary>
+    [Test]
+    public void MigrationRejectsMismatchedUnityRigidbody()
+    {
+        GameObject globalRoot = new GameObject(nameof(MigrationRejectsMismatchedUnityRigidbody));
+        GameObject entitiesRoot = new GameObject(nameof(ViewGlobalComponent.EntitiesTransform));
+        ViewEntityMapManager viewMap = new ViewEntityMapManager();
+        GameObjectViewComponent view = null;
+        try
+        {
+            entitiesRoot.transform.SetParent(globalRoot.transform);
+            this.target.transform.SetParent(entitiesRoot.transform);
+            this.target.AddComponent<Rigidbody>().isKinematic = true;
+            CapsuleCollider unityCollider = this.target.AddComponent<CapsuleCollider>();
+            viewMap.Init();
+            registerSingleton(viewMap);
+            this.root.Scene.AddComponent(new ViewGlobalComponent
+            {
+                GlobalTransform = globalRoot.transform,
+                EntitiesTransform = entitiesRoot.transform,
+            });
+            GameplayWorld world = GameplayWorldFactory.Create(
+                this.root.Scene, WORLD_ID, WORLD_INSTANCE_ID, nameof(GameplayWorld));
+            LogicScene source = LevelSceneFactory.Create(
+                world, world, LEVEL_ID, LEVEL_ID, nameof(LEVEL_ID)).GetAwaiter().GetResult();
+            LogicScene destination = LevelSceneFactory.Create(
+                world, world, DESTINATION_LEVEL_ID, DESTINATION_LEVEL_ID, nameof(DESTINATION_LEVEL_ID))
+                .GetAwaiter().GetResult();
+            Unit unit = UnitHelper.CreateMinimalUnit(source, UNIT_CONFIG_ID, UNIT_ID,
+                ENetRole.Authority, ENetRole.SimulatedProxy, float3.zero, quaternion.identity);
+            view = unit.AddComponent<GameObjectViewComponent, GameObjectViewComponentInitParam>(
+                new GameObjectViewComponentInitParam { View = this.target });
+            GameplayCapsuleCollider collider = unit.AddChild<GameplayCapsuleCollider, CapsuleColliderInitParams>(
+                new CapsuleColliderInitParams());
+            viewMap.MapCollider(collider, unityCollider);
+
+            Assert.Throws<InvalidOperationException>(
+                () => GameplaySubtreeMigration.MigrateAsync(unit, destination).GetAwaiter().GetResult());
+            Assert.That(unit.Parent, Is.SameAs(source));
+            Assert.That(unityCollider.attachedRigidbody, Is.Not.Null);
+        }
+        finally
+        {
+            if (view != null)
+            {
+                view.View = null;
+            }
+
+            this.target.transform.SetParent(null);
+            UnityEngine.Object.DestroyImmediate(globalRoot);
+            viewMap.Dispose();
+        }
     }
 
     /// <summary>Client Units and smoothing components use their LevelScene's GameplayWorld.</summary>

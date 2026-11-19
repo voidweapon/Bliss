@@ -147,7 +147,10 @@ namespace Bliss
                 {
                     foreach (var child in _children.Values)
                     {
-                        child.LogicScene = _logicScene;
+                        if (child is not ILogicScene)
+                        {
+                            child.LogicScene = _logicScene;
+                        }
                     }
                 }
 
@@ -343,6 +346,7 @@ namespace Bliss
             set
             {
                 CheckParentValue(value);
+                validateLevelSceneReparent(value);
 
                 if (_parent != null)
                 {
@@ -367,6 +371,47 @@ namespace Bliss
                 else
                 {
                     LogicScene = _parent.LogicScene;
+                }
+            }
+        }
+
+        internal void migrateLevelSceneParent(Entity destination)
+        {
+            CheckParentValue(destination);
+            if (IsComponent || _parent == null || this is ILogicScene ||
+                destination.Children.ContainsKey(Id))
+            {
+                throw new InvalidOperationException("The gameplay subtree cannot be mounted at the destination.");
+            }
+
+            Entity previousParent = _parent;
+            destination.AddToChildren(this);
+            previousParent.RemoveFromChildren(this);
+            _parent = destination;
+            setMigratedLogicScene(destination.LogicScene);
+        }
+
+        private void setMigratedLogicScene(ILogicScene destination)
+        {
+            if (this is ILogicScene)
+            {
+                return;
+            }
+
+            _logicScene = destination;
+            if (_children != null)
+            {
+                foreach (Entity child in _children.Values)
+                {
+                    child.setMigratedLogicScene(destination);
+                }
+            }
+
+            if (_components != null)
+            {
+                foreach (Entity component in _components.Values)
+                {
+                    component.setMigratedLogicScene(destination);
                 }
             }
         }
@@ -435,6 +480,7 @@ namespace Bliss
         private void SetComponentParent(Entity value)
         {
             CheckParentValue(value);
+            validateLevelSceneReparent(value);
             
             if (_parent != null)
             {
@@ -785,6 +831,18 @@ namespace Bliss
             if (value.LogicScene == null)
             {
                 throw new Exception($"cant set parent because parent domain is null: {GetType().FullName} {value.GetType().FullName}");
+            }
+        }
+
+        private void validateLevelSceneReparent(Entity value)
+        {
+            if (_parent != null && !ReferenceEquals(_parent, value) &&
+                ((this is ILogicScene && _logicScene?.SceneType == ELogicSceneType.Level) ||
+                    (this is not ILogicScene && !ReferenceEquals(_logicScene, value.LogicScene) &&
+                        (_logicScene?.SceneType == ELogicSceneType.Level ||
+                            value.LogicScene.SceneType == ELogicSceneType.Level))))
+            {
+                throw new InvalidOperationException("Mounted entities must use gameplay subtree migration to change LevelScenes.");
             }
         }
 
