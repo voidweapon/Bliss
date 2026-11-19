@@ -322,6 +322,137 @@ public class MoverIntegrationTests
         Assert.That(child.Scene(), Is.SameAs(destination));
     }
 
+    /// <summary>Requests that become overlapping before execution both fail without moving either subtree.</summary>
+    [Test]
+    public void GameplaySubtreeMigrationRejectsRequestsThatBecomeOverlapping()
+    {
+        this.createBulletTestServices();
+        LogicScene destination = LevelSceneFactory.Create(
+            this.world, this.world, DESTINATION_LEVEL_ID, DESTINATION_LEVEL_ID, nameof(DESTINATION_LEVEL_ID))
+            .GetAwaiter().GetResult();
+        destination.AddComponent<PhysicalScene, PhysicalWorldComponent>(
+            this.root.Scene.GetComponent<PhysicalWorldComponent>());
+        Unit first = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, TEST_UNIT_ID,
+            ENetRole.Authority, ENetRole.SimulatedProxy, float3.zero, quaternion.identity);
+        Unit second = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, TEST_SECOND_UNIT_ID,
+            ENetRole.Authority, ENetRole.SimulatedProxy, float3.zero, quaternion.identity);
+        MigrationTickObserver observer = new MigrationTickObserver(destination, second);
+        this.world.LogicUpdate.Register(first, nameof(GameplaySubtreeMigrationRejectsRequestsThatBecomeOverlapping),
+            GameplayWorldLogicPriority.MOVEMENT, observer.RequestThenOverlap);
+
+        earlyUpdate(this.root);
+        setServerTime(FIRST_TICK_TIME);
+        update(this.root);
+
+        Assert.Throws<InvalidOperationException>(observer.Task.GetResult);
+        Assert.Throws<InvalidOperationException>(observer.SecondTask.GetResult);
+        Assert.That(first.Scene(), Is.SameAs(this.level));
+        Assert.That(second.Scene(), Is.SameAs(this.level));
+        Assert.That(second.Parent, Is.SameAs(first));
+    }
+
+    /// <summary>A completion callback cannot make later queued subtrees overlap and migrate together.</summary>
+    [Test]
+    public void GameplaySubtreeMigrationRejectsOverlapCreatedByCompletionCallback()
+    {
+        this.createBulletTestServices();
+        LogicScene destination = LevelSceneFactory.Create(
+            this.world, this.world, DESTINATION_LEVEL_ID, DESTINATION_LEVEL_ID, nameof(DESTINATION_LEVEL_ID))
+            .GetAwaiter().GetResult();
+        destination.AddComponent<PhysicalScene, PhysicalWorldComponent>(
+            this.root.Scene.GetComponent<PhysicalWorldComponent>());
+        TestCargo first = this.level.AddChildWithId<TestCargo>(TEST_UNIT_ID);
+        TestCargo second = this.level.AddChildWithId<TestCargo>(TEST_SECOND_UNIT_ID);
+        TestCargo third = this.level.AddChildWithId<TestCargo>(TEST_THIRD_UNIT_ID);
+        MigrationTickObserver observer = new MigrationTickObserver(destination, second, third);
+        this.world.LogicUpdate.Register(first, nameof(GameplaySubtreeMigrationRejectsOverlapCreatedByCompletionCallback),
+            GameplayWorldLogicPriority.MOVEMENT, observer.RequestThenOverlapFromCompletion);
+
+        earlyUpdate(this.root);
+        setServerTime(FIRST_TICK_TIME);
+        update(this.root);
+
+        observer.Task.GetResult();
+        Assert.Throws<InvalidOperationException>(observer.SecondTask.GetResult);
+        Assert.Throws<InvalidOperationException>(observer.ThirdTask.GetResult);
+        Assert.That(first.Scene(), Is.SameAs(destination));
+        Assert.That(second.Scene(), Is.SameAs(this.level));
+        Assert.That(third.Scene(), Is.SameAs(this.level));
+        Assert.That(second.Parent, Is.SameAs(third));
+    }
+
+    /// <summary>A same-scene reparent cannot create a cycle that would make migration traversal unsafe.</summary>
+    [Test]
+    public void GameplaySubtreeRejectsReparentingUnderItsDescendant()
+    {
+        TestCargo parent = this.level.AddChild<TestCargo>();
+        TestCargo child = parent.AddChild<TestCargo>();
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => parent.Parent = child);
+            Assert.That(parent.Parent, Is.SameAs(this.level));
+            Assert.That(child.Parent, Is.SameAs(parent));
+        }
+        finally
+        {
+            if (ReferenceEquals(parent.Parent, child))
+            {
+                parent.Parent = this.level;
+            }
+        }
+    }
+
+    /// <summary>A destroy callback cannot migrate a sibling out of an ancestor being disposed.</summary>
+    [Test]
+    public void GameplaySubtreeMigrationRejectsDisposingAncestor()
+    {
+        this.createBulletTestServices();
+        LogicScene destination = LevelSceneFactory.Create(
+            this.world, this.world, DESTINATION_LEVEL_ID, DESTINATION_LEVEL_ID, nameof(DESTINATION_LEVEL_ID))
+            .GetAwaiter().GetResult();
+        destination.AddComponent<PhysicalScene, PhysicalWorldComponent>(
+            this.root.Scene.GetComponent<PhysicalWorldComponent>());
+        TestCargo parent = this.level.AddChild<TestCargo>();
+        MigrationOnDestroy trigger = parent.AddChildWithId<MigrationOnDestroy>(TEST_UNIT_ID);
+        TestCargo sibling = parent.AddChildWithId<TestCargo>(TEST_SECOND_UNIT_ID);
+        trigger.Sibling = sibling;
+        trigger.Destination = destination;
+
+        Assert.DoesNotThrow(parent.Dispose);
+
+        Assert.That(trigger.Task, Is.Not.Null);
+        Assert.Throws<InvalidOperationException>(trigger.Task!.GetResult);
+        Assert.That(sibling.IsDisposed, Is.True);
+        Assert.That(destination.GetChild<TestCargo>(TEST_SECOND_UNIT_ID), Is.Null);
+    }
+
+    /// <summary>A subtree cannot migrate when its child collection disagrees with the child's parent.</summary>
+    [Test]
+    public void GameplaySubtreeMigrationRejectsInconsistentDescendant()
+    {
+        this.createBulletTestServices();
+        LogicScene destination = LevelSceneFactory.Create(
+            this.world, this.world, DESTINATION_LEVEL_ID, DESTINATION_LEVEL_ID, nameof(DESTINATION_LEVEL_ID))
+            .GetAwaiter().GetResult();
+        destination.AddComponent<PhysicalScene, PhysicalWorldComponent>(
+            this.root.Scene.GetComponent<PhysicalWorldComponent>());
+        TestCargo subtree = this.level.AddChildWithId<TestCargo>(TEST_UNIT_ID);
+        TestCargo sibling = this.level.AddChildWithId<TestCargo>(TEST_SECOND_UNIT_ID);
+        subtree.Children.Add(sibling.Id, sibling);
+
+        try
+        {
+            Assert.Throws<InvalidOperationException>(
+                () => GameplaySubtreeMigration.MigrateAsync(subtree, destination).GetAwaiter().GetResult());
+            Assert.That(subtree.Scene(), Is.SameAs(this.level));
+            Assert.That(sibling.Scene(), Is.SameAs(this.level));
+        }
+        finally
+        {
+            subtree.Children.Remove(sibling.Id);
+        }
+    }
+
     /// <summary>A completion callback cannot migrate another subtree while its earlier request is queued.</summary>
     [Test]
     public void GameplaySubtreeMigrationRejectsOverlapFromCompletionCallback()
@@ -448,6 +579,33 @@ public class MoverIntegrationTests
         update(this.root);
 
         Assert.Throws<OperationCanceledException>(observer.Task.GetResult);
+    }
+
+    /// <summary>A throwing cancellation continuation cannot prevent World and scene disposal.</summary>
+    [Test]
+    public void GameplayWorldDisposesWhenMigrationCancellationContinuationThrows()
+    {
+        this.createBulletTestServices();
+        LogicScene destination = LevelSceneFactory.Create(
+            this.world, this.world, DESTINATION_LEVEL_ID, DESTINATION_LEVEL_ID, nameof(DESTINATION_LEVEL_ID))
+            .GetAwaiter().GetResult();
+        destination.AddComponent<PhysicalScene, PhysicalWorldComponent>(
+            this.root.Scene.GetComponent<PhysicalWorldComponent>());
+        Unit unit = UnitHelper.CreateMinimalUnit(this.level, UNIT_CONFIG_ID, TEST_UNIT_ID,
+            ENetRole.Authority, ENetRole.SimulatedProxy, float3.zero, quaternion.identity);
+        MigrationTickObserver observer = new MigrationTickObserver(destination);
+        this.world.LogicUpdate.Register(unit,
+            nameof(GameplayWorldDisposesWhenMigrationCancellationContinuationThrows),
+            GameplayWorldLogicPriority.MOVEMENT, observer.RequestThenDestroyWorldWithThrowingContinuation);
+
+        earlyUpdate(this.root);
+        setServerTime(FIRST_TICK_TIME);
+        Assert.Throws<Exception>(() => update(this.root));
+
+        Assert.Throws<OperationCanceledException>(observer.Task.GetResult);
+        Assert.That(this.world.IsDisposed, Is.True);
+        Assert.That(this.level.IsDisposed, Is.True);
+        Assert.That(destination.IsDisposed, Is.True);
     }
 
     /// <summary>A failed fixed tick cancels queued migration without moving the subtree.</summary>
@@ -2495,6 +2653,30 @@ public class MoverIntegrationTests
     {
     }
 
+    /// <summary>Requests sibling migration from its destruction callback.</summary>
+    public sealed class MigrationOnDestroy : Entity, IDestroy
+    {
+        /// <summary>Gets or sets the sibling to migrate.</summary>
+        public Entity Sibling { get; set; } = null!;
+
+        /// <summary>Gets or sets the migration destination.</summary>
+        public LogicScene Destination { get; set; } = null!;
+
+        /// <summary>Gets or sets the request made during destruction.</summary>
+        public ETTask? Task { get; set; }
+    }
+
+    /// <summary>Runs a sibling migration when the test trigger is destroyed.</summary>
+    [EntitySystem]
+    public sealed class MigrationOnDestroySystem : DestroySystem<MigrationOnDestroy>
+    {
+        /// <inheritdoc />
+        protected override void Destroy(MigrationOnDestroy entity)
+        {
+            entity.Task = GameplaySubtreeMigration.MigrateAsync(entity.Sibling, entity.Destination);
+        }
+    }
+
     private sealed class MigrationWorldMutationObserver
     {
         private readonly GameplayWorld originalWorld;
@@ -2529,12 +2711,14 @@ public class MoverIntegrationTests
     {
         private readonly LogicScene destination;
         private readonly Entity? secondEntity;
+        private readonly Entity? thirdEntity;
 
         /// <summary>Captures the target and optional second participant.</summary>
-        public MigrationTickObserver(LogicScene destination, Entity? secondEntity = null)
+        public MigrationTickObserver(LogicScene destination, Entity? secondEntity = null, Entity? thirdEntity = null)
         {
             this.destination = destination;
             this.secondEntity = secondEntity;
+            this.thirdEntity = thirdEntity;
         }
 
         /// <summary>Gets the first migration request.</summary>
@@ -2554,6 +2738,9 @@ public class MoverIntegrationTests
 
         private Entity requiredSecondEntity =>
             this.secondEntity ?? throw new InvalidOperationException("The second migration participant is required.");
+
+        private Entity requiredThirdEntity =>
+            this.thirdEntity ?? throw new InvalidOperationException("The third migration participant is required.");
 
         /// <summary>Requests a migration during the tick.</summary>
         public void Request(Entity entity, float deltaTime)
@@ -2588,6 +2775,28 @@ public class MoverIntegrationTests
         {
             this.Task = GameplaySubtreeMigration.MigrateAsync(entity, this.destination);
             this.SecondTask = GameplaySubtreeMigration.MigrateAsync(this.requiredSecondEntity, this.destination);
+        }
+
+        /// <summary>Queues disjoint requests before changing their hierarchy to overlap.</summary>
+        public void RequestThenOverlap(Entity entity, float deltaTime)
+        {
+            this.Task = GameplaySubtreeMigration.MigrateAsync(entity, this.destination);
+            this.SecondTask = GameplaySubtreeMigration.MigrateAsync(this.requiredSecondEntity, this.destination);
+            this.requiredSecondEntity.Parent = entity;
+        }
+
+        /// <summary>Queues three subtrees and changes the later pair from the first completion callback.</summary>
+        public void RequestThenOverlapFromCompletion(Entity entity, float deltaTime)
+        {
+            this.Task = GameplaySubtreeMigration.MigrateAsync(entity, this.destination);
+            this.Task.OnCompleted(this.overlapPendingSubtrees);
+            this.SecondTask = GameplaySubtreeMigration.MigrateAsync(this.requiredSecondEntity, this.destination);
+            this.ThirdTask = GameplaySubtreeMigration.MigrateAsync(this.requiredThirdEntity, this.destination);
+        }
+
+        private void overlapPendingSubtrees()
+        {
+            this.requiredSecondEntity.Parent = this.requiredThirdEntity;
         }
 
         /// <summary>Requests two subtrees and makes the first completion callback throw.</summary>
@@ -2627,6 +2836,15 @@ public class MoverIntegrationTests
         {
             GameplayWorld world = entity.GetLevelGameplayWorld();
             this.Task = GameplaySubtreeMigration.MigrateAsync(entity, this.destination);
+            world.Dispose();
+        }
+
+        /// <summary>Destroys the World while a cancellation continuation throws.</summary>
+        public void RequestThenDestroyWorldWithThrowingContinuation(Entity entity, float deltaTime)
+        {
+            GameplayWorld world = entity.GetLevelGameplayWorld();
+            this.Task = GameplaySubtreeMigration.MigrateAsync(entity, this.destination);
+            this.Task.OnCompleted(throwFromContinuation);
             world.Dispose();
         }
 

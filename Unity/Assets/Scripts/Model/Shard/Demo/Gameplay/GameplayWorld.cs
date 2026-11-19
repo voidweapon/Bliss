@@ -10,6 +10,8 @@ namespace Bliss
         Entity Owner { get; }
         /// <summary>Executes the request after a successful tick.</summary>
         void Execute();
+        /// <summary>Marks a request whose subtree overlaps another pending request.</summary>
+        void MarkOverlapping();
         /// <summary>Cancels a request when its World cannot execute it.</summary>
         void Cancel();
     }
@@ -87,6 +89,7 @@ namespace Bliss
         }
 
         /// <summary>Disposes the world and clears its timers and pending simulation ticks.</summary>
+        /// <exception cref="AggregateException">Multiple disposal callbacks or cleanup operations failed.</exception>
         public override void Dispose()
         {
             if (this.IsDisposed)
@@ -94,9 +97,43 @@ namespace Bliss
                 return;
             }
 
-            this.Timer.dispose();
-            this.LogicUpdate.dispose();
-            base.Dispose();
+            List<Exception> failures = null;
+            try
+            {
+                this.Timer.dispose();
+            }
+            catch (Exception exception)
+            {
+                (failures ??= new List<Exception>()).Add(exception);
+            }
+
+            try
+            {
+                this.LogicUpdate.dispose();
+            }
+            catch (Exception exception)
+            {
+                (failures ??= new List<Exception>()).Add(exception);
+            }
+
+            try
+            {
+                base.Dispose();
+            }
+            catch (Exception exception)
+            {
+                (failures ??= new List<Exception>()).Add(exception);
+            }
+
+            if (failures?.Count == 1)
+            {
+                ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            }
+
+            if (failures != null)
+            {
+                throw new AggregateException("GameplayWorld disposal failed.", failures);
+            }
         }
     }
 
@@ -483,6 +520,15 @@ namespace Bliss
                 {
                     if (execute && !this.isDisposed && !this.world.IsFaulted)
                     {
+                        foreach (IGameplayWorldDeferredWork pending in this.deferredWork)
+                        {
+                            if (isAncestor(pending.Owner, work.Owner) || isAncestor(work.Owner, pending.Owner))
+                            {
+                                work.MarkOverlapping();
+                                pending.MarkOverlapping();
+                            }
+                        }
+
                         work.Execute();
                     }
                     else

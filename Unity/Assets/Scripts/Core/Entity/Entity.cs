@@ -333,6 +333,8 @@ namespace Bliss
 #endif
         protected Entity _parent;
 
+        /// <summary>Gets or sets the parent without creating a cycle or bypassing LevelScene migration.</summary>
+        /// <exception cref="InvalidOperationException">The destination creates a cycle or changes LevelScene ownership.</exception>
 #if DOTNET
         [MongoDB.Bson.Serialization.Attributes.BsonIgnore]
 #endif
@@ -825,6 +827,26 @@ namespace Bliss
             if (value == this)
             {
                 throw new Exception($"cant set parent self: {GetType().FullName}");
+            }
+
+            if ((_children != null && _children.Count > 0) || (_components != null && _components.Count > 0))
+            {
+                Entity current = value;
+                Entity fast = value;
+                while (current != null)
+                {
+                    if (ReferenceEquals(current, this))
+                    {
+                        throw new InvalidOperationException("An entity cannot be parented beneath its descendant.");
+                    }
+
+                    current = current.Parent;
+                    fast = fast?.Parent?.Parent;
+                    if (current != null && ReferenceEquals(current, fast))
+                    {
+                        throw new InvalidOperationException("The destination hierarchy contains a cycle.");
+                    }
+                }
             }
 
             // 严格限制parent必须要有domain,也就是说parent必须在数据树上面

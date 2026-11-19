@@ -52,6 +52,8 @@ namespace Bliss
             }
 
             LogicScene source = subtree.Scene();
+            validateHierarchy(subtree, source, null);
+            validateHierarchy(destination, null, subtree);
             GameplayWorld world = subtree.GetLevelGameplayWorld();
             LevelGameWorldComponent sourceOwner = source?.GetComponent<LevelGameWorldComponent>();
             LevelGameWorldComponent destinationOwner = destination.GetComponent<LevelGameWorldComponent>();
@@ -74,15 +76,41 @@ namespace Bliss
                 throw new InvalidOperationException("The subtree root must be a child rather than a component.");
             }
 
-            for (Entity current = destination; current != null; current = current.Parent)
+            return world;
+        }
+
+        private static void validateHierarchy(Entity start, Entity requiredAncestor, Entity prohibitedAncestor)
+        {
+            bool foundRequiredAncestor = requiredAncestor == null;
+            Entity fast = start;
+            for (Entity current = start; current != null; current = current.Parent)
             {
-                if (ReferenceEquals(current, subtree))
+                if (current.IsDisposed)
+                {
+                    throw new InvalidOperationException("The migration hierarchy contains a destroyed entity.");
+                }
+
+                if (ReferenceEquals(current, requiredAncestor))
+                {
+                    foundRequiredAncestor = true;
+                }
+
+                if (ReferenceEquals(current, prohibitedAncestor))
                 {
                     throw new InvalidOperationException("The destination cannot be inside the migrating subtree.");
                 }
+
+                fast = fast?.Parent?.Parent;
+                if (fast != null && ReferenceEquals(current.Parent, fast))
+                {
+                    throw new InvalidOperationException("The migration hierarchy contains a cycle.");
+                }
             }
 
-            return world;
+            if (!foundRequiredAncestor)
+            {
+                throw new InvalidOperationException("The subtree is not attached beneath its source LevelScene.");
+            }
         }
 
         private static void apply(Entity entity, LogicScene source, LogicScene destination)
@@ -136,6 +164,11 @@ namespace Bliss
                 return;
             }
 
+            if (entity.IsDisposed || !ReferenceEquals(entity.Scene(), source))
+            {
+                throw new InvalidOperationException("The migration subtree contains an invalid entity or LevelScene.");
+            }
+
             if (entity is Bullet bullet)
             {
                 if (!ReferenceEquals((LogicScene)bullet.LevelScene, source) ||
@@ -151,6 +184,7 @@ namespace Bliss
             {
                 foreach (Entity component in entity.Components.Values)
                 {
+                    validateDescendant(entity, component);
                     collectBullets(component, source, sourcePhysics, bullets);
                 }
             }
@@ -159,8 +193,17 @@ namespace Bliss
             {
                 foreach (Entity child in entity.Children.Values)
                 {
+                    validateDescendant(entity, child);
                     collectBullets(child, source, sourcePhysics, bullets);
                 }
+            }
+        }
+
+        private static void validateDescendant(Entity parent, Entity descendant)
+        {
+            if (descendant == null || !ReferenceEquals(descendant.Parent, parent))
+            {
+                throw new InvalidOperationException("The migration subtree contains an inconsistent hierarchy.");
             }
         }
 
@@ -171,6 +214,7 @@ namespace Bliss
             private readonly EntityRef<LogicScene> destination;
             private readonly EntityRef<GameplayWorld> world;
             private readonly ETTask task;
+            private bool isOverlapping;
 
             /// <summary>Captures the original owner and completion task for execution-time validation.</summary>
             public MigrationRequest(Entity subtree, LogicScene destination, GameplayWorld world, ETTask task)
@@ -198,6 +242,11 @@ namespace Bliss
                         throw new OperationCanceledException("The migration source was destroyed.");
                     }
 
+                    if (this.isOverlapping)
+                    {
+                        throw new InvalidOperationException("Pending migrations have overlapping subtrees.");
+                    }
+
                     if (!ReferenceEquals(entity.Scene(), oldScene))
                     {
                         throw new InvalidOperationException("The subtree changed LevelScenes before migration.");
@@ -223,6 +272,12 @@ namespace Bliss
                 }
 
                 this.task.SetResult();
+            }
+
+            /// <inheritdoc />
+            public void MarkOverlapping()
+            {
+                this.isOverlapping = true;
             }
 
             /// <inheritdoc />
