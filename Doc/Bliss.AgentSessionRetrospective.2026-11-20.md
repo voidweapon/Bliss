@@ -51,6 +51,8 @@
 
 **落点：** `BlissBenchMark/` 和 [性能敏感组件开发流程](Bliss.PerformanceSensitiveWorkflow.md)。
 
+**状态（2026-11-20）：** 已达成设计共识，尚未实施。正式比较将通过 `BlissBenchMark` 统一 CLI 进行，探索性运行仍可直接使用 BenchmarkDotNet；正式和快速配置分开。入口记录代码版本、工作区差异标识、负载、参数、BenchmarkDotNet 配置及运行环境。原始结果留在忽略的本地 artifacts，正式结论写入项目文档。比较必须显式指定基线并校验条件；不匹配或没有可比基线时，不生成性能提升/回归结论。性能实验按需手动运行，不纳入常规 PR CI。
+
 ### 4. 中：普通 Release 构建会修改被跟踪的分析器 DLL
 
 **证据：** `Bliss.ProjectRule/Bliss.ProjectRule/Bliss.ProjectRule.csproj` 的 `CustomAfterBuild` 在 Release 构建后自动复制 DLL 到 `Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll`。本轮基准构建多次触发该副作用，需要人工比对产物再恢复。
@@ -58,6 +60,8 @@
 **建议：** 将构建分析器与发布分析器到 Unity 分为显式步骤或受控的 MSBuild 开关，避免普通测试和基准运行顺带更新该文件。
 
 **验收：** 普通验证不修改被跟踪的 Unity 分析器 DLL；显式发布仍能生成并更新正确产物。检查运行前后的工作区差异，保留用户原有修改。
+
+**状态（2026-11-20）：** 已达成设计共识，尚未实施。普通 Release 构建不再复制 DLL，改由显式发布目标更新 Unity 分析器；分析器源码变更时 CI 构建服务端并验证被跟踪的 Unity DLL 已同步，发现差异即失败，不自动提交。Unity Editor 编译留待后续阶段。
 
 ### 5. 中：技能加载失败被过早解释为未安装
 
@@ -69,6 +73,8 @@
 
 **落点：** [Skill 加载排错](Bliss.AgentSkillTroubleshooting.md)、技能发现和诊断入口。
 
+**状态（2026-11-20）：** 已达成文档级补足共识，尚未实施。排错结果将明确区分工具未识别、定义不存在和依赖不可用；保留先实际加载、再按目录查找定义/索引和依赖、依赖失败则停止的流程。不修改用户目录或第三方 skill，也不新增自动诊断工具。
+
 ### 6. 中：规范重复，已有指南缺少明确入口
 
 **证据：** 根目录、Server、Unity 的 `AGENTS.md` 重复维护通用规范，部分命名例外不一致。客户端处理指南已存在，但这些入口文件中缺少明确的触发式导航。用户在会话中补充了 Entity/System 分工及避免闭包、lambda 的偏好。
@@ -78,6 +84,8 @@
 **验收：** 新会话能从适用的 `AGENTS.md` 找到相关规范和客户端处理指南；重复规则及例外冲突得到处理，现有约束不因整理而丢失。
 
 **当前部分完成：** Entity/System 与回调约定已写入根 `CODING_STANDARDS.md`，并有根 `AGENTS.md` 导航；未统一其余历史规范或新增分析器规则。
+
+**后续共识（2026-11-20）：** 通用代码规范统一归入根 `CODING_STANDARDS.md`；根、Server、Unity 的 `AGENTS.md` 保留目录信息、导航及代理工作流规则。保留 `_lowerCamelCase` 私有字段和框架事件/调用处理器命名两项例外。规范适用于新增和修改的代码，不借此批量清理历史代码；本项先做文档归并，不扩展 analyzer。尚未实施。
 
 ## 新会话接续方式
 
