@@ -60,6 +60,10 @@
 
 继续本轮复盘提出的开发环境改进时，先阅读 `Doc/Bliss.AgentSessionRetrospective.2026-11-20.md`；其中区分已完成工作、候选改进和后续验收条件。
 
+### 工作区代码审查
+
+审查未提交的项目改动时，按 `Doc/Bliss.WorktreeCodeReviewWorkflow.md` 固定基点、选择补丁范围并验证审查前后的补丁一致性。该项目内流程补充外部审查技能，不要求修改用户目录或第三方技能。
+
 ### Skill 加载排错
 
 读取或加载 skill 失败时，按 `Doc/Bliss.AgentSkillTroubleshooting.md` 排查。
