@@ -79,7 +79,9 @@ jobs:
       # Add the gameplay integration test after its project is merged into main.
       - name: Test unit
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: dotnet test Bliss.UnitTest/Bliss.UnitTest/Bliss.UnitTest.csproj --configuration Debug --logger "trx;LogFileName=unit.trx" --results-directory "${{ runner.temp }}/test-results/unit"
+        env:
+          MATHEMATICS_VERSION: ${{ steps.unity-mathematics.outputs.version }}
+        run: dotnet test Bliss.UnitTest/Bliss.UnitTest/Bliss.UnitTest.csproj --configuration Debug -p:UnityMathematicsPackagePath="${RUNNER_TEMP}/unity-mathematics/${MATHEMATICS_VERSION}" --logger "trx;LogFileName=unit.trx" --results-directory "${{ runner.temp }}/test-results/unit"
 
       - name: Check for analyzer input changes
         id: analyzer-inputs

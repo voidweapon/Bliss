@@ -7,6 +7,7 @@
 
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
+        <UnityMathematicsPackagePath Condition="'$(UnityMathematicsPackagePath)' == ''">..\..\Unity\Library\PackageCache\com.unity.mathematics*</UnityMathematicsPackagePath>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -47,11 +48,11 @@
             <Link>Scripts\ThirdParty\%(RecursiveDir)%(FileName)%(Extension)</Link>
         </Compile>
 
-        <Compile Include="..\..\Unity\Library\PackageCache\com.unity.mathematics*\Unity.Mathematics\**\*.cs">
-            <Link>Unity.Mathematics/$([System.String]::new(%(RecursiveDir)).Substring($([System.String]::new(%(RecursiveDir)).Indexof("Unity.Mathematics"))).Replace("Unity.Mathematics", ""))/%(FileName)%(Extension)</Link>
+        <Compile Include="$(UnityMathematicsPackagePath)\Unity.Mathematics\**\*.cs">
+            <Link>Unity.Mathematics/%(RecursiveDir)%(FileName)%(Extension)</Link>
         </Compile>
 
-        <Compile Update="..\..\Unity\Library\PackageCache\com.unity.mathematics@1.2.6\Unity.Mathematics\PropertyAttribute.cs">
+        <Compile Update="$(UnityMathematicsPackagePath)\Unity.Mathematics\PropertyAttribute.cs">
           <Link>Unity.Mathematics\PropertyAttribute.cs</Link>
         </Compile>
 
