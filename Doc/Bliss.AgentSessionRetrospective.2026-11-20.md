@@ -39,6 +39,8 @@
 - `Bliss.UnitTest/Bliss.GameplayIntegrationTest/Bliss.GameplayIntegrationTest.csproj`
 - [Unity 客户端处理与编译流程](Bliss.UnityClientWorkflow.md)及 `Unity/Assets/Scripts/Tests/`
 
+**状态（2026-11-20）：** 已达成首阶段 CI 设计共识，采用公开仓库和必需的 .NET 状态检查；范围与取舍见 [ADR-0001](../docs/adr/0001-public-repository-for-required-dotnet-ci.md)。仓库可见性和 CI 工作流尚未更改。
+
 ### 3. 中：性能实验记录仍依赖人工
 
 **证据：** 已有性能敏感工作流程，但本轮部分路径没有修改前的可比基线，运行配置或准备阶段也发生变化，无法据此判断性能变化。
