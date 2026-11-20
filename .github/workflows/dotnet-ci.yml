@@ -23,6 +23,44 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Read Unity.Mathematics version
+        id: unity-mathematics
+        run: |
+          version="$(jq -r '.dependencies["com.unity.mathematics"].version' Unity/Packages/packages-lock.json)"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Unsupported Unity.Mathematics version in packages-lock.json: $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Unity.Mathematics package
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/unity-mathematics-${{ steps.unity-mathematics.outputs.version }}.tgz
+          key: unity-mathematics-${{ steps.unity-mathematics.outputs.version }}
+
+      - name: Prepare Unity.Mathematics source
+        env:
+          MATHEMATICS_VERSION: ${{ steps.unity-mathematics.outputs.version }}
+        run: |
+          packageArchive="$RUNNER_TEMP/unity-mathematics-$MATHEMATICS_VERSION.tgz"
+          packageDirectory="$RUNNER_TEMP/unity-mathematics/$MATHEMATICS_VERSION"
+
+          if [ ! -f "$packageArchive" ]; then
+            curl --fail --location --retry 3 --retry-delay 2 \
+              "https://packages.unity.com/com.unity.mathematics/-/com.unity.mathematics-$MATHEMATICS_VERSION.tgz" \
+              --output "$packageArchive"
+          fi
+
+          mkdir -p "$packageDirectory"
+          tar -xzf "$packageArchive" --directory "$packageDirectory" --strip-components=1
+
+          if [ ! -f "$packageDirectory/Unity.Mathematics/Unity.Mathematics.asmdef" ]; then
+            echo "::error::Unity.Mathematics $MATHEMATICS_VERSION package is missing its runtime assembly."
+            exit 1
+          fi
+          echo "Prepared Unity.Mathematics $MATHEMATICS_VERSION in $packageDirectory."
+
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v4
         with:
@@ -30,19 +68,18 @@ jobs:
 
       - name: Build server solution
         id: build
-        run: dotnet build Server/Server.sln --configuration Debug
+        env:
+          MATHEMATICS_VERSION: ${{ steps.unity-mathematics.outputs.version }}
+        run: dotnet build Server/Server.sln --configuration Debug -p:UnityMathematicsPackagePath="${RUNNER_TEMP}/unity-mathematics/${MATHEMATICS_VERSION}"
 
       - name: Test analyzer
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: dotnet test Bliss.ProjectRule/Bliss.ProjectRule.Test/Bliss.ProjectRule.Test.csproj --configuration Debug --logger "trx;LogFileName=analyzer.trx" --results-directory "${{ runner.temp }}/test-results/analyzer"
 
+      # Add the gameplay integration test after its project is merged into main.
       - name: Test unit
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: dotnet test Bliss.UnitTest/Bliss.UnitTest/Bliss.UnitTest.csproj --configuration Debug --logger "trx;LogFileName=unit.trx" --results-directory "${{ runner.temp }}/test-results/unit"
-
-      - name: Test gameplay integration
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: dotnet test Bliss.UnitTest/Bliss.GameplayIntegrationTest/Bliss.GameplayIntegrationTest.csproj --configuration Debug --logger "trx;LogFileName=gameplay-integration.trx" --results-directory "${{ runner.temp }}/test-results/gameplay-integration"
 
       - name: Check for analyzer input changes
         id: analyzer-inputs
@@ -73,7 +110,9 @@ jobs:
 
       - name: Build server against analyzer source in Release
         if: ${{ steps.analyzer-inputs.outputs.changed == 'true' }}
-        run: dotnet build Server/Server.sln --configuration Release
+        env:
+          MATHEMATICS_VERSION: ${{ steps.unity-mathematics.outputs.version }}
+        run: dotnet build Server/Server.sln --configuration Release -p:UnityMathematicsPackagePath="${RUNNER_TEMP}/unity-mathematics/${MATHEMATICS_VERSION}"
 
       - name: Publish and verify Unity analyzer DLL
         if: ${{ steps.analyzer-inputs.outputs.changed == 'true' }}
