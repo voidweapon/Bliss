@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v4
@@ -41,6 +43,53 @@ jobs:
       - name: Test gameplay integration
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: dotnet test Bliss.UnitTest/Bliss.GameplayIntegrationTest/Bliss.GameplayIntegrationTest.csproj --configuration Debug --logger "trx;LogFileName=gameplay-integration.trx" --results-directory "${{ runner.temp }}/test-results/gameplay-integration"
+
+      - name: Check for analyzer input changes
+        id: analyzer-inputs
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          baseSha="$BASE_SHA"
+          if [ "$baseSha" = "0000000000000000000000000000000000000000" ]; then
+            baseSha="$(git hash-object -t tree -w /dev/null)"
+          fi
+
+          changedFiles="$(git diff --name-only "$baseSha" "$HEAD_SHA" -- \
+            Bliss.ProjectRule/Bliss.ProjectRule \
+            Unity/Assets/Scripts/Base/Helpers/HashCodeHelper.cs \
+            Unity/Assets/Scripts/Base/Analyzer \
+            Unity/Assets/Scripts/Core/AnalyzerAttribute \
+            Unity/Assets/Scripts/Core/Entity/EntitySystems/IEntitySystemConstraint.cs)"
+
+          if [ -n "$changedFiles" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Analyzer inputs changed:"
+            printf '%s\n' "$changedFiles"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No analyzer inputs changed; skipping analyzer artifact verification."
+          fi
+
+      - name: Build server against analyzer source in Release
+        if: ${{ steps.analyzer-inputs.outputs.changed == 'true' }}
+        run: dotnet build Server/Server.sln --configuration Release
+
+      - name: Publish and verify Unity analyzer DLL
+        if: ${{ steps.analyzer-inputs.outputs.changed == 'true' }}
+        run: |
+          expected="${RUNNER_TEMP}/Bliss.ProjectRule.dll.expected"
+          unityAnalyzer="Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll"
+          cp "$unityAnalyzer" "$expected"
+
+          dotnet msbuild Bliss.ProjectRule/Bliss.ProjectRule/Bliss.ProjectRule.csproj \
+            /t:PublishUnityAnalyzer /p:Configuration=Release
+
+          if ! cmp --silent "$expected" "$unityAnalyzer"; then
+            echo "::error file=${unityAnalyzer}::Generated analyzer DLL differs from the tracked Unity analyzer DLL."
+            exit 1
+          fi
+          echo "Generated analyzer DLL matches the tracked Unity analyzer DLL."
 
       - name: Upload test results on failure
         if: failure()
