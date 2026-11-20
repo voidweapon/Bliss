@@ -102,9 +102,26 @@ jobs:
             Unity/Assets/Scripts/Core/Entity/EntitySystems/IEntitySystemConstraint.cs)"
 
           if [ -n "$changedFiles" ]; then
+            trackedAnalyzer="${RUNNER_TEMP}/Bliss.ProjectRule.dll.tracked"
+            baseAnalyzerVersion=""
+            if git cat-file -e "${baseSha}:Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll" 2>/dev/null; then
+              git show "${baseSha}:Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll" > "$trackedAnalyzer"
+              baseAnalyzerVersion="$(strings "$trackedAnalyzer" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\+bliss-analyzer$' | head -n 1 || true)"
+            fi
+            currentAnalyzerVersion="$(strings Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\+bliss-analyzer$' | head -n 1 || true)"
+            if [ -z "$currentAnalyzerVersion" ]; then
+              echo "::error file=Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll::The tracked analyzer DLL is missing its informational version."
+              exit 1
+            fi
+            if [ -n "$baseAnalyzerVersion" ] && [ "$currentAnalyzerVersion" = "$baseAnalyzerVersion" ]; then
+              echo "::error file=Bliss.ProjectRule/Bliss.ProjectRule/Bliss.ProjectRule.csproj::Bump InformationalVersion and regenerate the analyzer DLL when analyzer inputs change."
+              exit 1
+            fi
+
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Analyzer inputs changed:"
             printf '%s\n' "$changedFiles"
+            echo "Analyzer version changed from ${baseAnalyzerVersion:-not available} to $currentAnalyzerVersion."
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No analyzer inputs changed; skipping analyzer artifact verification."
@@ -117,7 +134,6 @@ jobs:
         run: dotnet build Server/Server.sln --configuration Release -p:UnityMathematicsPackagePath="${RUNNER_TEMP}/unity-mathematics/${MATHEMATICS_VERSION}"
 
       - name: Publish and verify Unity analyzer DLL
-        id: verify-analyzer
         if: ${{ steps.analyzer-inputs.outputs.changed == 'true' }}
         run: |
           expected="${RUNNER_TEMP}/Bliss.ProjectRule.dll.expected"
@@ -127,26 +143,17 @@ jobs:
           dotnet msbuild Bliss.ProjectRule/Bliss.ProjectRule/Bliss.ProjectRule.csproj \
             /t:PublishUnityAnalyzer /p:Configuration=Release
 
-          if ! cmp --silent "$expected" "$unityAnalyzer"; then
-            echo "Tracked analyzer:"
-            sha256sum "$expected"
-            echo "Generated analyzer:"
-            sha256sum "$unityAnalyzer"
-            echo "::error file=${unityAnalyzer}::Generated analyzer DLL differs from the tracked Unity analyzer DLL."
+          expectedVersion="$(strings "$expected" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\+bliss-analyzer$' | head -n 1 || true)"
+          generatedVersion="$(strings "$unityAnalyzer" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\+bliss-analyzer$' | head -n 1 || true)"
+          if [ -z "$expectedVersion" ] || [ -z "$generatedVersion" ]; then
+            echo "::error file=${unityAnalyzer}::The tracked or generated analyzer DLL is missing its informational version."
             exit 1
           fi
-          echo "Generated analyzer DLL matches the tracked Unity analyzer DLL."
-
-      - name: Upload analyzer comparison files on failure
-        if: ${{ failure() && steps.verify-analyzer.outcome == 'failure' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: analyzer-comparison
-          path: |
-            ${{ runner.temp }}/Bliss.ProjectRule.dll.expected
-            Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll
-          if-no-files-found: error
-          retention-days: 7
+          if [ "$expectedVersion" != "$generatedVersion" ]; then
+            echo "::error file=${unityAnalyzer}::Tracked analyzer version ${expectedVersion} differs from generated version ${generatedVersion}."
+            exit 1
+          fi
+          echo "Tracked and generated analyzer versions match: $generatedVersion."
 
       - name: Upload test results on failure
         if: failure()

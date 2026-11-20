@@ -11,6 +11,8 @@
         <NoWarn>RS2008</NoWarn>
         <PackageScribanIncludeSource>true</PackageScribanIncludeSource>
         <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+        <!-- Bump this when analyzer inputs change; CI verifies it against the tracked DLL. -->
+        <InformationalVersion>1.0.1+bliss-analyzer</InformationalVersion>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
