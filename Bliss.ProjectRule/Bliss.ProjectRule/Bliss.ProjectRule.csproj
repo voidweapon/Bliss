@@ -55,8 +55,9 @@
         </Compile>
     </ItemGroup>
     
-    <Target Name="CustomAfterBuild" AfterTargets="Build" Condition=" '$(Configuration)' == 'Release' ">
-        <Message Text = "Copy $(TargetDir)/$(TargetName).dll -> $(ProjectDir)/../../Unity/Assets/CodeAnalyzer/$(TargetName).dll"  Importance="High"/>
-        <Copy SourceFiles="$(TargetDir)/$(TargetName).dll" DestinationFiles="$(ProjectDir)/../../Unity/Assets/CodeAnalyzer/$(TargetName).dll" ContinueOnError="false" xmlns="" />
+    <Target Name="PublishUnityAnalyzer" DependsOnTargets="Build">
+        <Error Condition="'$(Configuration)' != 'Release'" Text="PublishUnityAnalyzer requires Configuration=Release." />
+        <Message Text="Copy $(TargetPath) -> $(ProjectDir)../../Unity/Assets/CodeAnalyzer/$(TargetName).dll" Importance="High" />
+        <Copy SourceFiles="$(TargetPath)" DestinationFiles="$(ProjectDir)../../Unity/Assets/CodeAnalyzer/$(TargetName).dll" ContinueOnError="false" />
     </Target>
 </Project>
