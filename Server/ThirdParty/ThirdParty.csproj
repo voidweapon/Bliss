@@ -9,6 +9,7 @@
     <PropertyGroup>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
         <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+        <UnityMathematicsPackagePath Condition="'$(UnityMathematicsPackagePath)' == ''">..\..\Unity\Library\PackageCache\com.unity.mathematics*</UnityMathematicsPackagePath>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -35,8 +36,8 @@
         <Compile Include="..\..\Unity\Assets\Scripts\ThirdParty\KCP\**\*.cs">
             <Link>KCP/%(RecursiveDir)%(FileName)%(Extension)</Link>
         </Compile>
-        <Compile Include="..\..\Unity\Library\PackageCache\com.unity.mathematics*\Unity.Mathematics\**\*.cs">
-            <Link>Unity.Mathematics/$([System.String]::new(%(RecursiveDir)).Substring($([System.String]::new(%(RecursiveDir)).Indexof("Unity.Mathematics"))).Replace("Unity.Mathematics", ""))/%(FileName)%(Extension)</Link>
+        <Compile Include="$(UnityMathematicsPackagePath)\Unity.Mathematics\**\*.cs">
+            <Link>Unity.Mathematics/%(RecursiveDir)%(FileName)%(Extension)</Link>
         </Compile>
     </ItemGroup>
 
