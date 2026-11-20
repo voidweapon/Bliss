@@ -107,6 +107,7 @@ Unity/Assets/StreamingAssets.meta
 /BlissBenchMark/.idea
 /BlissBenchMark/.vs
 /BlissBenchMark/BenchmarkDotNet.Artifacts
+/BlissBenchMark/artifacts/
 /Tools/Configs/Generate
 
 #其他
