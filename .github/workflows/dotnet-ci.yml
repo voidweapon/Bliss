@@ -1,0 +1,160 @@
+name: .NET CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: dotnet-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: .NET build and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read Unity.Mathematics version
+        id: unity-mathematics
+        run: |
+          version="$(jq -r '.dependencies["com.unity.mathematics"].version' Unity/Packages/packages-lock.json)"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Unsupported Unity.Mathematics version in packages-lock.json: $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Unity.Mathematics package
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/unity-mathematics-${{ steps.unity-mathematics.outputs.version }}.tgz
+          key: unity-mathematics-${{ steps.unity-mathematics.outputs.version }}
+
+      - name: Prepare Unity.Mathematics source
+        env:
+          MATHEMATICS_VERSION: ${{ steps.unity-mathematics.outputs.version }}
+        run: |
+          packageArchive="$RUNNER_TEMP/unity-mathematics-$MATHEMATICS_VERSION.tgz"
+          packageDirectory="$RUNNER_TEMP/unity-mathematics/$MATHEMATICS_VERSION"
+
+          if [ ! -f "$packageArchive" ]; then
+            curl --fail --location --retry 3 --retry-delay 2 \
+              "https://packages.unity.com/com.unity.mathematics/-/com.unity.mathematics-$MATHEMATICS_VERSION.tgz" \
+              --output "$packageArchive"
+          fi
+
+          mkdir -p "$packageDirectory"
+          tar -xzf "$packageArchive" --directory "$packageDirectory" --strip-components=1
+
+          if [ ! -f "$packageDirectory/Unity.Mathematics/Unity.Mathematics.asmdef" ]; then
+            echo "::error::Unity.Mathematics $MATHEMATICS_VERSION package is missing its runtime assembly."
+            exit 1
+          fi
+          echo "Prepared Unity.Mathematics $MATHEMATICS_VERSION in $packageDirectory."
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build server solution
+        id: build
+        env:
+          MATHEMATICS_VERSION: ${{ steps.unity-mathematics.outputs.version }}
+        run: dotnet build Server/Server.sln --configuration Debug -p:UnityMathematicsPackagePath="${RUNNER_TEMP}/unity-mathematics/${MATHEMATICS_VERSION}"
+
+      - name: Test analyzer
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: dotnet test Bliss.ProjectRule/Bliss.ProjectRule.Test/Bliss.ProjectRule.Test.csproj --configuration Debug --logger "trx;LogFileName=analyzer.trx" --results-directory "${{ runner.temp }}/test-results/analyzer"
+
+      # Add the gameplay integration test after its project is merged into main.
+      - name: Test unit
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          MATHEMATICS_VERSION: ${{ steps.unity-mathematics.outputs.version }}
+        run: dotnet test Bliss.UnitTest/Bliss.UnitTest/Bliss.UnitTest.csproj --configuration Debug -p:UnityMathematicsPackagePath="${RUNNER_TEMP}/unity-mathematics/${MATHEMATICS_VERSION}" --logger "trx;LogFileName=unit.trx" --results-directory "${{ runner.temp }}/test-results/unit"
+
+      - name: Check for analyzer input changes
+        id: analyzer-inputs
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          baseSha="$BASE_SHA"
+          if [ "$baseSha" = "0000000000000000000000000000000000000000" ]; then
+            baseSha="$(git hash-object -t tree -w /dev/null)"
+          fi
+
+          changedFiles="$(git diff --name-only "$baseSha" "$HEAD_SHA" -- \
+            Bliss.ProjectRule/Bliss.ProjectRule \
+            Unity/Assets/Scripts/Base/Helpers/HashCodeHelper.cs \
+            Unity/Assets/Scripts/Base/Analyzer \
+            Unity/Assets/Scripts/Core/AnalyzerAttribute \
+            Unity/Assets/Scripts/Core/Entity/EntitySystems/IEntitySystemConstraint.cs)"
+
+          baseAnalyzerVersion=""
+          if git cat-file -e "${baseSha}:Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll" 2>/dev/null; then
+            baseAnalyzerVersion="$(git show "${baseSha}:Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll" | strings | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(\+[^ ]+)?$' | head -n 1 || true)"
+          fi
+          echo "base-version=$baseAnalyzerVersion" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$changedFiles" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Analyzer inputs changed:"
+            printf '%s\n' "$changedFiles"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No analyzer inputs changed; skipping analyzer artifact verification."
+          fi
+
+      - name: Build server against analyzer source in Release
+        if: ${{ steps.analyzer-inputs.outputs.changed == 'true' }}
+        env:
+          MATHEMATICS_VERSION: ${{ steps.unity-mathematics.outputs.version }}
+        run: dotnet build Server/Server.sln --configuration Release -p:UnityMathematicsPackagePath="${RUNNER_TEMP}/unity-mathematics/${MATHEMATICS_VERSION}"
+
+      - name: Publish and verify Unity analyzer DLL
+        if: ${{ steps.analyzer-inputs.outputs.changed == 'true' }}
+        env:
+          BASE_ANALYZER_VERSION: ${{ steps.analyzer-inputs.outputs.base-version }}
+        run: |
+          expected="${RUNNER_TEMP}/Bliss.ProjectRule.dll.expected"
+          unityAnalyzer="Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll"
+          cp "$unityAnalyzer" "$expected"
+
+          dotnet msbuild Bliss.ProjectRule/Bliss.ProjectRule/Bliss.ProjectRule.csproj \
+            /t:PublishUnityAnalyzer /p:Configuration=Release
+
+          expectedVersion="$(strings "$expected" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\+bliss\.[0-9a-f]{12}$' | head -n 1 || true)"
+          generatedVersion="$(strings "$unityAnalyzer" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\+bliss\.[0-9a-f]{12}$' | head -n 1 || true)"
+          if [ -z "$expectedVersion" ] || [ -z "$generatedVersion" ]; then
+            echo "::error file=${unityAnalyzer}::The tracked or generated analyzer DLL is missing its informational version."
+            exit 1
+          fi
+          if [ "$expectedVersion" != "$generatedVersion" ]; then
+            echo "::error file=${unityAnalyzer}::Tracked analyzer version ${expectedVersion} differs from the generated version ${generatedVersion}. Run PublishUnityAnalyzer and commit the regenerated DLL."
+            exit 1
+          fi
+          if [ -n "$BASE_ANALYZER_VERSION" ] && [ "$BASE_ANALYZER_VERSION" = "$generatedVersion" ]; then
+            echo "::error file=${unityAnalyzer}::Analyzer inputs changed but the generated version did not change from the base version."
+            exit 1
+          fi
+          echo "Tracked and generated analyzer versions match: $generatedVersion."
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-test-results
+          path: ${{ runner.temp }}/test-results/**/*.trx
+          if-no-files-found: ignore
+          retention-days: 7
