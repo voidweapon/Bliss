@@ -101,27 +101,16 @@ jobs:
             Unity/Assets/Scripts/Core/AnalyzerAttribute \
             Unity/Assets/Scripts/Core/Entity/EntitySystems/IEntitySystemConstraint.cs)"
 
-          if [ -n "$changedFiles" ]; then
-            trackedAnalyzer="${RUNNER_TEMP}/Bliss.ProjectRule.dll.tracked"
-            baseAnalyzerVersion=""
-            if git cat-file -e "${baseSha}:Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll" 2>/dev/null; then
-              git show "${baseSha}:Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll" > "$trackedAnalyzer"
-              baseAnalyzerVersion="$(strings "$trackedAnalyzer" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\+bliss-analyzer$' | head -n 1 || true)"
-            fi
-            currentAnalyzerVersion="$(strings Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\+bliss-analyzer$' | head -n 1 || true)"
-            if [ -z "$currentAnalyzerVersion" ]; then
-              echo "::error file=Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll::The tracked analyzer DLL is missing its informational version."
-              exit 1
-            fi
-            if [ -n "$baseAnalyzerVersion" ] && [ "$currentAnalyzerVersion" = "$baseAnalyzerVersion" ]; then
-              echo "::error file=Bliss.ProjectRule/Bliss.ProjectRule/Bliss.ProjectRule.csproj::Bump InformationalVersion and regenerate the analyzer DLL when analyzer inputs change."
-              exit 1
-            fi
+          baseAnalyzerVersion=""
+          if git cat-file -e "${baseSha}:Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll" 2>/dev/null; then
+            baseAnalyzerVersion="$(git show "${baseSha}:Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll" | strings | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(\+[^ ]+)?$' | head -n 1 || true)"
+          fi
+          echo "base-version=$baseAnalyzerVersion" >> "$GITHUB_OUTPUT"
 
+          if [ -n "$changedFiles" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Analyzer inputs changed:"
             printf '%s\n' "$changedFiles"
-            echo "Analyzer version changed from ${baseAnalyzerVersion:-not available} to $currentAnalyzerVersion."
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No analyzer inputs changed; skipping analyzer artifact verification."
@@ -135,6 +124,8 @@ jobs:
 
       - name: Publish and verify Unity analyzer DLL
         if: ${{ steps.analyzer-inputs.outputs.changed == 'true' }}
+        env:
+          BASE_ANALYZER_VERSION: ${{ steps.analyzer-inputs.outputs.base-version }}
         run: |
           expected="${RUNNER_TEMP}/Bliss.ProjectRule.dll.expected"
           unityAnalyzer="Unity/Assets/CodeAnalyzer/Bliss.ProjectRule.dll"
@@ -143,14 +134,18 @@ jobs:
           dotnet msbuild Bliss.ProjectRule/Bliss.ProjectRule/Bliss.ProjectRule.csproj \
             /t:PublishUnityAnalyzer /p:Configuration=Release
 
-          expectedVersion="$(strings "$expected" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\+bliss-analyzer$' | head -n 1 || true)"
-          generatedVersion="$(strings "$unityAnalyzer" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\+bliss-analyzer$' | head -n 1 || true)"
+          expectedVersion="$(strings "$expected" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\+bliss\.[0-9a-f]{12}$' | head -n 1 || true)"
+          generatedVersion="$(strings "$unityAnalyzer" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\+bliss\.[0-9a-f]{12}$' | head -n 1 || true)"
           if [ -z "$expectedVersion" ] || [ -z "$generatedVersion" ]; then
             echo "::error file=${unityAnalyzer}::The tracked or generated analyzer DLL is missing its informational version."
             exit 1
           fi
           if [ "$expectedVersion" != "$generatedVersion" ]; then
-            echo "::error file=${unityAnalyzer}::Tracked analyzer version ${expectedVersion} differs from generated version ${generatedVersion}."
+            echo "::error file=${unityAnalyzer}::Tracked analyzer version ${expectedVersion} differs from the generated version ${generatedVersion}. Run PublishUnityAnalyzer and commit the regenerated DLL."
+            exit 1
+          fi
+          if [ -n "$BASE_ANALYZER_VERSION" ] && [ "$BASE_ANALYZER_VERSION" = "$generatedVersion" ]; then
+            echo "::error file=${unityAnalyzer}::Analyzer inputs changed but the generated version did not change from the base version."
             exit 1
           fi
           echo "Tracked and generated analyzer versions match: $generatedVersion."

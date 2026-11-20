@@ -1,5 +1,45 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+    <UsingTask TaskName="ComputeAnalyzerFingerprint"
+               TaskFactory="RoslynCodeTaskFactory"
+               AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+        <ParameterGroup>
+            <Files ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+            <Fingerprint ParameterType="System.String" Output="true" />
+        </ParameterGroup>
+        <Task>
+            <Using Namespace="System" />
+            <Using Namespace="System.IO" />
+            <Using Namespace="System.Linq" />
+            <Using Namespace="System.Security.Cryptography" />
+            <Using Namespace="System.Text" />
+            <Code Type="Fragment" Language="cs"><![CDATA[
+                using (var stream = new MemoryStream())
+                {
+                    foreach (var file in Files.OrderBy(file => file.GetMetadata("FingerprintPath"), StringComparer.Ordinal))
+                    {
+                        var stablePath = file.GetMetadata("FingerprintPath").Replace('\\', '/');
+                        var path = Encoding.UTF8.GetBytes(stablePath);
+                        stream.Write(path, 0, path.Length);
+                        stream.WriteByte(0);
+
+                        var contents = File.ReadAllBytes(file.ItemSpec);
+                        stream.Write(contents, 0, contents.Length);
+                        stream.WriteByte(0);
+                    }
+
+                    using (var hash = SHA256.Create())
+                    {
+                        Fingerprint = BitConverter.ToString(hash.ComputeHash(stream.ToArray()))
+                            .Replace("-", string.Empty)
+                            .Substring(0, 12)
+                            .ToLowerInvariant();
+                    }
+                }
+            ]]></Code>
+        </Task>
+    </UsingTask>
+
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
         <LangVersion>12</LangVersion>
@@ -11,8 +51,8 @@
         <NoWarn>RS2008</NoWarn>
         <PackageScribanIncludeSource>true</PackageScribanIncludeSource>
         <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-        <!-- Bump this when analyzer inputs change; CI verifies it against the tracked DLL. -->
-        <InformationalVersion>1.0.1+bliss-analyzer</InformationalVersion>
+        <!-- Manually raise this semantic version for significant analyzer changes. -->
+        <AnalyzerSemanticVersion>1.0.1</AnalyzerSemanticVersion>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -58,7 +98,42 @@
             <Link>AnalyzerAttribute/%(RecursiveDir)%(FileName)%(Extension)</Link>
         </Compile>
     </ItemGroup>
-    
+
+    <Target Name="ComputeAnalyzerInformationalVersion" BeforeTargets="GetAssemblyAttributes">
+        <ItemGroup>
+            <AnalyzerVersionInput Include="$(MSBuildProjectFullPath)">
+                <FingerprintPath>Bliss.ProjectRule.csproj</FingerprintPath>
+            </AnalyzerVersionInput>
+            <AnalyzerVersionInput Include="$(MSBuildProjectDirectory)/**/*.cs"
+                                  Exclude="$(MSBuildProjectDirectory)/obj/**/*.cs;$(MSBuildProjectDirectory)/bin/**/*.cs">
+                <FingerprintPath>%(RecursiveDir)%(Filename)%(Extension)</FingerprintPath>
+            </AnalyzerVersionInput>
+            <AnalyzerVersionInput Include="$(MSBuildProjectDirectory)/**/*.editorconfig;$(MSBuildProjectDirectory)/**/*.resx;$(MSBuildProjectDirectory)/**/*.sbn;$(MSBuildProjectDirectory)/**/*.props;$(MSBuildProjectDirectory)/**/*.targets"
+                                  Exclude="$(MSBuildProjectDirectory)/obj/**/*;$(MSBuildProjectDirectory)/bin/**/*">
+                <FingerprintPath>%(RecursiveDir)%(Filename)%(Extension)</FingerprintPath>
+            </AnalyzerVersionInput>
+            <AnalyzerVersionInput Include="../../Unity/Assets/Scripts/Base/Helpers/HashCodeHelper.cs">
+                <FingerprintPath>Unity/Assets/Scripts/Base/Helpers/HashCodeHelper.cs</FingerprintPath>
+            </AnalyzerVersionInput>
+            <AnalyzerVersionInput Include="../../Unity/Assets/Scripts/Base/Analyzer/**/*.cs">
+                <FingerprintPath>Unity/Assets/Scripts/Base/Analyzer/%(RecursiveDir)%(Filename)%(Extension)</FingerprintPath>
+            </AnalyzerVersionInput>
+            <AnalyzerVersionInput Include="../../Unity/Assets/Scripts/Core/AnalyzerAttribute/**/*.cs">
+                <FingerprintPath>Unity/Assets/Scripts/Core/AnalyzerAttribute/%(RecursiveDir)%(Filename)%(Extension)</FingerprintPath>
+            </AnalyzerVersionInput>
+            <AnalyzerVersionInput Include="../../Unity/Assets/Scripts/Core/Entity/EntitySystems/IEntitySystemConstraint.cs">
+                <FingerprintPath>Unity/Assets/Scripts/Core/Entity/EntitySystems/IEntitySystemConstraint.cs</FingerprintPath>
+            </AnalyzerVersionInput>
+        </ItemGroup>
+        <ComputeAnalyzerFingerprint Files="@(AnalyzerVersionInput)">
+            <Output TaskParameter="Fingerprint" PropertyName="_AnalyzerVersionFingerprint" />
+        </ComputeAnalyzerFingerprint>
+        <PropertyGroup>
+            <InformationalVersion>$(AnalyzerSemanticVersion)+bliss.$(_AnalyzerVersionFingerprint)</InformationalVersion>
+        </PropertyGroup>
+        <Message Text="Analyzer informational version: $(InformationalVersion)" Importance="High" />
+    </Target>
+
     <Target Name="PublishUnityAnalyzer" DependsOnTargets="Build">
         <Error Condition="'$(Configuration)' != 'Release'" Text="PublishUnityAnalyzer requires Configuration=Release." />
         <Message Text="Copy $(TargetPath) -> $(ProjectDir)../../Unity/Assets/CodeAnalyzer/$(TargetName).dll" Importance="High" />
