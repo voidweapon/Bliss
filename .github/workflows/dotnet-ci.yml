@@ -1,0 +1,52 @@
+name: .NET CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: dotnet-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: .NET build and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build server solution
+        id: build
+        run: dotnet build Server/Server.sln --configuration Debug
+
+      - name: Test analyzer
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: dotnet test Bliss.ProjectRule/Bliss.ProjectRule.Test/Bliss.ProjectRule.Test.csproj --configuration Debug --logger "trx;LogFileName=analyzer.trx" --results-directory "${{ runner.temp }}/test-results/analyzer"
+
+      - name: Test unit
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: dotnet test Bliss.UnitTest/Bliss.UnitTest/Bliss.UnitTest.csproj --configuration Debug --logger "trx;LogFileName=unit.trx" --results-directory "${{ runner.temp }}/test-results/unit"
+
+      - name: Test gameplay integration
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: dotnet test Bliss.UnitTest/Bliss.GameplayIntegrationTest/Bliss.GameplayIntegrationTest.csproj --configuration Debug --logger "trx;LogFileName=gameplay-integration.trx" --results-directory "${{ runner.temp }}/test-results/gameplay-integration"
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-test-results
+          path: ${{ runner.temp }}/test-results/**/*.trx
+          if-no-files-found: ignore
+          retention-days: 7
