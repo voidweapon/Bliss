@@ -37,6 +37,8 @@
 
 本阶段方案已通过讨论确认，尚未实施。它扩展第一阶段的 EditMode 环境，不改变共享代码由 `Bliss.UnitTest/` 覆盖的边界。
 
+Server 进程内业务集成测试和 .NET 驱动的 Server 端到端测试另见 [Server 测试环境计划](Bliss.ServerTestEnvironmentPlan.md)；两类测试与 Unity 客户端联调互为补充，不相互替代。
+
 ### 测试组织与范围
 
 - 保留 Editor-only 的 `Bliss.UnityTests` 供 EditMode 测试使用；新增独立 PlayMode 测试程序集，避免混合两种测试模式。
