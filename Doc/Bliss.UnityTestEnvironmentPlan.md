@@ -35,7 +35,7 @@
 
 ## 后续阶段：客户端 PlayMode 与 Server 联调
 
-本阶段方案已通过讨论确认，尚未实施。它扩展第一阶段的 EditMode 环境，不改变共享代码由 `Bliss.UnitTest/` 覆盖的边界。
+本阶段方案已通过讨论确认。客户端协议模拟组已实现；生产启动与真实 Server 联调及完整入口仍属后续工作。它扩展第一阶段的 EditMode 环境，不改变共享代码由 `Bliss.UnitTest/` 覆盖的边界。
 
 Server 进程内业务集成测试和 .NET 驱动的 Server 端到端测试另见 [Server 测试环境计划](Bliss.ServerTestEnvironmentPlan.md)；两类测试与 Unity 客户端联调互为补充，不相互替代。
 
@@ -48,6 +48,28 @@ Server 进程内业务集成测试和 .NET 驱动的 Server 端到端测试另�
 - 两组各自独占客户端 World 生命周期，确保只有对应驱动器更新 World；结束时释放各自的 Session、网络线程和测试创建的对象。遇到已有不兼容的活动 World 时明确失败，不接管或销毁它。
 - 当前客户端 Realm 地址与 Server 配置使用固定 loopback 端口。测试运行前检查所需端口；冲突时明确失败且不终止占用端口的其他进程。fake 与真实 Server 使用相同 Realm 端口，因此测试组必须串行执行，暂不支持同机并行运行。
 - 当前 Server 登录流程不校验账号密码，Gate 按账号在进程内存中创建玩家。真实 Server 测试使用每次运行生成的合成账号，不使用真实用户凭据。正式认证、账号注册或持久化登录流程实现后，重新设计测试账号准备、清理及成功/拒绝场景。
+
+### 客户端协议模拟组运行方式
+
+使用 Python 3.8 及以上版本，并显式指定与 `Unity/ProjectSettings/ProjectVersion.txt` 一致的 Unity Editor **可执行文件**。不自动安装 Editor 或激活许可证：
+
+```bash
+# macOS
+python3 Unity/Tests/run_protocol_playmode_tests.py --editor "/Applications/Unity/Hub/Editor/6000.3.6f1/Unity.app/Contents/MacOS/Unity"
+```
+
+```powershell
+# Windows
+py -3 Unity/Tests/run_protocol_playmode_tests.py --editor "C:\Program Files\Unity\Hub\Editor\6000.3.6f1\Editor\Unity.exe"
+```
+
+路径仅为示例，应替换为本机安装位置；`--timeout` 可指定测试超时秒数，默认 300 秒。入口先校验 Editor 版本、独占运行锁和 Realm UDP `127.0.0.1:30300`，再以 PlayMode 运行 `ProtocolLoginTests`。端口预检后仍可能发生占用竞争，fake 的实际绑定也会报告失败。不要同时运行真实 Server、另一组协议测试或打开同一工程的其他 Editor；脚本不会关闭它们。
+
+每次运行先清除本组旧结果，输出 `Unity/TestResults/ProtocolPlayMode/results.xml` 和 `editor.log`，该目录不纳入 Git。命令要求 Editor 退出成功，且报告包含所有必需测试、全部通过，缺少结果、跳过、失败、启动失败或超时均返回非零。并发入口无法获得锁时直接失败，不覆盖正在运行的结果。Editor Test Runner 中可在 PlayMode 选择 `Bliss.ProtocolPlayModeTests` 或 `ProtocolLoginTests` 调试；手动运行同样要求端口空闲、没有活动的生产 World。
+
+本组通过 `UdpNetDriver` fake Realm/Gate 和真实客户端 `LoginHelper`、Session、UDP/KCP 网络路径执行登录成功与 Gate 拒绝，不启动生产 `Init` 或真实 Server；另验证已有 World 和端口占用保护，以及登录后 Session 和网络线程释放。测试固定串行，独占测试 World，由测试协程推进。为避开本机 Unity 6000.3.6f1 的 Burst 编译器原生崩溃，命令入口使用 `--burst-disable-compilation`；本组不验证 Burst 编译行为。
+
+**实际验证（2026-11-23）**：macOS arm64 使用 Unity 6000.3.6f1 和当前机器已有许可证，协议组及完整 PlayMode 均为 6 项通过，完整 EditMode 15 项通过；首次尝试未正确禁用 Burst 时 Editor 发生 SIGSEGV，日志定位到 Burst 编译线程，使用正确的双连字符参数后运行通过。Python 运行器测试 7 项通过。当前执行环境为 macOS，无法实际运行 Windows 命令；Windows Editor、许可证和运行结果均尚待在 Windows 机器上验证，不能将 macOS 结果视作 Windows 验收。
 
 ### 本地运行与进程生命周期
 

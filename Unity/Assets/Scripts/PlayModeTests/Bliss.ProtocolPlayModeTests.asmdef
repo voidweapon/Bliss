@@ -1,0 +1,14 @@
+{
+    "name": "Bliss.ProtocolPlayModeTests",
+    "references": [
+        "Bliss.Base",
+        "Bliss.Core",
+        "Bliss.Model",
+        "Bliss.Logic",
+        "Bliss.ThirdParty",
+        "Bliss.Unity"
+    ],
+    "includePlatforms": [],
+    "optionalUnityReferences": ["TestAssemblies"],
+    "autoReferenced": false
+}

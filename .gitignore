@@ -93,6 +93,7 @@ crashlytics-build.properties
 /Unity/ScenePhysicalData
 /Unity/Unity_BurstDebugInformation_DoNotShip
 /Unity/Logs
+/Unity/TestResults
 /Unity/*.csproj
 /Unity/*.unityproj
 /Unity/*.sln
