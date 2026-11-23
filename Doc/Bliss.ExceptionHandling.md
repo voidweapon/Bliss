@@ -188,9 +188,46 @@ public async Task<string> ReadAsync(string path)
 
 **R20 · MUST** 捕获可取消异步操作的基类 `OperationCanceledException`，而非只捕获派生的 `TaskCanceledException`。
 
-**R21 · MUST** 取消是正常取消语义，不记为 Error，不转换成业务失败。需要继续传播时使用 `throw;`。
+**R21 · MUST** 已确认的请求取消按取消语义处理，不记为 Error，也不转换成业务失败。需要继续传播时使用 `throw;`；明确负责停机的边界可以完成约定的停机流程。未确认原因的取消异常应继续传播。
 
 **R22 · SHOULD** 异步任务或 `Task.WhenAll` 中保留每个子任务异常的诊断栈；聚合或转换异常时保留原始异常、内部异常或适用的 `AggregateException`。
+
+### 协作式取消
+
+取消是请求，不是强制终止：操作必须自行观察取消信号或将令牌传给支持取消的操作。
+
+**R22.1 · MUST** 接收 `CancellationToken` 的方法必须实际使用它：在适当的安全点调用 `ThrowIfCancellationRequested()`，或传给下层可取消 API。长时间执行的循环应在适当间隔检查，而不是只在开始时检查。
+
+**R22.2 · MUST** 在调用链中向支持取消的下层 API 传递适用令牌；需要组合停机和超时时使用链接令牌，不要无意丢弃调用方的取消请求。
+
+```csharp
+using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+timeout.CancelAfter(TimeSpan.FromSeconds(5));
+await service.ProcessAsync(items, timeout.Token);
+```
+
+**R22.3 · NEVER** 捕获取消异常后静默返回正常成功结果。向调用方传播取消，或在明确负责停机的边界按约定退出。
+
+**R22.4 · MUST** 当外部停机与单次超时需要不同行为时，使用 `when` 过滤器检查异常关联的令牌及相应取消源，区分取消原因；未能确认原因时传播异常。超时是否重试、记录或返回失败取决于调用方契约，不得一律当作停机或成功。
+
+```csharp
+catch (OperationCanceledException ex) when (ex.CancellationToken == timeout.Token && stoppingToken.IsCancellationRequested)
+{
+    break; // 当前循环负责处理停机
+}
+catch (OperationCanceledException ex) when (ex.CancellationToken == timeout.Token && timeout.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
+{
+    _logger.LogWarning("本轮超时，继续下一轮");
+}
+```
+
+上述示例仅适用于被调用方以链接令牌报告取消、且契约允许超时后继续下一轮的循环。检查到多个令牌同时取消时优先处理停机；并发状态可能在过滤器检查后变化，循环仍须再次检查停机信号。若被调用方报告其他令牌或不提供令牌，按其契约识别原因，无法确认时传播异常。
+
+**R22.5 · MUST** 由创建者负责释放 `CancellationTokenSource`；使用 `using` 或明确的生命周期管理，并确保消费者不再访问它、回调执行完毕后再释放。不要在相关操作仍在使用时重置或复用取消源；重试通常创建新的取消源。
+
+**R22.6 · SHOULD** 使用 `CancelAfter` 或 `CreateLinkedTokenSource` 实现超时及组合取消源，避免手写计时器和布尔标志。
+
+**R22.7 · NEVER** 使用 `Thread.Abort`、`Task.Dispose` 或仅依赖 `Task.Run(..., token)` 强制终止已运行任务。传给 `Task.Run` 的令牌本身不会中断已启动的委托；委托必须自行观察或向下传递令牌。
 
 ## 6. 状态与副作用
 
@@ -265,6 +302,10 @@ catch
 | `finally { throw ...; }` | R16 | 移除异常抛出或保留原异常 |
 | 用异常控制 `int.Parse` 正常流程 | R10/R13 | 使用 `int.TryParse` |
 | 自定义异常只提供消息构造函数 | R26 | 补全三个构造函数 |
+| 接收令牌后不检查也不传递 | R22.1/R22.2 | 在安全点检查，或传给下层可取消操作 |
+| 捕获取消后静默返回默认值 | R22.3 | 传播取消或按约定完成停机 |
+| 混淆停机与单次超时 | R22.4 | 按令牌状态区分；原因不明时传播 |
+| 用 `Thread.Abort`、`Task.Dispose` 强制取消任务 | R22.7 | 使用协作式取消 |
 
 ## 12. 提交前自检
 
@@ -281,6 +322,8 @@ Agent 在提交或报告完成异常相关改动前逐项确认：
 9. 部分成功操作已回滚或具备事务边界。
 10. 异常消息和日志未包含敏感信息。
 11. 编译通过，相关回归测试和公开 API 注释已同步更新。
+12. 本次新增或修改的令牌被实际使用，并传递给适用的下层可取消操作；取消源在消费者结束后释放。
+13. 本次新增或修改的取消处理不把取消伪装成成功；需要区分停机与超时的路径已验证不同原因及竞态。
 
 若无法确认某处是否该捕获，默认让异常传播，并说明判断依据。不要为了消除编译或诊断告警而扩大捕获范围或吞掉异常。
 
