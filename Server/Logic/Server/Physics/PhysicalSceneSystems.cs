@@ -1348,9 +1348,20 @@ public static unsafe partial class PhysicalSceneSystems
     
     private static GameplayCollider __CreateGameplayCollider(this PhysicalScene self, Entity entity, PxShape* shape, bool isTrigger)
     {
+        if (shape == null)
+        {
+            throw new ArgumentNullException(nameof(shape));
+        }
+
         GameplayCollider gameplayCollider = null!;
         var pxGeometry = shape->GetGeometry();
-        if ((PxSphereGeometry*)pxGeometry != null)
+        if (pxGeometry == null)
+        {
+            throw new InvalidOperationException("The PhysX shape has no geometry.");
+        }
+
+        var geometryType = PxGeometry_getType(pxGeometry);
+        if (geometryType == PxGeometryType.Sphere)
         {
             gameplayCollider = entity.AddChild<GameplaySphereCollider, SphereColliderInitParams>(new SphereColliderInitParams()
             {
@@ -1361,7 +1372,7 @@ public static unsafe partial class PhysicalSceneSystems
             });
         }
 
-        if ((PxBoxGeometry*)pxGeometry != null)
+        else if (geometryType == PxGeometryType.Box)
         {
             gameplayCollider = entity.AddChild<GameplayBoxCollider, BoxColliderInitParams>(new BoxColliderInitParams()
             {
@@ -1372,7 +1383,7 @@ public static unsafe partial class PhysicalSceneSystems
             });
         }
         
-        if ((PxCapsuleGeometry*)pxGeometry != null)
+        else if (geometryType == PxGeometryType.Capsule)
         {
             var capsuleGeometry = (PxCapsuleGeometry*)pxGeometry;
             gameplayCollider =   entity.AddChild<GameplayCapsuleCollider, CapsuleColliderInitParams>(new CapsuleColliderInitParams()
@@ -1386,18 +1397,17 @@ public static unsafe partial class PhysicalSceneSystems
             });
         }
 
-        if ((PxConvexMeshGeometry*)pxGeometry != null || (PxTriangleMeshGeometry*)pxGeometry != null)
+        else if (geometryType == PxGeometryType.Convexmesh || geometryType == PxGeometryType.Trianglemesh)
         {
-            var convexMeshGeometry = (PxConvexMeshGeometry*)pxGeometry;
             gameplayCollider = entity.AddChild<GameplayMeshCollider, GameplayMeshColliderInitParams>(new GameplayMeshColliderInitParams()
             {
                 PxShape = shape,
                 IsTrigger = isTrigger,
-                Convex = convexMeshGeometry != null,
+                Convex = geometryType == PxGeometryType.Convexmesh,
             });
         }
 
-        if ((PxHeightFieldGeometry*)pxGeometry != null)
+        else if (geometryType == PxGeometryType.Heightfield)
         {
             gameplayCollider = entity.AddChild<GameplayHeightFieldCollider, GameplayHeightFieldColliderInitParams>(new GameplayHeightFieldColliderInitParams()
             {
@@ -1412,6 +1422,6 @@ public static unsafe partial class PhysicalSceneSystems
             return gameplayCollider;
         }
         
-        throw new NotImplementedException("Unsupported geometry type");
+        throw new NotSupportedException($"Unsupported geometry type: {geometryType}");
     }
 }

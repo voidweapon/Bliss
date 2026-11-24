@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using Bliss;
 using Bliss.CharacterControllers;
 using Bliss.CharacterMovement;
@@ -10,6 +11,7 @@ using Bliss.Server;
 using Bliss.Timer;
 using ET;
 using MagicPhysX;
+using MemoryPack;
 using NUnit.Framework;
 using Unity.Mathematics;
 using static MagicPhysX.NativeMethods;
@@ -1031,6 +1033,151 @@ public class MoverIntegrationTests
         finally
         {
             GameplayPhysics.GameplayPhysicsHandler = previousPhysics;
+        }
+    }
+
+    /// <summary>The real DemoScene loads its triangle mesh as a non-convex gameplay collider.</summary>
+    [Test]
+    public void DemoScenePhysicalDataCreatesTriangleMeshCollider()
+    {
+        PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+        PhysicalScene physicalScene = this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+        ILogger previousLogger = Log.Logger;
+
+        try
+        {
+            Log.Logger = new RecordingLogger();
+            physicalScene.LoadActorFromMemoryPackFile("DemoScene");
+
+            Assert.That(physicalScene.ColliderDict.Values.OfType<GameplayMeshCollider>()
+                .Any(collider => !collider.Convex), Is.True);
+        }
+        finally
+        {
+            Log.Logger = previousLogger;
+        }
+    }
+
+    /// <summary>Each supported PhysX geometry creates exactly one matching gameplay collider.</summary>
+    [Test]
+    public unsafe void PhysicalSceneCreatesMatchingCollidersForSupportedGeometries()
+    {
+        PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+        PhysicalScene physicalScene = this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+        float3[] vertices =
+        {
+            new(0, 0, 0), new(1, 0, 0), new(0, 1, 0), new(0, 0, 1),
+        };
+        int[] triangles = { 0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3 };
+        List<PhysicalShapeConfig> shapes = new()
+        {
+            new BoxColliderConfig { HalfExtents = new float3(1) },
+            new SphereColliderConfig { Radius = 1 },
+            new CapsuleColliderConfig { Radius = 1, Height = 2 },
+            new MeshColliderConfig { IsConvex = true, Vertices = vertices, Triangles = triangles },
+            new MeshColliderConfig { IsConvex = false, Vertices = vertices, Triangles = triangles },
+            new HeightFieldConfig { Width = 2, Height = 2, Heights = new short[4] },
+        };
+        foreach (PhysicalShapeConfig shape in shapes)
+        {
+            shape.Name = shape.GetType().Name;
+            shape.Tag = string.Empty;
+            shape.Rotation = quaternion.identity;
+            shape.Scale = new float3(1);
+            shape.ContactOffset = 0.02f;
+            shape.MaterialId = 1;
+        }
+
+        PhysicalSceneConfig config = new()
+        {
+            Materials = new List<PhysicMaterialConfig>
+            {
+                new() { InstanceId = 1, StaticFriction = 0.5f, DynamicFriction = 0.5f },
+            },
+            Actors = new List<PhysicalRigidActorConfig>
+            {
+                new() { Name = "GeometryTest", Rotation = quaternion.identity, IsStatic = true, Shapes = shapes },
+            },
+        };
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"BlissGeometryTest-{Guid.NewGuid():N}");
+        string serverDirectory = Path.Combine(temporaryRoot, "Server");
+        string sceneDirectory = Path.Combine(temporaryRoot, "ServerRes", "ScenePhysicals");
+        string previousWorkingDirectory = Directory.GetCurrentDirectory();
+        ILogger previousLogger = Log.Logger;
+        Exception? failure = null;
+        bool temporaryRootCreated = false;
+        try
+        {
+            Directory.CreateDirectory(temporaryRoot);
+            temporaryRootCreated = true;
+            Directory.CreateDirectory(serverDirectory);
+            Directory.CreateDirectory(sceneDirectory);
+            File.WriteAllBytes(Path.Combine(sceneDirectory, "GeometryTest.dat"), MemoryPackSerializer.Serialize(config));
+            Directory.SetCurrentDirectory(serverDirectory);
+            Log.Logger = new RecordingLogger();
+            physicalScene.LoadActorFromMemoryPackFile("GeometryTest");
+        }
+        catch (Exception exception)
+        {
+            failure = exception;
+        }
+        finally
+        {
+            Log.Logger = previousLogger;
+            try
+            {
+                Directory.SetCurrentDirectory(previousWorkingDirectory);
+            }
+            catch (Exception exception)
+            {
+                failure = failure == null ? exception : new AggregateException(failure, exception);
+            }
+
+            if (temporaryRootCreated)
+            {
+                try
+                {
+                    Directory.Delete(temporaryRoot, true);
+                }
+                catch (Exception exception)
+                {
+                    failure = failure == null ? exception : new AggregateException(failure, exception);
+                }
+            }
+        }
+
+        if (failure != null)
+        {
+            ExceptionDispatchInfo.Capture(failure).Throw();
+        }
+
+        List<GameplayCollider> colliders = physicalScene.ColliderDict.Values;
+        Assert.That(colliders.Select(collider => collider.GetType()), Is.EquivalentTo(new[]
+        {
+            typeof(GameplayBoxCollider), typeof(GameplaySphereCollider), typeof(GameplayCapsuleCollider),
+            typeof(GameplayMeshCollider), typeof(GameplayMeshCollider), typeof(GameplayHeightFieldCollider),
+        }));
+        Assert.That(colliders[0].Parent.Children.Values.OfType<GameplayCollider>().Count(), Is.EqualTo(shapes.Count));
+        Assert.That(colliders.OfType<GameplayMeshCollider>().Count(collider => collider.Convex), Is.EqualTo(1));
+        Assert.That(colliders.OfType<GameplayMeshCollider>().Count(collider => !collider.Convex), Is.EqualTo(1));
+        foreach (GameplayCollider collider in colliders)
+        {
+            PxGeometryType geometryType = PxGeometry_getType(collider.ShapePtr->GetGeometry());
+            Type expectedType = geometryType switch
+            {
+                PxGeometryType.Box => typeof(GameplayBoxCollider),
+                PxGeometryType.Sphere => typeof(GameplaySphereCollider),
+                PxGeometryType.Capsule => typeof(GameplayCapsuleCollider),
+                PxGeometryType.Convexmesh => typeof(GameplayMeshCollider),
+                PxGeometryType.Trianglemesh => typeof(GameplayMeshCollider),
+                PxGeometryType.Heightfield => typeof(GameplayHeightFieldCollider),
+                _ => throw new AssertionException($"Unexpected geometry type: {geometryType}"),
+            };
+            Assert.That(collider, Is.TypeOf(expectedType));
+            if (collider is GameplayMeshCollider meshCollider)
+            {
+                Assert.That(meshCollider.Convex, Is.EqualTo(geometryType == PxGeometryType.Convexmesh));
+            }
         }
     }
 
