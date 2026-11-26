@@ -49,7 +49,7 @@ Unity 与 Server 的新增、修改及审查代码统一遵循仓库根目录 `C
 
 ### 会话复盘与后续工作
 
-继续本轮复盘提出的开发环境改进时，先阅读 `Doc/Bliss.AgentSessionRetrospective.2026-11-20.md`；其中区分已完成工作、候选改进和后续验收条件。
+继续会话复盘提出的开发环境改进时，先阅读对应复盘：`Doc/Bliss.AgentSessionRetrospective.2026-11-20.md` 或 `Doc/Bliss.AgentSessionRetrospective.2026-11-27.md`；其中区分已完成工作、候选改进和后续验收条件。
 
 ### 工作区代码审查
 
