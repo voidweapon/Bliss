@@ -1,6 +1,7 @@
 using System;
 using Bliss.CharacterMovement;
 using Bliss.Core;
+using Bliss.Physics;
 using Unity.Mathematics;
 
 namespace Bliss
@@ -15,6 +16,13 @@ namespace Bliss
         
         private static void AfterSceneInit(this MovablePlatform self)
         {
+            var physicalData = self.SceneActorCmpConfig.PhysicalData;
+            if(physicalData != null)
+            {
+                var physicalScene = self.Scene().GetComponent<PhysicalScene>();
+                physicalScene.CreatePhysicalComponent(self.Parent, physicalData);
+            }
+            
             var mover = self.Parent.AddComponent<KinematicRigidbodyMover>();
             var moverController = new MovablePlatformMoverController();
             moverController.SetMovablePlatform(self);

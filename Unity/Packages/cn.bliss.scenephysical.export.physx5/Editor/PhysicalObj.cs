@@ -10,6 +10,7 @@ namespace ScenePhysicalExport
     [MemoryPackUnion(3, typeof(MeshColliderConfig))]
     [MemoryPackUnion(4, typeof(HeightFieldConfig))]
     [MemoryPackable(GenerateType.NoGenerate)]
+    [System.Serializable]
     public abstract partial class PhysicalShapeConfig
     {
         public float3 Location;
@@ -28,25 +29,31 @@ namespace ScenePhysicalExport
     
     
     [MemoryPackable(GenerateType.Object)]
+    [System.Serializable]
     public sealed partial class BoxColliderConfig : PhysicalShapeConfig
     {
         public float3 HalfExtents;
     }
     
     [MemoryPackable(GenerateType.Object)]
+    [System.Serializable]
     public sealed partial class SphereColliderConfig : PhysicalShapeConfig
     {
         public float Radius;
     }
     
     [MemoryPackable(GenerateType.Object)]
+    [System.Serializable]
     public sealed partial class CapsuleColliderConfig : PhysicalShapeConfig
     {
         public float Radius;
         public float Height;
+        public int Direction; // 0: X, 1: Y, 2: Z
+        
     }
     
     [MemoryPackable(GenerateType.Object)]
+    [System.Serializable]
     public sealed partial class MeshColliderConfig : PhysicalShapeConfig
     {
         public bool IsConvex;
@@ -56,6 +63,7 @@ namespace ScenePhysicalExport
     
         
     [MemoryPackable(GenerateType.Object)]
+    [System.Serializable]
     public sealed partial class HeightFieldConfig : PhysicalShapeConfig
     {
         public int Width;
@@ -75,12 +83,15 @@ namespace ScenePhysicalExport
     }
 
     [MemoryPackable(GenerateType.Object)]
+    [System.Serializable]
     public sealed partial class PhysicalRigidActorConfig
     {
         public string Name;
         public float3 Location;
         public quaternion Rotation;
         public bool IsStatic;
+        public bool IsKinematic;
+        public bool UseGravity;
         public List<PhysicalShapeConfig> Shapes;
     }
     

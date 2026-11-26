@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Unity.Mathematics;
 
 namespace Bliss
 {
@@ -25,4 +26,15 @@ namespace Bliss
         public GameplayMeshCollider Collider;
     }
     
+    public static class MeshColliderInitParamsHelper
+    {
+        public static GameplayMeshColliderInitParams ToParam(this MeshColliderConfig config)
+        {
+            return new GameplayMeshColliderInitParams()
+            {
+                Convex = config.IsConvex,
+                IsTrigger = false
+            };
+        }
+    }
 }

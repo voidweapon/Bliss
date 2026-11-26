@@ -21,6 +21,7 @@ namespace Bliss.EditorTool.LevelEditorTool
         protected override byte[] OnSerialize()
         {
             SetupConfigTransform(out Config.Position, out Config.Rotation, out var _);
+            Config.PhysicalData = LevelEditorHelper.CreatePhysicalConfig(gameObject);
             return Serializer.Serialize(Config);
         }
 

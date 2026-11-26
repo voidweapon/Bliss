@@ -59,6 +59,9 @@ public static unsafe partial class PhysicalSceneSystems
         
         self.ConfigureSimulationEventCallbacks(ref sceneDesc);
         self.ConfigureQueryFilterCallbacks();
+        
+        var defaultPxMaterial = PxPhysics_createMaterial_mut(self.PhysicalWorld.Physics,0.6f, 0.6f, 0f);
+        self.PhysicalWorld.MaterialsRef[0] = (IntPtr)defaultPxMaterial;
     }
 
     /// <summary>
@@ -959,7 +962,7 @@ public static unsafe partial class PhysicalSceneSystems
             var namePtr = Marshal.StringToHGlobalAnsi(actorConfig.Name);
             PxActor_setName_mut((PxActor*)pxRigidBody, (byte*)namePtr);
             PxRigidActor_setGlobalPose_mut((PxRigidActor*)pxRigidBody, &transform, false);
-            var gameplayRigidbody = self.__CreateGameplayRigidbody(pxRigidBody, 0, actorConfig.Location, actorConfig.Rotation, actorConfig.IsStatic, false);
+            var gameplayRigidbody = self.__CreateEntityWithGameplayRigidbody(pxRigidBody, 0, actorConfig.Location, actorConfig.Rotation, actorConfig.IsStatic, false, false);
 
 
             PxShape* shape = null;
@@ -992,7 +995,7 @@ public static unsafe partial class PhysicalSceneSystems
 
                 if (shape != null)
                 {
-                    self.__CreateGameplayCollider(gameplayRigidbody.Parent, shape, shapeConfig.IsTrigger);
+                    self.__AddGameplayColliderToEntity(gameplayRigidbody.Parent, shape, shapeConfig.IsTrigger);
                     PxRigidActor_attachShape_mut((PxRigidActor*)pxRigidBody, shape);
                 }
                 Log.Info($"End Load Shape[{shapeConfig.Name}]");
@@ -1179,12 +1182,15 @@ public static unsafe partial class PhysicalSceneSystems
 
     private static unsafe void SetupPxShape(this PhysicalScene self, PxShape* shape, PhysicalShapeConfig  shapeConfig)
     {
-        var namePtr = Marshal.StringToHGlobalAnsi(shapeConfig.Name);
         var transform = CreatePxTransform(shapeConfig.Location, shapeConfig.Rotation);
         PxShape_setLocalPose_mut(shape, &transform);
-        PxShape_setName_mut(shape,  (byte*)namePtr);
         PxShape_setContactOffset_mut(shape, shapeConfig.ContactOffset);
         SetShapeQueryFilterData(shape, shapeConfig);
+        if(!string.IsNullOrEmpty(shapeConfig.Name))
+        {
+            var namePtr = Marshal.StringToHGlobalAnsi(shapeConfig.Name);
+            PxShape_setName_mut(shape,  (byte*)namePtr);
+        }
     }
     
     private static PxShapeFlags GetShapeFlags(PhysicalShapeConfig collider)
@@ -1223,7 +1229,7 @@ public static unsafe partial class PhysicalSceneSystems
     }
     #endregion
     
-    public static Entity CreateGameplayRigidbodyComponent(this PhysicalScene self,
+    public static Entity CreateEntityWithGameplayRigidbodyComponent(this PhysicalScene self,
         int layer, float3 position, quaternion rotation,
         bool isStatic = false, bool isKinematic = false)
     {
@@ -1238,11 +1244,11 @@ public static unsafe partial class PhysicalSceneSystems
         var transformComponent = entity.AddComponent<TransformComponent>();
         transformComponent.SetPositionAndRotation(position, rotation);
         
-        self.AddGameplayRigidbodyComponent(entity, isStatic, isKinematic);
+        self.AddGameplayRigidbodyComponentToEntity(entity, layer, isStatic, isKinematic);
         return entity;
     }
     
-    public static void AddGameplayRigidbodyComponent(this PhysicalScene self, Entity entity, bool isStatic = false, bool isKinematic = false)
+    public static void AddGameplayRigidbodyComponentToEntity(this PhysicalScene self, Entity entity, int layer, bool isStatic = false, bool isKinematic = false, bool useGravity = false)
     {
         if (isStatic)
         {
@@ -1269,12 +1275,12 @@ public static unsafe partial class PhysicalSceneSystems
         PxRigidActor_setGlobalPose_mut((PxRigidActor*)pxRigidBody, &pxTransform, false);
         PxScene_addActor_mut(self.PxScene, (PxActor*)pxRigidBody, null);
         
-        self.__CreateGameplayRigidbody(pxRigidBody, 0, transform.Location, transform.Rotation, isStatic, isKinematic);
+        self.__AddGameplayRigidbodyToEntity(pxRigidBody, entity, transform.Location, transform.Rotation, isStatic, isKinematic, useGravity);
     }
 
-    public static Entity CreateGameplayBoxCollider(this PhysicalScene self,
+    public static Entity CreateEntityWithGameplayBoxCollider(this PhysicalScene self,
         int layer, float3 position, quaternion rotation,
-        ref BoxColliderInitParams initParams)
+        BoxColliderConfig boxColliderConfig)
     {
         var entity = self.AddChild<Entity>();
         entity.AddComponent<GameplayLayer, int>(layer);
@@ -1282,24 +1288,21 @@ public static unsafe partial class PhysicalSceneSystems
         var transformComponent = entity.AddComponent<TransformComponent>();
         transformComponent.SetPositionAndRotation(position, rotation);
         
-        self.AddGameplayBoxCollider(entity, layer, ref initParams);
+        self.AddGameplayBoxColliderToEntity(entity, layer, boxColliderConfig, false);
         return entity;
     }
 
-    public static void AddGameplayBoxCollider(this PhysicalScene self, Entity entity, int layer, ref BoxColliderInitParams initParams)
+    public static void AddGameplayBoxColliderToEntity(this PhysicalScene self, Entity entity, int layer, BoxColliderConfig boxColliderConfig, bool autoAttachToRigidbody)
     {
-        var halfExtents = initParams.Size / 2.0f;
-        var transform = CreatePxTransform(float3.zero, quaternion.identity);
-        PxBoxGeometry boxGeometry = PxBoxGeometry_new_1(halfExtents.ToPxVec3());
-        PxShapeFlags shapeFlags = GetShapeFlags(initParams.IsTrigger);
+        var shapePtr= self.CreateBoxCollider(self.PhysicalWorld.Physics, boxColliderConfig);
         
-        var shape = PxPhysics_createShape_mut(self.PhysicalWorld.Physics, (PxGeometry*)&boxGeometry, null, false, shapeFlags);
-        PxShape_setLocalPose_mut(shape, &transform);
-        PxShape_setContactOffset_mut(shape, 0);
-        SetShapeQueryFilterData(shape, layer, initParams.IsTrigger);
-
-        initParams.PxShape = shape;
-        self.__CreateGameplayCollider(entity, shape, initParams.IsTrigger);
+        self.__AddGameplayColliderToEntity(entity, shapePtr, boxColliderConfig.IsTrigger);
+        
+        if (autoAttachToRigidbody)
+        {
+            var gameplayRigidbody = entity.GetComponent<GameplayRigidbody>();
+            PxRigidActor_attachShape_mut((PxRigidActor*)gameplayRigidbody.RigidBodyPtr, shapePtr);
+        }
     }
     
 
@@ -1326,27 +1329,41 @@ public static unsafe partial class PhysicalSceneSystems
         return PxTransform_new_5(&pxOrigin, &pxRRotation);
     }
 
-    private static GameplayRigidbody __CreateGameplayRigidbody(this PhysicalScene self, PxRigidBody* actor,
+    private static GameplayRigidbody __CreateEntityWithGameplayRigidbody(this PhysicalScene self, PxRigidBody* actor,
         int layer, float3 position, quaternion rotation,
-        bool isStatic, bool isKinematic)
+        bool isStatic, bool isKinematic, bool useGravity)
     {
         var entity = self.AddChild<SceneActor>();
         entity.AddComponent<GameplayLayer, int>(layer);
         var transform = entity.AddComponent<TransformComponent>();
         transform.SetPositionAndRotation(position, rotation);
         
+        return self.__AddGameplayRigidbodyToEntity(actor, entity, position, rotation, isStatic, isKinematic, useGravity);
+    }
+    
+    private static GameplayRigidbody __AddGameplayRigidbodyToEntity(this PhysicalScene self, PxRigidBody* actor,
+        Entity entity, float3 position, quaternion rotation,
+        bool isStatic, bool isKinematic, bool useGravity)
+    {
         var gameplayRigidbody = entity.AddComponent<GameplayRigidbody, GameplayRigidbodyInitParams>(new GameplayRigidbodyInitParams()
         {
             IsStatic = isStatic,
             IsKinematic = isKinematic,
+            UseGravity = useGravity,
             RigidBodyPtr = actor,
         });
-        self.RigidbodyDict.Add((IntPtr)actor,  gameplayRigidbody);
 
+        self.RigidbodyDict.Add((IntPtr)actor,  gameplayRigidbody);
+        
+        PxVec3 pxOrigin = position.ToPxVec3();
+        PxQuat pxRRotation = rotation.ToPxQuat();
+        var pxTransform = PxTransform_new_5(&pxOrigin, &pxRRotation);
+        PxRigidActor_setGlobalPose_mut((PxRigidActor*)actor, &pxTransform, true);
+        
         return gameplayRigidbody;
     }
     
-    private static GameplayCollider __CreateGameplayCollider(this PhysicalScene self, Entity entity, PxShape* shape, bool isTrigger)
+    private static GameplayCollider __AddGameplayColliderToEntity(this PhysicalScene self, Entity entity, PxShape* shape, bool isTrigger)
     {
         if (shape == null)
         {

@@ -67,4 +67,16 @@ namespace Bliss
         public float Radius;
     }
 
+    public static class SphereColliderInitParamsHelper
+    {
+        public static SphereColliderInitParams ToParam(this SphereColliderConfig config, float3 center)
+        {
+            return new SphereColliderInitParams()
+            {
+                Center = center,
+                Radius = config.Radius,
+                IsTrigger = false
+            };
+        }
+    }
 }

@@ -23,4 +23,16 @@ namespace Bliss
     {
         public GameplayHeightFieldCollider Collider;
     }
+    
+    
+    public static class HeightFieldColliderInitParamsHelper
+    {
+        public static GameplayHeightFieldColliderInitParams ToParam(this HeightFieldConfig config)
+        {
+            return new GameplayHeightFieldColliderInitParams()
+            {
+                EnableTreeCollider = false,
+            };
+        }
+    }
 }

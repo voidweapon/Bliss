@@ -3,8 +3,8 @@ using Unity.Mathematics;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
-namespace Bliss;
-
+namespace Bliss
+{
     [MemoryPackUnion(0, typeof(BoxColliderConfig))]
     [MemoryPackUnion(1, typeof(SphereColliderConfig))]
     [MemoryPackUnion(2, typeof(CapsuleColliderConfig))]
@@ -45,6 +45,7 @@ namespace Bliss;
     {
         public float Radius;
         public float Height;
+        public int Direction; // 0: X, 1: Y, 2: Z
     }
     
     [MemoryPackable(GenerateType.Object)]
@@ -82,6 +83,8 @@ namespace Bliss;
         public float3 Location;
         public quaternion Rotation;
         public bool IsStatic;
+        public bool IsKinematic;
+        public bool UseGravity;
         public List<PhysicalShapeConfig> Shapes;
     }
     
@@ -92,4 +95,5 @@ namespace Bliss;
         public List<PhysicMaterialConfig> Materials;
  
     }
+}
 

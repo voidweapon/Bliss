@@ -115,4 +115,19 @@ namespace Bliss
         public GameplayCapsuleCollider Collider;
         public int Direction;
     }
+    
+    public static class CapsuleColliderInitParamsHelper
+    {
+        public static CapsuleColliderInitParams ToParam(this CapsuleColliderConfig config, float3 center)
+        {
+            return new CapsuleColliderInitParams()
+            {
+                Center = center,
+                Radius = config.Radius,
+                Height = config.Height,
+                Direction = config.Direction,
+                IsTrigger = false
+            };
+        }
+    }
 }

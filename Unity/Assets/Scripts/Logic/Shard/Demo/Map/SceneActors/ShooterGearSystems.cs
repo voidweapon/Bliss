@@ -50,8 +50,8 @@ namespace Bliss
             EventSystem.Instance.Push(self.Scene(), new GameplayEvent_ShootBullet()
             {
                 BulletConfigId = self.SceneActorCmpConfig.BulletConfigId,
-                Caster = self,
-                Shooter = self,
+                Caster = self.Parent,
+                Shooter = self.Parent,
                 Position = transformCmp.Transform.Location,
                 Rotation = transformCmp.Transform.Rotation,
                 TargetInfo = new GameplayTargetInfo()

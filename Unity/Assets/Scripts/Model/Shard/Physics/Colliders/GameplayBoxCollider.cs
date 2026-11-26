@@ -67,4 +67,17 @@ namespace Bliss
         public GameplayBoxCollider Collider;
         public float3 Size;
     }
+
+    public static class BoxColliderInitParamsHelper
+    {
+        public static BoxColliderInitParams ToParam(this BoxColliderConfig config, float3 center)
+        {
+            return new BoxColliderInitParams()
+            {
+                Center = center,
+                Size = config.HalfExtents * 2,
+                IsTrigger = false
+            };
+        }
+    }
 }

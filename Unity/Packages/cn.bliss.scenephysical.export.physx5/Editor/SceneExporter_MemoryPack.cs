@@ -55,15 +55,15 @@ namespace ScenePhysicalExport
                 return false;
             }
         }
-
-        private static unsafe void ExportRootGameObject(PhysicalSceneConfig physicsContext, GameObject go)
+        
+        public static unsafe PhysicalRigidActorConfig ExportGameObjectToPhysicalRigidActorConfig(GameObject go)
         {
             List<PhysicalShapeConfig> shapes = CreatePhysicalShapes(go);
             Rigidbody rigidBody = go.GetComponent<Rigidbody>();
 
             if (shapes.Count == 0 && rigidBody == null)
             {
-                return;
+                return null;
             }
             
             var rigidActorConfig = new PhysicalRigidActorConfig();
@@ -72,6 +72,15 @@ namespace ScenePhysicalExport
             rigidActorConfig.Rotation = go.transform.rotation;
             rigidActorConfig.IsStatic = rigidBody == null;
             rigidActorConfig.Shapes = shapes;
+
+            return rigidActorConfig;
+        }
+
+        private static unsafe void ExportRootGameObject(PhysicalSceneConfig physicsContext, GameObject go)
+        {
+            var rigidActorConfig = ExportGameObjectToPhysicalRigidActorConfig(go);
+            if(rigidActorConfig == null)
+                return;
             
             physicsContext.Actors.Add(rigidActorConfig);
         }
@@ -178,7 +187,6 @@ namespace ScenePhysicalExport
                     {
                         continue;
                     }
-                    
                     shape.Location = rootTransform.InverseTransformPoint(goTransform.TransformPoint(capsuleCollider.center));
                     shape.Rotation = Quaternion.Inverse(rootTransform.rotation) * colliderRotation;
                     //Debug.Log($"CapsuleCollider: {capsuleCollider.name}  location={shape.Location}");
@@ -242,6 +250,8 @@ namespace ScenePhysicalExport
                 rigidActorConfig.Location = go.transform.position;
                 rigidActorConfig.Rotation = go.transform.rotation;
                 rigidActorConfig.IsStatic = goRigidBody == null;
+                rigidActorConfig.IsKinematic = goRigidBody != null && goRigidBody.isKinematic;
+                rigidActorConfig.UseGravity = goRigidBody != null && goRigidBody.useGravity;
                 rigidActorConfig.Shapes = new List<PhysicalShapeConfig>(terrianShapes);
             
                 physicsContext.Actors.Add(rigidActorConfig);
@@ -255,6 +265,8 @@ namespace ScenePhysicalExport
                 rigidActorConfig.Location = go.transform.position;
                 rigidActorConfig.Rotation = go.transform.rotation;
                 rigidActorConfig.IsStatic = goRigidBody == null;
+                rigidActorConfig.IsKinematic = goRigidBody != null && goRigidBody.isKinematic;
+                rigidActorConfig.UseGravity = goRigidBody != null && goRigidBody.useGravity;
                 rigidActorConfig.Shapes = new List<PhysicalShapeConfig>(shapes);
             
                 physicsContext.Actors.Add(rigidActorConfig);
@@ -457,6 +469,8 @@ namespace ScenePhysicalExport
             {
                 Radius = radius,
                 Height = height,
+                //Direction = capsuleCollider.direction
+                Direction = 0, //Direction保持为0, 由旋转矩阵来确定方向
             };
             
             SetupColliderConfig(capsuleConfig, capsuleCollider);

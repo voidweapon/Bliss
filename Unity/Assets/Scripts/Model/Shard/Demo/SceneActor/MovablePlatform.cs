@@ -17,5 +17,6 @@ namespace Bliss
         public float3 Point2;
         public bool InitialDirection;
         public float Speed;
+        public PhysicalRigidActorConfig PhysicalData;
     }
 }

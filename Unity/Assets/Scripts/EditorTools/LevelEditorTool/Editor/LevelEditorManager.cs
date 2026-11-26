@@ -116,6 +116,7 @@ namespace Bliss.EditorTool.LevelEditorTool
             
             var data = Serializer.Serialize(sceneSetting);
             File.WriteAllBytes(outputPath, data);
+            Debug.Log($"saved {outputPath}");
             AssetDatabase.Refresh(); 
         }
         
