@@ -104,26 +104,76 @@ namespace Bliss
         }
 
 
-        public async ETTask<int> Create(int id, int zone, ELogicSceneType sceneType, string name)
+        /// <summary>Creates and initializes a Root without a Server initialization gate.</summary>
+        /// <param name="id">The Root identifier.</param>
+        /// <param name="zone">The Root zone.</param>
+        /// <param name="sceneType">The initialization handler's scene type.</param>
+        /// <param name="name">The Root name.</param>
+        /// <returns>The identifier after initialization succeeds.</returns>
+        public ETTask<int> Create(int id, int zone, ELogicSceneType sceneType, string name)
+        {
+            return Create(id, zone, sceneType, name, false);
+        }
+
+        /// <summary>Creates and initializes a Root, optionally gating its Server initialization.</summary>
+        /// <param name="id">The Root identifier.</param>
+        /// <param name="zone">The Root zone.</param>
+        /// <param name="sceneType">The initialization handler's scene type.</param>
+        /// <param name="name">The Root name.</param>
+        /// <param name="useInitializationGate">Whether to mount the initialization gate before invoking the handler.</param>
+        /// <returns>The identifier after initialization succeeds.</returns>
+        public async ETTask<int> Create(int id, int zone, ELogicSceneType sceneType, string name,
+            bool useInitializationGate)
         {
             var root =  new Root(id, zone, sceneType, name);
             _children.Add(id, root);
             _addQueue.Enqueue(id);
             
-            Log.Info($"[{name}][{sceneType}]:Create Scene Id={id} Zone={zone}");
-            await EventSystem.Instance.Invoke<Invoke_RootInit, ETTask>((long)sceneType, new Invoke_RootInit()
+            try
             {
-                Root = root
-            });
+                if (useInitializationGate)
+                {
+                    root.BeginInitialization();
+                }
+
+                Log.Info($"[{name}][{sceneType}]:Create Scene Id={id} Zone={zone}");
+                await EventSystem.Instance.Invoke<Invoke_RootInit, ETTask>((long)sceneType, new Invoke_RootInit()
+                {
+                    Root = root
+                });
+                root.CompleteInitialization();
+            }
+            catch
+            {
+                root.FailInitialization();
+                throw;
+            }
             
             return id;
         }
         
-        public async ETTask<int> Create(int zone, ELogicSceneType sceneType, string name)
+        /// <summary>Creates and initializes a Root with a generated identifier and no Server gate.</summary>
+        /// <param name="zone">The Root zone.</param>
+        /// <param name="sceneType">The initialization handler's scene type.</param>
+        /// <param name="name">The Root name.</param>
+        /// <returns>The identifier after initialization succeeds.</returns>
+        public ETTask<int> Create(int zone, ELogicSceneType sceneType, string name)
+        {
+            return Create(zone, sceneType, name, false);
+        }
+
+        /// <summary>Creates and initializes a Root with a generated identifier.</summary>
+        /// <param name="zone">The Root zone.</param>
+        /// <param name="sceneType">The initialization handler's scene type.</param>
+        /// <param name="name">The Root name.</param>
+        /// <param name="useInitializationGate">Whether to mount the initialization gate before invoking the handler.</param>
+        /// <returns>The identifier after initialization succeeds.</returns>
+        public async ETTask<int> Create(int zone, ELogicSceneType sceneType, string name,
+            bool useInitializationGate)
         {
             int id = ++idGenerator;
   
-            return await Create(id, zone, sceneType, name);
+            return await Create(id, zone, sceneType, name, useInitializationGate);
         }
 
         public void Remove(int id)
@@ -134,7 +184,10 @@ namespace Bliss
             }
         }
 
-        internal Root Get(int id)
+        /// <summary>Finds a registered Root by its identifier.</summary>
+        /// <param name="id">The Root identifier.</param>
+        /// <returns>The registered Root, or null if it is absent.</returns>
+        public Root Get(int id)
         {
             _children.TryGetValue(id, out var root);
             return root;

@@ -1058,6 +1058,26 @@ public class MoverIntegrationTests
         }
     }
 
+    /// <summary>A scene without a physical data file continues without loading actors.</summary>
+    [Test]
+    public void MissingPhysicalDataFileRemainsOptional()
+    {
+        PhysicalWorldComponent physicalWorld = this.root.Scene.AddComponent<PhysicalWorldComponent>();
+        PhysicalScene physicalScene = this.level.AddComponent<PhysicalScene, PhysicalWorldComponent>(physicalWorld);
+        string sceneName = $"MissingPhysicalData-{Guid.NewGuid():N}";
+        ILogger previousLogger = Log.Logger;
+        try
+        {
+            Log.Logger = new RecordingLogger();
+            Assert.DoesNotThrow(() => physicalScene.LoadActorFromMemoryPackFile(sceneName));
+            Assert.That(physicalScene.ColliderDict.Values, Is.Empty);
+        }
+        finally
+        {
+            Log.Logger = previousLogger;
+        }
+    }
+
     /// <summary>Each supported PhysX geometry creates exactly one matching gameplay collider.</summary>
     [Test]
     public unsafe void PhysicalSceneCreatesMatchingCollidersForSupportedGeometries()
@@ -1332,18 +1352,24 @@ public class MoverIntegrationTests
     public void ServerMapInitializationCreatesKinematicManager()
     {
         int mapId = ConfigManager.Instance.Tables.TbLevelConfig.DicSceneId2Level.Keys.First();
-        Root mapRoot = (Root)rootConstructor.Invoke(new object[]
-            { mapId, ROOT_ZONE, ELogicSceneType.Map, nameof(ServerMapInitializationCreatesKinematicManager) });
         int previousLogLevel = Log.LogLevel;
         ILogger previousLogger = Log.Logger;
         RecordingLogger logger = new RecordingLogger();
         ProcessMessageManager messageManager = new ProcessMessageManager();
+        RootManager rootManager = new RootManager();
+        rootManager.Init();
         try
         {
             Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
             Log.Logger = logger;
             registerSingleton.Invoke(messageManager, null);
-            new RootInit_Server_Map_Invoke().Handle(new Invoke_RootInit { Root = mapRoot }).GetAwaiter().GetResult();
+            registerSingleton.Invoke(rootManager, null);
+            rootManager.Create(mapId, ROOT_ZONE, ELogicSceneType.Map,
+                nameof(ServerMapInitializationCreatesKinematicManager), useInitializationGate: true)
+                .GetAwaiter().GetResult();
+            Root mapRoot = rootManager.Get(mapId);
+            Assert.That(mapRoot.InitializationState, Is.EqualTo(ERootInitializationState.Ready));
+            Assert.That(mapRoot.Scene.GetComponent<RootInitializationGateComponent>(), Is.Null);
             GameplayWorld mapWorld = (GameplayWorld)mapRoot.Scene.GetChild<LogicScene>(GameplayWorldFactory.DEFAULT_WORLD_ID);
             KinematicMoverManager manager = mapWorld.GetComponent<KinematicMoverManager>();
             Assert.That(manager, Is.Not.Null);
@@ -1362,12 +1388,84 @@ public class MoverIntegrationTests
         }
         finally
         {
-            mapRoot.Dispose();
+            rootManager.Dispose();
             messageManager.Dispose();
             Log.LogLevel = previousLogLevel;
             Log.Logger = previousLogger;
         }
         Assert.That(logger.Errors, Is.Empty);
+    }
+
+    /// <summary>Invalid physical data fails Map initialization without opening its update gate.</summary>
+    [Test]
+    public void ServerMapInitializationFailsWhenPhysicalDataIsNull()
+    {
+        int mapId = ConfigManager.Instance.Tables.TbLevelConfig.DicSceneId2Level.Keys.First();
+        string levelName = ConfigManager.Instance.Tables.TbLevelConfig.DicSceneId2Level[mapId][0].Name;
+        string temporaryRoot = Directory.CreateTempSubdirectory("BlissInvalidPhysicalData-").FullName;
+        string serverDirectory = Path.Combine(temporaryRoot, "Server");
+        string resourceDirectory = Path.Combine(temporaryRoot, "ServerRes");
+        string sceneDirectory = Path.Combine(resourceDirectory, "ScenePhysicals");
+        string sceneFile = Path.Combine(sceneDirectory, $"{levelName}.dat");
+        string previousWorkingDirectory = Directory.GetCurrentDirectory();
+        int previousLogLevel = Log.LogLevel;
+        ILogger previousLogger = Log.Logger;
+        ProcessMessageManager messageManager = new ProcessMessageManager();
+        RootManager rootManager = new RootManager();
+        rootManager.Init();
+        try
+        {
+            Directory.CreateDirectory(serverDirectory);
+            Directory.CreateDirectory(sceneDirectory);
+            File.WriteAllBytes(sceneFile, MemoryPackSerializer.Serialize<PhysicalSceneConfig>(null));
+            Directory.SetCurrentDirectory(serverDirectory);
+            Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+            Log.Logger = new RecordingLogger();
+            this.eventSystem.Dispose();
+            this.typeManager.GetTypes(typeof(EventAttribute)).Add(typeof(EventHandler_AfterCreateLevelScene_Server));
+            this.eventSystem = new EventSystem();
+            this.eventSystem.Init();
+            registerSingleton.Invoke(this.eventSystem, null);
+            registerSingleton.Invoke(messageManager, null);
+            registerSingleton.Invoke(rootManager, null);
+
+            ETTask<int> create = rootManager.Create(mapId, ROOT_ZONE, ELogicSceneType.Map,
+                nameof(ServerMapInitializationFailsWhenPhysicalDataIsNull), useInitializationGate: true);
+            InvalidDataException failure = Assert.Throws<InvalidDataException>(() => create.GetAwaiter().GetResult())!;
+            Assert.That(failure.Message, Does.Contain(levelName));
+            Root mapRoot = rootManager.Get(mapId);
+            Assert.That(mapRoot.InitializationState, Is.EqualTo(ERootInitializationState.Failed));
+            Assert.That(mapRoot.Scene.GetComponent<RootInitializationGateComponent>(), Is.Not.Null);
+            TestRootUpdateProbe probe = mapRoot.Scene.AddChild<TestRootUpdateProbe>();
+            earlyUpdate(mapRoot);
+            update(mapRoot);
+            Assert.That(probe.UpdateCount, Is.Zero);
+        }
+        finally
+        {
+            rootManager.Dispose();
+            messageManager.Dispose();
+            Log.LogLevel = previousLogLevel;
+            Log.Logger = previousLogger;
+            Directory.SetCurrentDirectory(previousWorkingDirectory);
+            File.Delete(sceneFile);
+            if (Directory.Exists(sceneDirectory))
+            {
+                Directory.Delete(sceneDirectory);
+            }
+
+            if (Directory.Exists(resourceDirectory))
+            {
+                Directory.Delete(resourceDirectory);
+            }
+
+            if (Directory.Exists(serverDirectory))
+            {
+                Directory.Delete(serverDirectory);
+            }
+
+            Directory.Delete(temporaryRoot);
+        }
     }
 
     /// <summary>Negative and non-finite client timestamps cannot be accepted as server moves.</summary>
@@ -2081,6 +2179,397 @@ public class MoverIntegrationTests
         {
             physicalScene.PxScene = nativeScene;
         }
+    }
+
+    /// <summary>A Root without a gate continues running all ordinary update phases.</summary>
+    [Test]
+    public void UngatedRootRunsOrdinaryUpdatePhases()
+    {
+        TestRootUpdateProbe probe = this.root.Scene.AddChild<TestRootUpdateProbe>();
+        earlyUpdate(this.root);
+        update(this.root);
+        lateUpdate(this.root);
+        Assert.That(probe.EarlyCount, Is.EqualTo(1));
+        Assert.That(probe.UpdateCount, Is.EqualTo(1));
+        Assert.That(probe.LateCount, Is.EqualTo(1));
+        Assert.That(this.root.InitializationState, Is.EqualTo(ERootInitializationState.Unmanaged));
+    }
+
+    /// <summary>An initialization gate blocks ordinary Root systems until it is removed.</summary>
+    [Test]
+    public void RootInitializationGateBlocksUpdatesUntilRemoved()
+    {
+        TestRootUpdateProbe probe = this.root.Scene.AddChild<TestRootUpdateProbe>();
+        this.root.Scene.AddComponent<RootInitializationGateComponent>();
+
+        earlyUpdate(this.root);
+        update(this.root);
+        lateUpdate(this.root);
+        Assert.That(probe.UpdateCount, Is.Zero);
+
+        this.root.Scene.RemoveComponent<RootInitializationGateComponent>();
+        earlyUpdate(this.root);
+        update(this.root);
+        lateUpdate(this.root);
+        Assert.That(probe.UpdateCount, Is.EqualTo(1));
+    }
+
+    /// <summary>Only the explicitly allowed concrete update system runs while gated.</summary>
+    [Test]
+    public void RootInitializationGateAllowsOnlySpecifiedSystem()
+    {
+        TestRootUpdateProbe probe = this.root.Scene.AddChild<TestRootUpdateProbe>();
+        RootInitializationGateComponent gate = this.root.Scene.AddComponent<RootInitializationGateComponent>();
+        gate.AllowSystem(typeof(TestRootUpdateProbeSystem));
+
+        earlyUpdate(this.root);
+        update(this.root);
+        lateUpdate(this.root);
+
+        Assert.That(probe.EarlyCount, Is.Zero);
+        Assert.That(probe.UpdateCount, Is.EqualTo(1));
+        Assert.That(probe.LateCount, Is.Zero);
+    }
+
+    /// <summary>A gate mounted by an update immediately blocks subsequent entities and systems.</summary>
+    [Test]
+    public void GateMountedDuringUpdateBlocksRemainingDispatch()
+    {
+        TestRootUpdateProbe first = this.root.Scene.AddChild<TestRootUpdateProbe>();
+        TestRootUpdateProbe second = this.root.Scene.AddChild<TestRootUpdateProbe>();
+        first.MountGateOnUpdate = true;
+
+        earlyUpdate(this.root);
+        update(this.root);
+        lateUpdate(this.root);
+
+        Assert.That(first.UpdateCount, Is.EqualTo(1));
+        Assert.That(second.UpdateCount, Is.Zero);
+        Assert.That(first.LateCount, Is.Zero);
+        Assert.That(second.LateCount, Is.Zero);
+    }
+
+    /// <summary>Allowing a World driver does not implicitly allow its nested update systems.</summary>
+    [Test]
+    public void GateFiltersGameplayWorldSystemsIndependentlyFromTheirDriver()
+    {
+        TestWorldUpdateProbe probe = this.world.AddChild<TestWorldUpdateProbe>();
+        RootInitializationGateComponent gate = this.root.Scene.AddComponent<RootInitializationGateComponent>();
+        Type driverType = typeof(GameplayWorld).Assembly.GetType("Bliss.GameplayWorldEarlyDriverSystem")
+            ?? throw new InvalidOperationException("The GameplayWorld early driver was not found.");
+        gate.AllowSystem(driverType);
+
+        earlyUpdate(this.root);
+        Assert.That(probe.EarlyCount, Is.Zero);
+
+        gate.AllowSystem(typeof(TestWorldEarlyProbeSystem));
+        earlyUpdate(this.root);
+        Assert.That(probe.EarlyCount, Is.EqualTo(1));
+    }
+
+    /// <summary>Original RootManager creation signatures remain available to already-compiled clients.</summary>
+    [Test]
+    public void RootManagerRetainsOriginalCreateSignatures()
+    {
+        MethodInfo? explicitId = typeof(RootManager).GetMethod(nameof(RootManager.Create),
+            new[] { typeof(int), typeof(int), typeof(ELogicSceneType), typeof(string) });
+        MethodInfo? generatedId = typeof(RootManager).GetMethod(nameof(RootManager.Create),
+            new[] { typeof(int), typeof(ELogicSceneType), typeof(string) });
+
+        Assert.That(explicitId?.ReturnType, Is.EqualTo(typeof(ETTask<int>)));
+        Assert.That(generatedId?.ReturnType, Is.EqualTo(typeof(ETTask<int>)));
+    }
+
+    /// <summary>A missing gate cannot open an initializing Root to updates.</summary>
+    [Test]
+    public void MissingInitializationGateFailsClosed()
+    {
+        TestRootUpdateProbe probe = this.root.Scene.AddChild<TestRootUpdateProbe>();
+        this.root.BeginInitialization();
+        this.root.Scene.RemoveComponent<RootInitializationGateComponent>();
+
+        Assert.Throws<InvalidOperationException>(() => earlyUpdate(this.root));
+        Assert.That(probe.EarlyCount, Is.Zero);
+        Assert.That(probe.UpdateCount, Is.Zero);
+    }
+
+    /// <summary>A duplicate gate is rejected before changing the Root's initialization state.</summary>
+    [Test]
+    public void BeginInitializationRejectsExistingGateWithoutChangingState()
+    {
+        TestRootUpdateProbe probe = this.root.Scene.AddChild<TestRootUpdateProbe>();
+        RootInitializationGateComponent gate = this.root.Scene.AddComponent<RootInitializationGateComponent>();
+
+        Assert.Throws<InvalidOperationException>(() => this.root.BeginInitialization());
+        Assert.That(this.root.InitializationState, Is.EqualTo(ERootInitializationState.Unmanaged));
+        Assert.That(this.root.Scene.GetComponent<RootInitializationGateComponent>(), Is.SameAs(gate));
+        earlyUpdate(this.root);
+        update(this.root);
+        Assert.That(probe.UpdateCount, Is.Zero);
+
+        this.root.Scene.RemoveComponent<RootInitializationGateComponent>();
+        earlyUpdate(this.root);
+        update(this.root);
+        Assert.That(probe.UpdateCount, Is.EqualTo(1));
+    }
+
+    /// <summary>A remounted gate starts with an empty system allowlist.</summary>
+    [Test]
+    public void RemountedInitializationGateDoesNotRetainAllowedSystems()
+    {
+        TestRootUpdateProbe probe = this.root.Scene.AddChild<TestRootUpdateProbe>();
+        RootInitializationGateComponent first = this.root.Scene.AddComponent<RootInitializationGateComponent>();
+        first.AllowSystem(typeof(TestRootUpdateProbeSystem));
+        this.root.Scene.RemoveComponent<RootInitializationGateComponent>();
+        this.root.Scene.AddComponent(first);
+
+        earlyUpdate(this.root);
+        update(this.root);
+        Assert.That(probe.UpdateCount, Is.Zero);
+    }
+
+    /// <summary>Each managed Root becomes ready only after its own initialization completes.</summary>
+    [Test]
+    public void ManagedRootsBecomeReadyIndependently()
+    {
+        int previousLogLevel = Log.LogLevel;
+        Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+        RootManager manager = new RootManager();
+        manager.Init();
+        registerSingleton.Invoke(manager, null);
+        ETTask firstInitialization = ETTask.Create();
+        ETTask secondInitialization = ETTask.Create();
+        try
+        {
+            TestRootInit.PendingInitialization = firstInitialization;
+            ETTask<int> firstCreate = manager.Create(
+                FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.None, "first", useInitializationGate: true);
+            Root first = TestRootInit.LastCreatedRoot!;
+            TestRootUpdateProbe firstProbe = first.Scene.AddChild<TestRootUpdateProbe>();
+            TestRootInit.PendingInitialization = secondInitialization;
+            ETTask<int> secondCreate = manager.Create(
+                SECOND_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.None, "second", useInitializationGate: true);
+            Root second = TestRootInit.LastCreatedRoot!;
+            TestRootUpdateProbe secondProbe = second.Scene.AddChild<TestRootUpdateProbe>();
+
+            Assert.That(first.InitializationState, Is.EqualTo(ERootInitializationState.Initializing));
+            Assert.That(second.InitializationState, Is.EqualTo(ERootInitializationState.Initializing));
+            firstInitialization.SetResult();
+            Assert.That(firstCreate.GetAwaiter().GetResult(), Is.EqualTo(FIRST_MANAGED_ROOT_ID));
+            Assert.That(first.InitializationState, Is.EqualTo(ERootInitializationState.Ready));
+            Assert.That(second.InitializationState, Is.EqualTo(ERootInitializationState.Initializing));
+
+            earlyUpdate(first);
+            update(first);
+            earlyUpdate(second);
+            update(second);
+            Assert.That(firstProbe.UpdateCount, Is.EqualTo(1));
+            Assert.That(secondProbe.UpdateCount, Is.Zero);
+            secondInitialization.SetResult();
+            Assert.That(secondCreate.GetAwaiter().GetResult(), Is.EqualTo(SECOND_MANAGED_ROOT_ID));
+            Assert.That(second.InitializationState, Is.EqualTo(ERootInitializationState.Ready));
+            earlyUpdate(second);
+            update(second);
+            Assert.That(secondProbe.UpdateCount, Is.EqualTo(1));
+        }
+        finally
+        {
+            TestRootInit.PendingInitialization = null;
+            manager.Dispose();
+            Log.LogLevel = previousLogLevel;
+        }
+    }
+
+    /// <summary>Configured Roots initialize serially after Main is ready, without blocking its updates.</summary>
+    /// <param name="initializationSucceeds">Whether the second configured Root succeeds.</param>
+    [TestCase(true)]
+    [TestCase(false)]
+    public void ConfiguredRootsInitializeAfterMainIsReady(bool initializationSucceeds)
+    {
+        int previousLogLevel = Log.LogLevel;
+        Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+        RootManager manager = new RootManager();
+        manager.Init();
+        registerSingleton.Invoke(manager, null);
+        Options options = new Options { Process = ROOT_ZONE };
+        registerSingleton.Invoke(options, null);
+        List<ServerScene> configuredScenes = ConfigManager.Instance.Tables.TbServerScene.DataList;
+        ServerScene[] originalScenes = configuredScenes.ToArray();
+        ETTask firstInitialization = ETTask.Create();
+        ETTask secondInitialization = ETTask.Create();
+        try
+        {
+            using System.Text.Json.JsonDocument firstConfig = System.Text.Json.JsonDocument.Parse(
+                $"{{\"id\":{FIRST_MANAGED_ROOT_ID},\"Process\":{Options.Instance.Process},\"Zone\":{ROOT_ZONE},\"SceneType\":\"None\",\"Name\":\"first\",\"OuterPort\":0}}");
+            using System.Text.Json.JsonDocument secondConfig = System.Text.Json.JsonDocument.Parse(
+                $"{{\"id\":{SECOND_MANAGED_ROOT_ID},\"Process\":{Options.Instance.Process},\"Zone\":{ROOT_ZONE},\"SceneType\":\"None\",\"Name\":\"second\",\"OuterPort\":0}}");
+            configuredScenes.Clear();
+            configuredScenes.Add(new ServerScene(firstConfig.RootElement));
+            configuredScenes.Add(new ServerScene(secondConfig.RootElement));
+            manager.Create(ROOT_ID, ROOT_ZONE, ELogicSceneType.None, "main", useInitializationGate: true)
+                .GetAwaiter().GetResult();
+            Root main = manager.Get(ROOT_ID);
+            TestRootUpdateProbe mainProbe = main.Scene.AddChild<TestRootUpdateProbe>();
+
+            TestRootInit.PendingInitialization = firstInitialization;
+            ETTask startup = EventSystem.Instance.Invoke<Invoke_CreateConfiguredServerRoots, ETTask>(
+                (long)ELogicSceneType.Main, new Invoke_CreateConfiguredServerRoots());
+            Root first = manager.Get(FIRST_MANAGED_ROOT_ID);
+            Assert.That(main.InitializationState, Is.EqualTo(ERootInitializationState.Ready));
+            Assert.That(first.InitializationState, Is.EqualTo(ERootInitializationState.Initializing));
+            Assert.That(manager.Get(SECOND_MANAGED_ROOT_ID), Is.Null);
+            Assert.That(startup.IsCompleted, Is.False);
+            TestRootUpdateProbe firstProbe = first.Scene.AddChild<TestRootUpdateProbe>();
+            earlyUpdate(main);
+            update(main);
+            earlyUpdate(first);
+            update(first);
+            Assert.That(mainProbe.UpdateCount, Is.EqualTo(1));
+            Assert.That(firstProbe.UpdateCount, Is.Zero);
+
+            TestRootInit.PendingInitialization = secondInitialization;
+            firstInitialization.SetResult();
+            Root second = manager.Get(SECOND_MANAGED_ROOT_ID);
+            Assert.That(first.InitializationState, Is.EqualTo(ERootInitializationState.Ready));
+            Assert.That(second.InitializationState, Is.EqualTo(ERootInitializationState.Initializing));
+            Assert.That(startup.IsCompleted, Is.False);
+            if (initializationSucceeds)
+            {
+                secondInitialization.SetResult();
+                startup.GetAwaiter().GetResult();
+                Assert.That(second.InitializationState, Is.EqualTo(ERootInitializationState.Ready));
+            }
+            else
+            {
+                InvalidOperationException failure = new InvalidOperationException("Configured Root initialization failed.");
+                secondInitialization.SetException(failure);
+                Assert.That(Assert.Throws<InvalidOperationException>(() => startup.GetAwaiter().GetResult()),
+                    Is.SameAs(failure));
+                Assert.That(second.InitializationState, Is.EqualTo(ERootInitializationState.Failed));
+                Assert.That(main.InitializationState, Is.EqualTo(ERootInitializationState.Ready));
+            }
+        }
+        finally
+        {
+            TestRootInit.PendingInitialization = null;
+            configuredScenes.Clear();
+            configuredScenes.AddRange(originalScenes);
+            manager.Dispose();
+            options.Dispose();
+            Log.LogLevel = previousLogLevel;
+        }
+    }
+
+    /// <summary>A failed initialization stays closed even to previously allowlisted systems.</summary>
+    [Test]
+    public void FailedRootInitializationRemainsClosed()
+    {
+        int previousLogLevel = Log.LogLevel;
+        Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+        RootManager manager = new RootManager();
+        manager.Init();
+        registerSingleton.Invoke(manager, null);
+        ETTask initialization = ETTask.Create();
+        try
+        {
+            TestRootInit.PendingInitialization = initialization;
+            ETTask<int> create = manager.Create(
+                FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.None, "failed", useInitializationGate: true);
+            Root root = TestRootInit.LastCreatedRoot!;
+            TestRootUpdateProbe probe = root.Scene.AddChild<TestRootUpdateProbe>();
+            root.Scene.GetComponent<RootInitializationGateComponent>().AllowSystem(typeof(TestRootUpdateProbeSystem));
+            InvalidOperationException failure = new InvalidOperationException("initialization failed");
+            initialization.SetException(failure);
+
+            Assert.That(Assert.Throws<InvalidOperationException>(() => create.GetAwaiter().GetResult()), Is.SameAs(failure));
+            Assert.That(root.InitializationState, Is.EqualTo(ERootInitializationState.Failed));
+            Assert.That(root.Scene.GetComponent<RootInitializationGateComponent>(), Is.Not.Null);
+            earlyUpdate(root);
+            update(root);
+            Assert.That(probe.UpdateCount, Is.Zero);
+        }
+        finally
+        {
+            TestRootInit.PendingInitialization = null;
+            manager.Dispose();
+            Log.LogLevel = previousLogLevel;
+        }
+    }
+
+    /// <summary>A missing Server initialization handler leaves its Root failed and closed.</summary>
+    [Test]
+    public void MissingServerRootInitializerFailsClosed()
+    {
+        int previousLogLevel = Log.LogLevel;
+        Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+        RootManager manager = new RootManager();
+        manager.Init();
+        registerSingleton.Invoke(manager, null);
+        try
+        {
+            ETTask<int> create = manager.Create(
+                FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.Client, "missing", useInitializationGate: true);
+            Root root = manager.Get(FIRST_MANAGED_ROOT_ID);
+            Assert.Catch(() => create.GetAwaiter().GetResult());
+            Assert.That(root.InitializationState, Is.EqualTo(ERootInitializationState.Failed));
+            Assert.That(root.Scene.GetComponent<RootInitializationGateComponent>(), Is.Not.Null);
+            TestRootUpdateProbe probe = root.Scene.AddChild<TestRootUpdateProbe>();
+            earlyUpdate(root);
+            update(root);
+            Assert.That(probe.UpdateCount, Is.Zero);
+        }
+        finally
+        {
+            manager.Dispose();
+            Log.LogLevel = previousLogLevel;
+        }
+    }
+
+    /// <summary>A failure during an allowed system stops its remaining entities immediately.</summary>
+    [Test]
+    public void RootFailureDuringAllowedUpdateStopsRemainingEntities()
+    {
+        int previousLogLevel = Log.LogLevel;
+        Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+        RootManager manager = new RootManager();
+        manager.Init();
+        registerSingleton.Invoke(manager, null);
+        ETTask initialization = ETTask.Create();
+        try
+        {
+            TestRootInit.PendingInitialization = initialization;
+            ETTask<int> create = manager.Create(
+                FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.None, "failed", useInitializationGate: true);
+            Root root = TestRootInit.LastCreatedRoot!;
+            TestRootUpdateProbe first = root.Scene.AddChild<TestRootUpdateProbe>();
+            TestRootUpdateProbe second = root.Scene.AddChild<TestRootUpdateProbe>();
+            first.InitializationToFail = initialization;
+            root.Scene.GetComponent<RootInitializationGateComponent>().AllowSystem(typeof(TestRootUpdateProbeSystem));
+
+            earlyUpdate(root);
+            update(root);
+            Assert.That(root.InitializationState, Is.EqualTo(ERootInitializationState.Failed));
+            Assert.That(first.UpdateCount, Is.EqualTo(1));
+            Assert.That(second.UpdateCount, Is.Zero);
+            Assert.Throws<InvalidOperationException>(() => create.GetAwaiter().GetResult());
+        }
+        finally
+        {
+            TestRootInit.PendingInitialization = null;
+            manager.Dispose();
+            Log.LogLevel = previousLogLevel;
+        }
+    }
+
+    /// <summary>Awake and Destroy callbacks are not filtered by the initialization gate.</summary>
+    [Test]
+    public void RootInitializationGatePreservesMountAndDestroyCallbacks()
+    {
+        this.root.Scene.AddComponent<RootInitializationGateComponent>();
+        TestRootLifecycleProbe probe = this.root.Scene.AddChild<TestRootLifecycleProbe>();
+        Assert.That(probe.AwakeCount, Is.EqualTo(1));
+        probe.Dispose();
+        Assert.That(probe.DestroyCount, Is.EqualTo(1));
     }
 
     /// <summary>A physical failure stops its World without losing the Root or other Worlds.</summary>
@@ -3010,11 +3499,18 @@ public class MoverIntegrationTests
         /// <summary>Most recently initialized test Root.</summary>
         public static Root? LastCreatedRoot { get; private set; }
 
+        /// <summary>Optional test-controlled initialization task.</summary>
+        public static ETTask? PendingInitialization { get; set; }
+
         /// <inheritdoc />
         public override async ETTask Handle(Invoke_RootInit args)
         {
             LastCreatedRoot = args.Root;
-            await ETTask.CompletedTask;
+            ETTask? pending = PendingInitialization;
+            if (pending != null)
+            {
+                await pending;
+            }
         }
     }
 
@@ -3047,6 +3543,87 @@ public class MoverIntegrationTests
 
         /// <summary>Delta received by this participant's most recent fixed update.</summary>
         public float ObservedDelta;
+    }
+
+    /// <summary>Observes Root mount and destruction callbacks.</summary>
+    public sealed class TestRootLifecycleProbe : Entity, IAwake, IDestroy
+    {
+        /// <summary>Number of Awake calls.</summary>
+        public int AwakeCount;
+
+        /// <summary>Number of Destroy calls.</summary>
+        public int DestroyCount;
+    }
+
+    /// <summary>Records Root probe initialization.</summary>
+    [EntitySystem]
+    public sealed class TestRootAwakeProbeSystem : AwakeSystem<TestRootLifecycleProbe>
+    {
+        /// <inheritdoc />
+        protected override void Awake(TestRootLifecycleProbe entity) => entity.AwakeCount++;
+    }
+
+    /// <summary>Records Root probe destruction.</summary>
+    [EntitySystem]
+    public sealed class TestRootDestroyProbeSystem : DestroySystem<TestRootLifecycleProbe>
+    {
+        /// <inheritdoc />
+        protected override void Destroy(TestRootLifecycleProbe entity) => entity.DestroyCount++;
+    }
+
+    /// <summary>Observes ordinary Root updates.</summary>
+    public sealed class TestRootUpdateProbe : Entity, IEarlyUpdate, IUpdate, ILateUpdate
+    {
+        /// <summary>Number of EarlyUpdate calls.</summary>
+        public int EarlyCount;
+
+        /// <summary>Number of Update calls.</summary>
+        public int UpdateCount;
+
+        /// <summary>Number of LateUpdate calls.</summary>
+        public int LateCount;
+
+        /// <summary>Optional initialization to fail from the next update.</summary>
+        public ETTask? InitializationToFail;
+
+        /// <summary>Whether the next update mounts a Root initialization gate.</summary>
+        public bool MountGateOnUpdate;
+    }
+
+    /// <summary>Records early Root updates.</summary>
+    [EntitySystem]
+    public sealed class TestRootEarlyProbeSystem : EarlyUpdateSystem<TestRootUpdateProbe>
+    {
+        /// <inheritdoc />
+        protected override void EarlyUpdate(TestRootUpdateProbe entity) => entity.EarlyCount++;
+    }
+
+    /// <summary>Records ordinary Root updates.</summary>
+    [EntitySystem]
+    public sealed class TestRootUpdateProbeSystem : UpdateSystem<TestRootUpdateProbe>
+    {
+        /// <inheritdoc />
+        protected override void Update(TestRootUpdateProbe entity)
+        {
+            entity.UpdateCount++;
+            if (entity.MountGateOnUpdate)
+            {
+                entity.MountGateOnUpdate = false;
+                entity.RootScene().AddComponent<RootInitializationGateComponent>();
+            }
+
+            ETTask? initialization = entity.InitializationToFail;
+            entity.InitializationToFail = null;
+            initialization?.SetException(new InvalidOperationException("initialization failed"));
+        }
+    }
+
+    /// <summary>Records late Root updates.</summary>
+    [EntitySystem]
+    public sealed class TestRootLateProbeSystem : LateUpdateSystem<TestRootUpdateProbe>
+    {
+        /// <inheritdoc />
+        protected override void LateUpdate(TestRootUpdateProbe entity) => entity.LateCount++;
     }
 
     /// <summary>Observes ordinary World update phases.</summary>

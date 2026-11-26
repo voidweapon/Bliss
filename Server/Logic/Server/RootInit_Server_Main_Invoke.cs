@@ -32,18 +32,28 @@ namespace Bliss
 
 
             GameplayPhysics.GameplayPhysicsHandler = new GameplayPhysicsHandler_Server();
-            
+
+            await ETTask.CompletedTask;
+        }
+    }
+
+    /// <summary>Initializes the configured Server Roots after Main has become ready.</summary>
+    [Invoke((long)ELogicSceneType.Main)]
+    public class RootInit_Server_ConfiguredRoots_Invoke : AInvokeHandler<Invoke_CreateConfiguredServerRoots, ETTask>
+    {
+        /// <inheritdoc />
+        public override async ETTask Handle(Invoke_CreateConfiguredServerRoots args)
+        {
             foreach (var sceneCfg in ConfigManager.Instance.Tables.TbServerScene.DataList)
             {
                 if (sceneCfg.Process == Options.Instance.Process)
                 {
-                    await RootManager.Instance.Create(sceneCfg.Id, sceneCfg.Zone, Enum.Parse<ELogicSceneType>(sceneCfg.SceneType), sceneCfg.Name);
+                    await RootManager.Instance.Create(sceneCfg.Id, sceneCfg.Zone,
+                        Enum.Parse<ELogicSceneType>(sceneCfg.SceneType), sceneCfg.Name, useInitializationGate: true);
                 }
             }
             
-            Log.Info($"==============Server Init Success==============");
             await ETTask.CompletedTask;
         }
     }
 }
-

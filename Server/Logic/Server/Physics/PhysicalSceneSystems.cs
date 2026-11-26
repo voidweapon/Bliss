@@ -908,6 +908,10 @@ public static unsafe partial class PhysicalSceneSystems
     
     #endregion
     
+    /// <summary>Loads scene actors from a physical data file when one exists.</summary>
+    /// <param name="self">The physical scene receiving the actors.</param>
+    /// <param name="sceneName">The name of the scene data file without its extension.</param>
+    /// <exception cref="InvalidDataException">The physical data deserializes to a null scene configuration.</exception>
     public static unsafe void LoadActorFromMemoryPackFile(this PhysicalScene self, string sceneName)
     { 
         string path = Path.GetFullPath($"../ServerRes/ScenePhysicals/{sceneName}.dat");
@@ -924,8 +928,7 @@ public static unsafe partial class PhysicalSceneSystems
 
         if (sceneConfig == null)
         {
-            Log.Error($"Failed to deserialize scene config from {path}");
-            return;
+            throw new InvalidDataException($"Failed to deserialize scene config from {path}.");
         }
 
         var pxPhysics = self.PhysicalWorld.Physics;

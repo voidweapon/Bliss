@@ -6,6 +6,17 @@ namespace Bliss
     public class EntitySystem
     {
         private readonly EntityUpdateScheduler _updateScheduler = new EntityUpdateScheduler();
+        private readonly Root _root;
+
+        /// <summary>Creates an EntitySystem without a Root-specific initialization gate.</summary>
+        public EntitySystem()
+        {
+        }
+
+        internal EntitySystem(Root root)
+        {
+            _root = root;
+        }
 
         public virtual void RegisterSystem(Entity entity)
         {
@@ -142,24 +153,43 @@ namespace Bliss
 
         public void EarlyUpdate()
         {
+            if (_root?.InitializationState == ERootInitializationState.Failed)
+            {
+                return;
+            }
+
+            RootInitializationGateComponent gate = _root?.GetInitializationGate();
             _updateScheduler.BeginFrame();
             _updateScheduler.Update(
                 (ESystemUpdateGroup)SystemUpdateGroupRange.FIRST_EARLY_UPDATE,
-                ESystemUpdateGroup.EarlyUpdate);
+                ESystemUpdateGroup.EarlyUpdate,
+                _root, gate);
         }
 
         public void Update()
         {
+            if (_root?.InitializationState == ERootInitializationState.Failed)
+            {
+                return;
+            }
+
             _updateScheduler.Update(
                 (ESystemUpdateGroup)SystemUpdateGroupRange.FIRST_UPDATE,
-                ESystemUpdateGroup.Update);
+                ESystemUpdateGroup.Update,
+                _root, _root?.GetInitializationGate());
         }
 
         public void LateUpdate()
         {
+            if (_root?.InitializationState == ERootInitializationState.Failed)
+            {
+                return;
+            }
+
             _updateScheduler.Update(
                 (ESystemUpdateGroup)SystemUpdateGroupRange.FIRST_LATE_UPDATE,
-                ESystemUpdateGroup.LateUpdate);
+                ESystemUpdateGroup.LateUpdate,
+                _root, _root?.GetInitializationGate());
         }
         #endregion
     }

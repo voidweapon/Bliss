@@ -118,3 +118,98 @@ public sealed class RootSchedulingParticipantSystem : UpdateSystem<RootSchedulin
     /// <inheritdoc />
     protected override void Update(RootSchedulingParticipant entity) => entity.UpdateCount++;
 }
+
+/// <summary>Measures real RootManager dispatch while initialization gates block or allow an update system.</summary>
+[MemoryDiagnoser]
+public class RootInitializationGateBenchmark
+{
+    private const int SMALL_ROOT_COUNT = 1;
+    private const int MEDIUM_ROOT_COUNT = 10;
+    private const int LARGE_ROOT_COUNT = 100;
+    private const int ROOT_ID_BASE = 1000;
+    private const int ROOT_ZONE = 1;
+    private const int SUPPRESS_INFO_LOG_LEVEL = 4;
+    private readonly List<RootInitializationGateParticipant> participants = new();
+    private int previousLogLevel;
+
+    /// <summary>Number of initializing Roots with one update participant each.</summary>
+    [Params(SMALL_ROOT_COUNT, MEDIUM_ROOT_COUNT, LARGE_ROOT_COUNT)]
+    public int RootCount { get; set; }
+
+    /// <summary>Whether the concrete participant system is allowed during initialization.</summary>
+    [Params(false, true)]
+    public bool AllowUpdates { get; set; }
+
+    /// <summary>Creates gated Roots and verifies whether their participants are dispatched.</summary>
+    [GlobalSetup]
+    public void Initialize()
+    {
+        this.previousLogLevel = Log.LogLevel;
+        Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+        TypeManager typeManager = new TypeManager();
+        typeManager.Init(new List<System.Reflection.Assembly>
+        {
+            typeof(Entity).Assembly,
+            typeof(GameplayWorld).Assembly,
+            typeof(RootSchedulingBenchmark).Assembly,
+        });
+        World.Instance.AddSingleton(typeManager);
+        World.Instance.AddSingleton<EntitySystemManager>();
+        World.Instance.AddSingleton<EventSystem>();
+        RootManager rootManager = World.Instance.AddSingleton<RootManager>();
+        for (int index = 0; index < this.RootCount; index++)
+        {
+            int rootId = ROOT_ID_BASE + index;
+            rootManager.Create(rootId, ROOT_ZONE, ELogicSceneType.None, nameof(RootInitializationGateBenchmark))
+                .GetAwaiter().GetResult();
+            Root root = rootManager.Get(rootId);
+            root.BeginInitialization();
+            if (this.AllowUpdates)
+            {
+                root.Scene.GetComponent<RootInitializationGateComponent>()
+                    .AllowSystem(typeof(RootInitializationGateParticipantSystem));
+            }
+
+            this.participants.Add(root.Scene.AddChild<RootInitializationGateParticipant>());
+        }
+
+        World.Instance.EarlyUpdate();
+        World.Instance.EarlyUpdate();
+        World.Instance.Update();
+        foreach (RootInitializationGateParticipant participant in this.participants)
+        {
+            if ((participant.UpdateCount > 0) != this.AllowUpdates)
+            {
+                throw new InvalidOperationException("The initialization gate benchmark dispatched unexpected updates.");
+            }
+        }
+    }
+
+    /// <summary>Runs a normal production update over initializing Roots.</summary>
+    [Benchmark]
+    public void Update() => World.Instance.Update();
+
+    /// <summary>Releases Roots and production registries.</summary>
+    [GlobalCleanup]
+    public void Cleanup()
+    {
+        RootManager.Instance?.Dispose();
+        World.Instance.Dispose();
+        Log.LogLevel = this.previousLogLevel;
+    }
+}
+
+/// <summary>Update participant for gated Root dispatch measurements.</summary>
+public sealed class RootInitializationGateParticipant : Entity, IUpdate
+{
+    /// <summary>Number of updates observed.</summary>
+    public int UpdateCount;
+}
+
+/// <summary>Updates the participant through the production EntitySystem scheduler.</summary>
+[EntitySystem]
+public sealed class RootInitializationGateParticipantSystem : UpdateSystem<RootInitializationGateParticipant>
+{
+    /// <inheritdoc />
+    protected override void Update(RootInitializationGateParticipant entity) => entity.UpdateCount++;
+}

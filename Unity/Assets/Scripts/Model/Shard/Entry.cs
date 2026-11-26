@@ -24,7 +24,15 @@ namespace Bliss
             //创建支持reload的 singleton
             TypeManager.Instance.CreateAutoSingletonManager();
 
+#if DOTNET
+            await RootManager.Instance.Create(0, ELogicSceneType.Main, nameof(ELogicSceneType.Main),
+                useInitializationGate: true);
+            await EventSystem.Instance.Invoke<Invoke_CreateConfiguredServerRoots, ETTask>(
+                (long)ELogicSceneType.Main, new Invoke_CreateConfiguredServerRoots());
+            Log.Info("==============Server Init Success==============");
+#else
             await RootManager.Instance.Create(0, ELogicSceneType.Main, nameof(ELogicSceneType.Main));
+#endif
         }
     }
 
@@ -37,4 +45,11 @@ namespace Bliss
     {
         
     }
+
+#if DOTNET
+    /// <summary>Requests initialization of the configured Roots after Main is ready.</summary>
+    public struct Invoke_CreateConfiguredServerRoots
+    {
+    }
+#endif
 }

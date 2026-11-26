@@ -3,6 +3,19 @@ using System.Collections.Generic;
 
 namespace Bliss
 {
+    /// <summary>Initialization status for a Root using the Server readiness gate.</summary>
+    public enum ERootInitializationState
+    {
+        /// <summary>The Root does not use Server initialization gating.</summary>
+        Unmanaged,
+        /// <summary>The Root is initializing and ordinary updates are restricted.</summary>
+        Initializing,
+        /// <summary>The Root completed its initialization.</summary>
+        Ready,
+        /// <summary>The Root initialization failed and remains closed.</summary>
+        Failed,
+    }
+
     public class Root : IDisposable
     {
         public int Id { get; private set; }
@@ -16,6 +29,9 @@ namespace Bliss
         public LogicScene Scene { get; private set; }
         
         public bool IsDisposed { get; private set; }
+
+        /// <summary>The Root's Server initialization state, or Unmanaged for ungated Roots.</summary>
+        public ERootInitializationState InitializationState { get; private set; }
 
         public Root RootNode { get; private set; }
 
@@ -44,7 +60,60 @@ namespace Bliss
             Zone = zone;
             Scene = new LogicScene(this, id, ActorAddress.CFirstInstanceId, sceneType, name);
             RootNode = this;
-            EntitySystem = new EntitySystem();
+            EntitySystem = new EntitySystem(this);
+        }
+
+        /// <summary>Begins fail-closed initialization before registering routes or listeners.</summary>
+        /// <exception cref="InvalidOperationException">The Root is disposed, already initializing, or already has a gate.</exception>
+        public void BeginInitialization()
+        {
+            if (IsDisposed || InitializationState != ERootInitializationState.Unmanaged)
+            {
+                throw new InvalidOperationException("The Root cannot begin initialization.");
+            }
+
+            if (Scene.GetComponent<RootInitializationGateComponent>() != null)
+            {
+                throw new InvalidOperationException("The Root already has an initialization gate.");
+            }
+
+            InitializationState = ERootInitializationState.Initializing;
+            Scene.AddComponent<RootInitializationGateComponent>();
+        }
+
+        internal void CompleteInitialization()
+        {
+            if (InitializationState != ERootInitializationState.Initializing)
+            {
+                return;
+            }
+
+            if (IsDisposed || Scene.GetComponent<RootInitializationGateComponent>() == null)
+            {
+                throw new InvalidOperationException("The initializing Root has no live initialization gate.");
+            }
+
+            Scene.RemoveComponent<RootInitializationGateComponent>();
+            InitializationState = ERootInitializationState.Ready;
+        }
+
+        internal void FailInitialization()
+        {
+            if (InitializationState == ERootInitializationState.Initializing)
+            {
+                InitializationState = ERootInitializationState.Failed;
+            }
+        }
+
+        internal RootInitializationGateComponent GetInitializationGate()
+        {
+            RootInitializationGateComponent gate = Scene.GetComponent<RootInitializationGateComponent>();
+            if (InitializationState == ERootInitializationState.Initializing && gate == null)
+            {
+                throw new InvalidOperationException("The initializing Root has no initialization gate.");
+            }
+
+            return gate;
         }
 
         public Root CreateChild(int id, ELogicSceneType sceneType, string name)

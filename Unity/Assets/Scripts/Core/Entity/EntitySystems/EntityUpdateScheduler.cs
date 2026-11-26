@@ -100,14 +100,35 @@ namespace Bliss
         /// </summary>
         public void Update(ESystemUpdateGroup minimumGroup, ESystemUpdateGroup maximumGroup)
         {
+            Update(minimumGroup, maximumGroup, null, null);
+        }
+
+        internal void Update(ESystemUpdateGroup minimumGroup, ESystemUpdateGroup maximumGroup,
+            Root root, RootInitializationGateComponent gate)
+        {
             foreach (SystemGroup systemGroup in _frameGroups)
             {
+                if (root?.InitializationState == ERootInitializationState.Failed)
+                {
+                    return;
+                }
+
+                if (root != null && (gate == null || gate.IsDisposed))
+                {
+                    gate = root.GetInitializationGate();
+                }
+
                 if (systemGroup.UpdateGroup < (int)minimumGroup || systemGroup.UpdateGroup > (int)maximumGroup)
                 {
                     continue;
                 }
 
-                systemGroup.Update();
+                if (gate != null && !gate.AllowsSystem(systemGroup.SystemType))
+                {
+                    continue;
+                }
+
+                systemGroup.Update(root, gate);
             }
         }
 
@@ -168,6 +189,7 @@ namespace Bliss
             }
 
             public int UpdateGroup { get; }
+            public Type SystemType => _system.GetType();
 
             public void Register(Entity entity)
             {
@@ -210,7 +232,7 @@ namespace Bliss
                 _activeEntityCount = _entities.Count;
             }
 
-            public void Update()
+            public void Update(Root root, RootInitializationGateComponent gate)
             {
                 for (int i = 0; i < _activeEntityCount; i++)
                 {
@@ -218,6 +240,31 @@ namespace Bliss
                     if (entity == null || entity.IsDisposed)
                     {
                         continue;
+                    }
+
+                    Root entityRoot = root ?? entity.LogicScene?.Root;
+                    if (entityRoot?.InitializationState == ERootInitializationState.Failed)
+                    {
+                        if (root != null)
+                        {
+                            return;
+                        }
+
+                        continue;
+                    }
+
+                    if (entityRoot != null)
+                    {
+                        gate = entityRoot.GetInitializationGate();
+                        if (gate != null && !gate.AllowsSystem(SystemType))
+                        {
+                            if (root != null)
+                            {
+                                return;
+                            }
+
+                            continue;
+                        }
                     }
 
                     try
