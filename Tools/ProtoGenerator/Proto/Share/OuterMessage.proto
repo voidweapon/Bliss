@@ -44,7 +44,7 @@ message PropertySync_Long : IActorMessage
    int64 Value = 3;
 }
 
-message C2R_Login : ISessionRequest response : Bliss.G2C_Login
+message C2R_Login : ISessionRequest response : Bliss.R2C_Login
 {
     int32 RpcId = 1;
     string Account = 2;
@@ -180,4 +180,10 @@ message M2C_CharacterMovementRepData : IMessage
 {
   int64 ActorId = 1;
   CharacterRepMovement ReplicatedMovement = 2;
+}
+
+message S2C_RootNotReady : ISessionMessage
+{
+  int32 Error = 1;
+  int32 RejectedOpcode = 2;
 }

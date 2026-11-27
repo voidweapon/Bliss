@@ -13,6 +13,11 @@ namespace Bliss
         {
             Session session = args.Session;
             object message = args.Message;
+            if (ExternalMessageAdmission.RejectWhileInitializing(session, message, args.ReceivedBeforeRootReady,
+                    args.InitializationMessagePolicy))
+            {
+                return;
+            }
             switch (message)
             {
                 case IResponse response:

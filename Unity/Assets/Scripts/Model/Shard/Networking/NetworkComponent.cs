@@ -12,6 +12,8 @@ namespace Bliss
         public ANetDriver NetDriver;
         public Thread NetThread;
         public bool IsStop;
+        /// <summary>The Root whose readiness is observed by the network thread.</summary>
+        public Root OwnerRoot;
         public ConcurrentQueue<NetThreadOperation> NetThreadOpQueue =  new ConcurrentQueue<NetThreadOperation>();
         public ConcurrentQueue<MainThreadOperations> MainThreadOpQueue =  new ConcurrentQueue<MainThreadOperations>();
     }
@@ -77,6 +79,10 @@ namespace Bliss
         public IPEndPoint RemoteEndPoint;
         public SocketBufferRef BufferRef;
         public bool IsReliable; 
+        /// <summary>Whether the message arrived before its Server Root was ready.</summary>
+        public bool ReceivedBeforeRootReady;
+        /// <summary>The message policy when the network thread received this operation.</summary>
+        public RootInitializationMessagePolicy InitializationMessagePolicy;
     }
 
     public struct Invoke_OnReceiveMessage
@@ -84,6 +90,10 @@ namespace Bliss
         public Session Session;
         public ActorAddress TargetAddress;
         public object Message;
+        /// <summary>Whether the network thread received this message before the Root was ready.</summary>
+        public bool ReceivedBeforeRootReady;
+        /// <summary>The message policy when the network thread received this message.</summary>
+        public RootInitializationMessagePolicy InitializationMessagePolicy;
     }
     
     public struct Event_OnAcceiptConnection

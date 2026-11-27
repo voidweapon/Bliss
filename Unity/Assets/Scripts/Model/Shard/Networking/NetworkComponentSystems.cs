@@ -15,6 +15,7 @@ namespace Bliss
 
         private static void Awake(this NetworkComponent self, NetworkClientParam param1)
         {
+            self.OwnerRoot = self.Root();
             NetworkProfiler.Create();
             self.IsStop = false;
             self.NetDriver = self.CreateNetDriver(param1.DriverType);
@@ -30,6 +31,13 @@ namespace Bliss
         
         private static void Awake(this NetworkComponent self, NetworkServerParam param1)
         {
+            self.OwnerRoot = self.Root();
+            if (self.LogicScene.SceneType == ELogicSceneType.Gate || self.LogicScene.SceneType == ELogicSceneType.Realm)
+            {
+                self.RootScene().GetComponent<RootInitializationGateComponent>()
+                    ?.AllowSystem(typeof(NetworkComponent_EarlyUpdateSystem));
+            }
+
             NetworkProfiler.Create();
             self.IsStop = false;
             self.NetDriver = self.CreateNetDriver(param1.DriverType);
@@ -179,7 +187,8 @@ namespace Bliss
             session.Dispose();
         }
 
-        private static void OnReceive(this NetworkComponent self, uint connectionId, SocketBufferRef bufferRef)
+        private static void OnReceive(this NetworkComponent self, uint connectionId, SocketBufferRef bufferRef,
+            bool receivedBeforeRootReady, RootInitializationMessagePolicy initializationMessagePolicy)
         {
             Session session = self.GetChild<Session>(connectionId);
             if (session == null)
@@ -211,7 +220,9 @@ namespace Bliss
             EventSystem.Instance.Invoke((long)self.LogicScene.SceneType, new Invoke_OnReceiveMessage()
             {
                 Session = session,
-                Message = message
+                Message = message,
+                ReceivedBeforeRootReady = receivedBeforeRootReady,
+                InitializationMessagePolicy = initializationMessagePolicy,
             });
         }
         
@@ -226,7 +237,8 @@ namespace Bliss
                         self.OnAcceptConnection(operation.ConnectionId, operation.RemoteEndPoint);
                         break;
                     case EMainTreadOpType.OnReceiveMessage:
-                        self.OnReceive(operation.ConnectionId, operation.BufferRef);
+                        self.OnReceive(operation.ConnectionId, operation.BufferRef, operation.ReceivedBeforeRootReady,
+                            operation.InitializationMessagePolicy);
                         break;
                     case EMainTreadOpType.OnConnectionError:
                         self.OnConnectionError(operation.ConnectionId, operation.ErrorCode);
@@ -311,11 +323,17 @@ namespace Bliss
         
         private static void OnNetThreadConnectionReceive(this NetworkComponent self, uint connectionId, SocketBufferRef skBuffRef)
         {
+            // Preserve admission at receipt even if the Root becomes ready before the main thread drains the queue.
+            RootInitializationSnapshot snapshot = self.OwnerRoot.InitializationSnapshot;
+            ERootInitializationState state = snapshot.State;
             self.MainThreadOpQueue.Enqueue(new MainThreadOperations()
             {
                 OpType = EMainTreadOpType.OnReceiveMessage,
                 ConnectionId = connectionId,
                 BufferRef = skBuffRef,
+                ReceivedBeforeRootReady = state == ERootInitializationState.Initializing
+                    || state == ERootInitializationState.Failed,
+                InitializationMessagePolicy = snapshot.MessagePolicy,
             });
         }
         

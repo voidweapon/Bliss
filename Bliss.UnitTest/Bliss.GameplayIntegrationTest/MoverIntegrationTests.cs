@@ -1,10 +1,14 @@
 using System.Reflection;
 using System.Runtime.ExceptionServices;
+using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
 using Bliss;
 using Bliss.CharacterControllers;
 using Bliss.CharacterMovement;
 using Bliss.Core;
 using Bliss.Core.EventSystem;
+using Bliss.Core.Network;
 using Bliss.Gameplay.GameplayAbilitySystem;
 using Bliss.Physics;
 using Bliss.Server;
@@ -2328,6 +2332,245 @@ public class MoverIntegrationTests
         Assert.That(probe.UpdateCount, Is.Zero);
     }
 
+    /// <summary>Initializing external Roots respond to ordinary RPCs without running their handlers.</summary>
+    [TestCase(ELogicSceneType.Gate)]
+    [TestCase(ELogicSceneType.Realm)]
+    public void InitializingExternalRootRejectsRpcOverUdp(ELogicSceneType sceneType)
+    {
+        const int EXPECTED_ROOT_NOT_READY = 200004;
+        const int REQUEST_ID = 42;
+        ILogger previousLogger = Log.Logger;
+        MessageOpcodeManager opcodes = new MessageOpcodeManager();
+        LogMsg logMessages = new LogMsg();
+        SessionMessageDispatcher dispatcher = new SessionMessageDispatcher();
+        Root? externalRoot = null;
+        using UdpNetDriver client = new UdpNetDriver();
+        try
+        {
+            Log.Logger = new RecordingLogger();
+            MemoryPackSerializerRegister.Init();
+            opcodes.Init();
+            registerSingleton.Invoke(opcodes, null);
+            dispatcher.Init();
+            registerSingleton.Invoke(dispatcher, null);
+            logMessages.Init();
+            registerSingleton.Invoke(logMessages, null);
+            TimeInfo.Instance.Init();
+            TimeInfo.Instance.Update();
+
+            int port;
+            using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+            {
+                socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+                port = ((IPEndPoint)socket.LocalEndPoint!).Port;
+            }
+
+            externalRoot = (Root)rootConstructor.Invoke(new object[]
+                { FIRST_MANAGED_ROOT_ID, ROOT_ZONE, sceneType, "external-test" });
+            externalRoot.BeginInitialization();
+            externalRoot.Scene.AddComponent<NetworkComponent, NetworkServerParam>(new NetworkServerParam
+            {
+                BindEndPoint = new IPEndPoint(IPAddress.Loopback, port),
+                DriverType = ENetDriverType.Udp,
+                UseNetThread = true,
+            });
+            client.InitClient(AddressFamily.InterNetwork);
+            uint connectionId = client.CreateLocalConnectionId();
+            client.CreateRemoteConnection(connectionId, new IPEndPoint(IPAddress.Loopback, port));
+            MessageObject? received = null;
+            List<MessageObject> receivedMessages = new List<MessageObject>();
+            client.OnConnectionReceive += (_, buffer) =>
+            {
+                try
+                {
+                    received = MessageSerializer.NetStreamToMessage(buffer).Item2;
+                    receivedMessages.Add(received);
+                }
+                finally
+                {
+                    buffer.Dispose();
+                }
+            };
+            client.Send(connectionId, MessageSerializer.MessageToNetStream(client,
+                new C2G_EnterLevel { RpcId = REQUEST_ID }), true);
+            Stopwatch deadline = Stopwatch.StartNew();
+            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            {
+                TimeInfo.Instance.Update();
+                client.Update();
+                earlyUpdate(externalRoot);
+                Thread.Sleep(1);
+            }
+
+            Assert.That(received, Is.InstanceOf<G2C_EnterLevel>(), "The initializing Root did not reject the RPC.");
+            G2C_EnterLevel response = (G2C_EnterLevel)received!;
+            Assert.That(response.RpcId, Is.EqualTo(REQUEST_ID));
+            Assert.That(response.Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY));
+
+            if (sceneType == ELogicSceneType.Realm)
+            {
+                received = null;
+                client.Send(connectionId, MessageSerializer.MessageToNetStream(client,
+                    new C2R_Login { RpcId = REQUEST_ID, Account = "test", Password = "test" }), true);
+                deadline.Restart();
+                while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(3))
+                {
+                    TimeInfo.Instance.Update();
+                    client.Update();
+                    earlyUpdate(externalRoot);
+                    Thread.Sleep(1);
+                }
+                Assert.That(received, Is.InstanceOf<R2C_Login>());
+                Assert.That(((R2C_Login)received!).Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY));
+                Assert.That(((R2C_Login)received!).Message, Is.Null.Or.Empty);
+            }
+
+            NetworkComponent network = externalRoot.Scene.GetComponent<NetworkComponent>();
+            Session serverSession = network.Children.Values.OfType<Session>().Single();
+            received = null;
+            ETTask<IResponse> outboundCall = serverSession.Call(new C2G_EnterLevel(), null);
+            deadline.Restart();
+            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            {
+                TimeInfo.Instance.Update();
+                client.Update();
+                earlyUpdate(externalRoot);
+                Thread.Sleep(1);
+            }
+            Assert.That(received, Is.InstanceOf<C2G_EnterLevel>());
+            int outboundId = ((C2G_EnterLevel)received!).RpcId;
+            received = null;
+            client.Send(connectionId, MessageSerializer.MessageToNetStream(client,
+                new G2C_Login { RpcId = outboundId }), true);
+            deadline.Restart();
+            while (deadline.Elapsed < TimeSpan.FromMilliseconds(200))
+            {
+                TimeInfo.Instance.Update();
+                client.Update();
+                earlyUpdate(externalRoot);
+                Thread.Sleep(1);
+            }
+            Assert.That(outboundCall.IsCompleted, Is.False, "A response of the wrong type must not complete an RPC.");
+            client.Send(connectionId, MessageSerializer.MessageToNetStream(client,
+                new G2C_EnterLevel { RpcId = outboundId }), true);
+            deadline.Restart();
+            while (!outboundCall.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            {
+                TimeInfo.Instance.Update();
+                client.Update();
+                earlyUpdate(externalRoot);
+                Thread.Sleep(1);
+            }
+            Assert.That(outboundCall.IsCompleted, Is.True, "A matching response must complete the outstanding RPC.");
+            Assert.That(outboundCall.GetAwaiter().GetResult(), Is.InstanceOf<G2C_EnterLevel>());
+
+            externalRoot.Scene.GetComponent<RootInitializationGateComponent>()
+                .AllowMessage(typeof(PingMessage), ERootMessageIngress.Internal);
+            received = null;
+            client.Send(connectionId, MessageSerializer.MessageToNetStream(client, new PingMessage()), true);
+            deadline.Restart();
+            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            {
+                TimeInfo.Instance.Update();
+                client.Update();
+                earlyUpdate(externalRoot);
+                Thread.Sleep(1);
+            }
+
+            Assert.That(received, Is.InstanceOf<S2C_RootNotReady>());
+            S2C_RootNotReady notification = (S2C_RootNotReady)received!;
+            Assert.That(notification.Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY));
+            Assert.That(notification.RejectedOpcode, Is.EqualTo(OuterMessageOpcode.PingMessage));
+            Assert.That(client.TryGetConnection(connectionId, out _), Is.True);
+
+            received = null;
+            client.Send(connectionId, MessageSerializer.MessageToNetStream(client, new C2M_CharacterMoveData()), true);
+            deadline.Restart();
+            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            {
+                TimeInfo.Instance.Update();
+                client.Update();
+                earlyUpdate(externalRoot);
+                Thread.Sleep(1);
+            }
+            Assert.That(received, Is.InstanceOf<S2C_RootNotReady>());
+            Assert.That(((S2C_RootNotReady)received!).RejectedOpcode,
+                Is.EqualTo(OuterMessageOpcode.C2M_CharacterMoveData));
+
+            externalRoot.Scene.GetComponent<RootInitializationGateComponent>()
+                .AllowMessage(typeof(PingMessage), ERootMessageIngress.External);
+            received = null;
+            client.Send(connectionId, MessageSerializer.MessageToNetStream(client,
+                new PingMessage { PacketId = REQUEST_ID }), true);
+            deadline.Restart();
+            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            {
+                TimeInfo.Instance.Update();
+                client.Update();
+                earlyUpdate(externalRoot);
+                Thread.Sleep(1);
+            }
+            Assert.That(received, Is.InstanceOf<PongMessage>(), "An explicitly allowed message must reach its handler.");
+            Assert.That(((PongMessage)received!).PacketId, Is.EqualTo(REQUEST_ID));
+
+            received = null;
+            receivedMessages.Clear();
+            client.Send(connectionId, MessageSerializer.MessageToNetStream(client,
+                new C2G_EnterLevel { RpcId = REQUEST_ID + 1 }), true);
+            client.Send(connectionId, MessageSerializer.MessageToNetStream(client,
+                new PingMessage { PacketId = REQUEST_ID + 2 }), true);
+            deadline.Restart();
+            while (network.MainThreadOpQueue.Count(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage) < 2
+                && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            {
+                TimeInfo.Instance.Update();
+                client.Update();
+                Thread.Sleep(1);
+            }
+            Assert.That(network.MainThreadOpQueue.Count(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage),
+                Is.EqualTo(2), "The messages were not received during initialization.");
+            MethodInfo completeInitialization = typeof(Root).GetMethod("CompleteInitialization",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Root.CompleteInitialization was not found.");
+            completeInitialization.Invoke(externalRoot, null);
+            deadline.Restart();
+            while (receivedMessages.Count < 2 && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            {
+                TimeInfo.Instance.Update();
+                client.Update();
+                earlyUpdate(externalRoot);
+                Thread.Sleep(1);
+            }
+
+            Assert.That(receivedMessages.OfType<G2C_EnterLevel>().Single().Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY),
+                "A request received before Ready must not be replayed as a business request.");
+            Assert.That(receivedMessages.OfType<PongMessage>().Single().PacketId, Is.EqualTo(REQUEST_ID + 2),
+                "An allowed message received before Ready must retain its captured policy.");
+
+            received = null;
+            client.Send(connectionId, MessageSerializer.MessageToNetStream(client,
+                new PingMessage { PacketId = REQUEST_ID + 1 }), true);
+            deadline.Restart();
+            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            {
+                TimeInfo.Instance.Update();
+                client.Update();
+                earlyUpdate(externalRoot);
+                Thread.Sleep(1);
+            }
+            Assert.That(received, Is.InstanceOf<PongMessage>(), "Ready Roots must retain their normal routing.");
+            Assert.That(((PongMessage)received!).PacketId, Is.EqualTo(REQUEST_ID + 1));
+        }
+        finally
+        {
+            externalRoot?.Dispose();
+            dispatcher.Dispose();
+            opcodes.Dispose();
+            logMessages.Dispose();
+            Log.Logger = previousLogger;
+        }
+    }
+
     /// <summary>Each managed Root becomes ready only after its own initialization completes.</summary>
     [Test]
     public void ManagedRootsBecomeReadyIndependently()
@@ -3489,6 +3732,18 @@ public class MoverIntegrationTests
         {
             this.Task = GameplaySubtreeMigration.MigrateAsync(entity, this.destination);
             throw new InvalidOperationException("The fixed tick failed.");
+        }
+    }
+
+    /// <summary>Responds to test pings through the normal external session dispatcher.</summary>
+    [SessionMessageHandler(ELogicSceneType.Gate | ELogicSceneType.Realm)]
+    public sealed class TestExternalPingHandler : SessionMessageHandler<PingMessage>
+    {
+        /// <inheritdoc />
+        protected override async ETTask Run(Session session, PingMessage message)
+        {
+            session.Send(new PongMessage { PacketId = message.PacketId });
+            await ETTask.CompletedTask;
         }
     }
 

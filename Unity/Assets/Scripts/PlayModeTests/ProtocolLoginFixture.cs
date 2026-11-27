@@ -38,7 +38,12 @@ internal static class ProtocolLoginFixture
         return RunLogin(false);
     }
 
-    private static IEnumerator RunLogin(bool rejectGate)
+    internal static IEnumerator RunOneWayRejection()
+    {
+        return RunLogin(false, true);
+    }
+
+    private static IEnumerator RunLogin(bool rejectGate, bool rejectOneWay = false)
     {
         FieldInfo worldField = typeof(World).GetField("instance", BindingFlags.Static | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException("World instance field was not found.");
@@ -56,6 +61,8 @@ internal static class ProtocolLoginFixture
         ETTask login = null;
         Thread networkThread = null;
         Session session = null;
+        Application.LogCallback notificationObserver = null;
+        string notificationLog = null;
         try
         {
             resources.cleanupObject = new GameObject("ProtocolPlayModeCleanup");
@@ -76,6 +83,7 @@ internal static class ProtocolLoginFixture
 
             bool realmReceived = false;
             bool gateReceived = false;
+            int oneWayCount = 0;
             UdpNetDriver realmDriver = realm;
             UdpNetDriver gateDriver = gate;
             // The callbacks are owned by these drivers and capture only this test run's state.
@@ -106,6 +114,17 @@ internal static class ProtocolLoginFixture
                 try
                 {
                     var (_, message) = MessageSerializer.NetStreamToMessage(buffer);
+                    if (rejectOneWay && message is PingMessage)
+                    {
+                        oneWayCount++;
+                        gateDriver.Send(connectionId, MessageSerializer.MessageToNetStream(gateDriver,
+                            new S2C_RootNotReady
+                            {
+                                Error = ErrorCode.ERR_ROOT_NOT_READY,
+                                RejectedOpcode = OuterMessageOpcode.PingMessage,
+                            }), true);
+                        return;
+                    }
                     C2G_Login request = message as C2G_Login
                         ?? throw new InvalidOperationException($"Unexpected Gate message: {message.GetType()}");
                     Assert.That(request.GateToken, Is.EqualTo(GATE_TOKEN));
@@ -194,6 +213,33 @@ internal static class ProtocolLoginFixture
                 Assert.That(session.IsDisposed, Is.False, "The client session must still be live.");
                 Assert.That(clientScene.Children.Values.OfType<Player>().Single().Account, Is.EqualTo(ACCOUNT));
                 Assert.That(loginEvents, Is.EqualTo(1));
+                if (rejectOneWay)
+                {
+                    notificationObserver = (condition, _, type) =>
+                    {
+                        if (type == LogType.Warning && condition.Contains("RootNotReady"))
+                        {
+                            notificationLog = condition;
+                        }
+                    };
+                    Application.logMessageReceived += notificationObserver;
+                    resources.notificationObserver = notificationObserver;
+                    session.Send(new PingMessage());
+                    deadline = Time.realtimeSinceStartup + 1f;
+                    while (Time.realtimeSinceStartup < deadline)
+                    {
+                        realm.Update();
+                        gate.Update();
+                        world.EarlyUpdate();
+                        world.Update();
+                        world.LateUpdate();
+                        yield return null;
+                    }
+                    Assert.That(notificationLog, Does.Contain(ErrorCode.ERR_ROOT_NOT_READY.ToString()));
+                    Assert.That(notificationLog, Does.Contain(OuterMessageOpcode.PingMessage.ToString()));
+                    Assert.That(oneWayCount, Is.EqualTo(1), "The rejected operation must not be replayed.");
+                    Assert.That(session.IsDisposed, Is.False);
+                }
             }
         }
         finally
@@ -235,6 +281,7 @@ internal static class ProtocolLoginFixture
         internal ETTask login;
         internal Thread networkThread;
         internal GameObject cleanupObject;
+        internal Application.LogCallback notificationObserver;
         private bool disposed;
 
         /// <summary>Releases only resources owned by this test run.</summary>
@@ -248,6 +295,11 @@ internal static class ProtocolLoginFixture
             if (ReferenceEquals(activeRun, this))
             {
                 activeRun = null;
+            }
+            if (notificationObserver != null)
+            {
+                Application.logMessageReceived -= notificationObserver;
+                notificationObserver = null;
             }
             if (login != null && !login.IsCompleted) Cleanup(cancellation.Cancel);
             if (world != null) Cleanup(world.Dispose);

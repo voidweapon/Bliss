@@ -32,6 +32,13 @@ public class ProtocolLoginTests
         yield return ProtocolLoginFixture.RunRejectedLogin();
     }
 
+    /// <summary>A one-way rejection is recorded without replaying the rejected operation.</summary>
+    [UnityTest]
+    public IEnumerator OneWayRejectionIsRecordedWithoutReplay()
+    {
+        yield return ProtocolLoginFixture.RunOneWayRejection();
+    }
+
     /// <summary>An existing World is never taken over or disposed by the fixture.</summary>
     [Test]
     public void ExistingWorldIsPreserved()

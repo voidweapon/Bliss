@@ -13,6 +13,11 @@ namespace Bliss
             object message = args.Message;
             switch (message)
             {
+                case S2C_RootNotReady notification:
+                {
+                    Log.Warning($"RootNotReady: error={notification.Error}, opcode={notification.RejectedOpcode}");
+                    break;
+                }
                 case IResponse response:
                 {
                     session.OnResponse(response);

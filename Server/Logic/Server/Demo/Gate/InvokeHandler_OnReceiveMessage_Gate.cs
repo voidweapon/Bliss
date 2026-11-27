@@ -19,8 +19,18 @@ namespace Bliss
         {
             Session session = args.Session;
             object message = args.Message;
+            if (ExternalMessageAdmission.RejectWhileInitializing(session, message, args.ReceivedBeforeRootReady,
+                    args.InitializationMessagePolicy))
+            {
+                return;
+            }
             switch (message)
             {
+                case IResponse response:
+                {
+                    session.OnResponse(response);
+                    break;
+                }
                 case ISessionMessage sessionMessage:
                 {
                     SessionMessageDispatcher.Instance.Handle(session, sessionMessage);
@@ -43,11 +53,6 @@ namespace Bliss
                     {
                         session.Send((MessageObject)response);
                     }
-                    break;
-                }
-                case IResponse response:
-                {
-                    session.OnResponse(response);
                     break;
                 }
                 default:

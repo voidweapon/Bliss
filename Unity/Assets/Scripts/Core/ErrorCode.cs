@@ -25,6 +25,9 @@ namespace Bliss
         public const int ERR_TASK_TIMEOUT = 200002;
 
         public const int ERR_NOT_FOUND_MAP = 200003;
+
+        /// <summary>The target Server Root has not completed initialization.</summary>
+        public const int ERR_ROOT_NOT_READY = 200004;
         
         public static bool IsRpcNeedThrowException(int error)
         {

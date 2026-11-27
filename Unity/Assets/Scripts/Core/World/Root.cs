@@ -16,6 +16,22 @@ namespace Bliss
         Failed,
     }
 
+    /// <summary>An immutable, atomically published view of a Root's initialization admission.</summary>
+    public sealed class RootInitializationSnapshot
+    {
+        internal RootInitializationSnapshot(ERootInitializationState state, RootInitializationMessagePolicy messagePolicy)
+        {
+            State = state;
+            MessagePolicy = messagePolicy;
+        }
+
+        /// <summary>The Root state when this snapshot was published.</summary>
+        public ERootInitializationState State { get; }
+
+        /// <summary>The initialization message policy associated with this state.</summary>
+        public RootInitializationMessagePolicy MessagePolicy { get; }
+    }
+
     public class Root : IDisposable
     {
         public int Id { get; private set; }
@@ -30,8 +46,26 @@ namespace Bliss
         
         public bool IsDisposed { get; private set; }
 
+        private volatile RootInitializationSnapshot _initializationSnapshot =
+            new RootInitializationSnapshot(ERootInitializationState.Unmanaged, RootInitializationMessagePolicy.Empty);
+
         /// <summary>The Root's Server initialization state, or Unmanaged for ungated Roots.</summary>
-        public ERootInitializationState InitializationState { get; private set; }
+        public ERootInitializationState InitializationState
+        {
+            get => _initializationSnapshot.State;
+            private set => _initializationSnapshot = new RootInitializationSnapshot(value, _initializationSnapshot.MessagePolicy);
+        }
+
+        /// <summary>The current atomic initialization state and message policy.</summary>
+        public RootInitializationSnapshot InitializationSnapshot => _initializationSnapshot;
+
+        /// <summary>The immutable message policy snapshot for this Root's initialization.</summary>
+        public RootInitializationMessagePolicy InitializationMessagePolicy => _initializationSnapshot.MessagePolicy;
+
+        internal void SetInitializationMessagePolicy(RootInitializationMessagePolicy policy)
+        {
+            _initializationSnapshot = new RootInitializationSnapshot(_initializationSnapshot.State, policy);
+        }
 
         public Root RootNode { get; private set; }
 

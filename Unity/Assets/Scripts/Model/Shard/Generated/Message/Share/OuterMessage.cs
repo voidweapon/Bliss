@@ -289,7 +289,7 @@ namespace Bliss
     
     [MemoryPackable]
     [MessageOpcode(OuterMessageOpcode.C2R_Login)]
-    [MessageResponse("Bliss.G2C_Login")]
+    [MessageResponse("Bliss.R2C_Login")]
     public partial class C2R_Login : MessageObject, ISessionRequest 
     {
         
@@ -1179,6 +1179,50 @@ namespace Bliss
     }
     
     
+    [MemoryPackable]
+    [MessageOpcode(OuterMessageOpcode.S2C_RootNotReady)]
+    public partial class S2C_RootNotReady : MessageObject, ISessionMessage
+    {
+
+        [MemoryPackOrder(1)]
+        public int Error { get; set; }
+
+        [MemoryPackOrder(2)]
+        public int RejectedOpcode { get; set; }
+
+        public static S2C_RootNotReady Create(bool isFromPool = false)
+        {
+            return ObjectPool.Instance.Fetch(typeof(S2C_RootNotReady), isFromPool) as S2C_RootNotReady;
+        }
+
+        partial void CustomDispose();
+
+        public override void Dispose()
+        {
+            if (!this.IsFromPool)
+            {
+                return;
+            }
+
+            this.Error = default;
+            this.RejectedOpcode = default;
+
+            ObjectPool.Instance.Recycle(this);
+        }
+
+        private static int _sizeHint = System.Runtime.CompilerServices.Unsafe.SizeOf<int>() + System.Runtime.CompilerServices.Unsafe.SizeOf<int>();
+
+        partial void CustomSizeHint(ref int sizeHint);
+
+        public override int SizeHint()
+        {
+            int sizeHint = _sizeHint;
+            CustomSizeHint(ref sizeHint);
+            return sizeHint;
+        }
+    }
+
+
     public static partial  class OuterMessageOpcode
     {
         public const ushort PingMessage = 1000;
@@ -1205,5 +1249,6 @@ namespace Bliss
         public const ushort C2M_CharacterMoveData = 1021;
         public const ushort M2C_AckGoodCharacterMoveData = 1022;
         public const ushort M2C_CharacterMovementRepData = 1023;
+        public const ushort S2C_RootNotReady = 1024;
     }
 }
