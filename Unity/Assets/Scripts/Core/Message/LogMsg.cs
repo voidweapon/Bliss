@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Bliss
@@ -92,6 +93,28 @@ namespace Bliss
                 var scene = sender.Scene();
                 Log.Debug($"[ProcessInner][{scene.SceneType}][{scene.Name}]:{msg.GetType()} -- {message}");
             }
+        }
+
+        /// <summary>Logs gateway routing without including the business message body.</summary>
+        /// <param name="origin">The original sending Root.</param>
+        /// <param name="target">The final business Actor.</param>
+        /// <param name="opcode">The business message opcode.</param>
+        /// <param name="stage">The gateway routing stage.</param>
+        /// <param name="rpcId">The relevant RPC correlation identifier, or zero for one-way messages.</param>
+        public void DebugInternalGateway(RootAddress origin, ActorAddress target, ushort opcode, string stage, int rpcId)
+        {
+            if (_useIncludeRule && !_include.Contains(opcode)
+                || _useIgnoreRule && _ignore.Contains(opcode))
+            {
+                return;
+            }
+
+            if (!MessageOpcodeManager.Instance.GetMessageTypeBy(opcode, out Type messageType))
+            {
+                return;
+            }
+
+            Log.Debug($"[InternalGateway][{stage}] {origin} -> {target} {messageType.FullName} RpcId={rpcId}");
         }
 
         private bool Check(object msg)

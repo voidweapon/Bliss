@@ -153,11 +153,6 @@ namespace Bliss
 
         public void EarlyUpdate()
         {
-            if (_root?.InitializationState == ERootInitializationState.Failed)
-            {
-                return;
-            }
-
             RootInitializationGateComponent gate = _root?.GetInitializationGate();
             _updateScheduler.BeginFrame();
             _updateScheduler.Update(
@@ -168,11 +163,6 @@ namespace Bliss
 
         public void Update()
         {
-            if (_root?.InitializationState == ERootInitializationState.Failed)
-            {
-                return;
-            }
-
             _updateScheduler.Update(
                 (ESystemUpdateGroup)SystemUpdateGroupRange.FIRST_UPDATE,
                 ESystemUpdateGroup.Update,

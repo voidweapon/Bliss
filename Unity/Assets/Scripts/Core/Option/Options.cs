@@ -2,6 +2,9 @@ namespace Bliss
 {
     public class Options : Singleton<Options>
     {
+        /// <summary>The default bounded wait for forwarding an internal RPC through Main.</summary>
+        public const long DEFAULT_INTERNAL_MESSAGE_FORWARD_TIMEOUT_MS = 40 * 1000;
+
         
 #if DOTNET
         [CommandLine.Option(nameof(AppName), HelpText = "The name of the app.")]
@@ -25,5 +28,13 @@ namespace Bliss
         [CommandLine.Option(nameof(Console), Default = 1, HelpText = "Is enable console")]
 #endif        
         public int Console { get; set; }
+
+#if DOTNET
+        [CommandLine.Option(nameof(InternalMessageForwardTimeoutMS),
+            Default = DEFAULT_INTERNAL_MESSAGE_FORWARD_TIMEOUT_MS,
+            HelpText = "The maximum time in milliseconds that Main waits for a forwarded internal RPC.")]
+#endif
+        /// <summary>Maximum bounded forwarding wait in milliseconds; must be positive.</summary>
+        public long InternalMessageForwardTimeoutMS { get; set; } = DEFAULT_INTERNAL_MESSAGE_FORWARD_TIMEOUT_MS;
     }
 }

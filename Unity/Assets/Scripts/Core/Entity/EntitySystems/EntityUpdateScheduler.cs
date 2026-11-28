@@ -108,14 +108,15 @@ namespace Bliss
         {
             foreach (SystemGroup systemGroup in _frameGroups)
             {
-                if (root?.InitializationState == ERootInitializationState.Failed)
-                {
-                    return;
-                }
-
                 if (root != null && (gate == null || gate.IsDisposed))
                 {
                     gate = root.GetInitializationGate();
+                }
+
+                if (root?.InitializationState == ERootInitializationState.Failed
+                    && (gate == null || !gate.AllowsSystemAfterFailure(systemGroup.SystemType)))
+                {
+                    continue;
                 }
 
                 if (systemGroup.UpdateGroup < (int)minimumGroup || systemGroup.UpdateGroup > (int)maximumGroup)
@@ -245,12 +246,15 @@ namespace Bliss
                     Root entityRoot = root ?? entity.LogicScene?.Root;
                     if (entityRoot?.InitializationState == ERootInitializationState.Failed)
                     {
-                        if (root != null)
+                        if (root != null && (gate == null || !gate.AllowsSystemAfterFailure(SystemType)))
                         {
                             return;
                         }
 
-                        continue;
+                        if (root == null)
+                        {
+                            continue;
+                        }
                     }
 
                     if (entityRoot != null)

@@ -35,3 +35,18 @@ dotnet run --configuration Release --project BlissBenchMark -- no-baseline \
 ```
 
 Exploratory runs do not create formal manifests. A formal manifest is written only after BenchmarkDotNet completes successfully. Benchmark runs are intentionally not part of routine pull-request CI. For a performance conclusion, manually record the run IDs, measured result, environment, and relevant limitations in the project documentation alongside the change.
+
+## Main internal gateway results for #39
+
+Formal comparison: `issue39-main-gateway-baseline-v2` against `issue39-main-gateway-candidate-v4`. Both runs used the workload “MessageSender RPC and one-way batches (1 and 16) over loopback UDP using a local peer” and prepared Root, Main, network drivers, and peer before each measured iteration. Configuration was BenchmarkDotNet 0.15.2 on .NET 8.0.19, three launches, five warmups, and ten measurement iterations, with `MemoryDiagnoser`.
+
+Environment: macOS Darwin 25.6.0, Apple M1 Pro (10 processors), .NET SDK 8.0.413. Mean time and managed allocation are per benchmark invocation (one batch).
+
+| Route | Batch | Baseline mean | Candidate mean | Time change | Baseline allocated | Candidate allocated |
+|---|---:|---:|---:|---:|---:|---:|
+| RPC | 1 | 11.43 ms | 10.94 ms | -4.25% | 33,127 B | 58,281 B |
+| RPC | 16 | 13.58 ms | 16.27 ms | +19.82% | 419,545 B | 477,442 B |
+| One-way | 1 | 9.96 ms | 9.94 ms | -0.20% | 41,863 B | 42,009 B |
+| One-way | 16 | 9.97 ms | 9.98 ms | +0.12% | 202,698 B | 230,297 B |
+
+One-way timing is effectively unchanged. RPC batch 1 is also inconclusive: baseline and candidate 99.9% confidence intervals overlap (10.30–12.55 ms and 10.25–11.63 ms). RPC batch 16 is noisy and the intervals overlap (11.16–15.99 ms and 13.64–18.89 ms); do not infer a definite timing regression from its +19.82% mean. Managed allocation increased in all candidate cases except that one-way batch 1 remained nearly flat; most notably RPC batch 1 increased by about 76%. This loopback benchmark includes UDP scheduling and polling and does not isolate gateway CPU cost. Treat the results as an end-to-end local comparison, not a claim about production network latency.

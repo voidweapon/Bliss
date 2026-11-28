@@ -83,6 +83,8 @@ namespace Bliss
         public bool ReceivedBeforeRootReady;
         /// <summary>The message policy when the network thread received this operation.</summary>
         public RootInitializationMessagePolicy InitializationMessagePolicy;
+        /// <summary>The destination Root's policy when an internal network message arrived.</summary>
+        public RootMessageAdmission TargetAdmission;
     }
 
     public struct Invoke_OnReceiveMessage
@@ -94,6 +96,8 @@ namespace Bliss
         public bool ReceivedBeforeRootReady;
         /// <summary>The message policy when the network thread received this message.</summary>
         public RootInitializationMessagePolicy InitializationMessagePolicy;
+        /// <summary>The destination Root's policy when an internal network message arrived.</summary>
+        public RootMessageAdmission TargetAdmission;
     }
     
     public struct Event_OnAcceiptConnection

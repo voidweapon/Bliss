@@ -3,6 +3,7 @@ using System.Runtime.ExceptionServices;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Text.Json;
 using Bliss;
 using Bliss.CharacterControllers;
 using Bliss.CharacterMovement;
@@ -91,6 +92,10 @@ public class MoverIntegrationTests
     private const long HEALTHY_WORLD_INSTANCE_ID = 10002;
     private const int SUPPRESS_INFO_LOG_LEVEL = 4;
     private const long FAULTED_WORLD_TIMER_INTERVAL = 200;
+    private const int MESSAGE_TEST_TIMEOUT_SECONDS = 3;
+    private const int GATEWAY_TEST_TIMEOUT_SECONDS = 4;
+    private const int MESSAGE_TEST_RPC_TIMEOUT_MILLISECONDS = 3000;
+    private const int MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS = 1;
     private static readonly float3 moveDirection = new float3(UNIT_AXIS, ZERO_AXIS, ZERO_AXIS);
     private static readonly Action<Entity, float> recordLogicCallback = recordLogicUpdate;
     private static readonly ConstructorInfo rootConstructor =
@@ -2332,6 +2337,974 @@ public class MoverIntegrationTests
         Assert.That(probe.UpdateCount, Is.Zero);
     }
 
+    /// <summary>Internal RPCs to an initializing Root receive a RootNotReady response.</summary>
+    [Test]
+    public void InitializingInternalRootRejectsRpc()
+    {
+        const int EXPECTED_ROOT_NOT_READY = 200004;
+        ProcessMessageManager messages = new ProcessMessageManager();
+        MessageOpcodeManager opcodes = new MessageOpcodeManager();
+        LogMsg logMessages = new LogMsg();
+        MessageDispatcher dispatcher = new MessageDispatcher();
+        Options options = new Options { Process = ROOT_ZONE };
+        ILogger previousLogger = Log.Logger;
+        RecordingLogger logger = new RecordingLogger();
+        Root? target = null;
+        try
+        {
+            registerSingleton.Invoke(options, null);
+            Log.Logger = logger;
+            registerSingleton.Invoke(messages, null);
+            opcodes.Init();
+            registerSingleton.Invoke(opcodes, null);
+            logMessages.Init();
+            registerSingleton.Invoke(logMessages, null);
+            dispatcher.Init();
+            registerSingleton.Invoke(dispatcher, null);
+            InternalPingHandler.Count = 0;
+            InternalLocationHandler.Count = 0;
+            InternalRequestHandler.Count = 0;
+            this.root.Scene.AddComponent<NetworkEntityManagerComponent>();
+            ProcessInnerMessageProxy sender = this.root.Scene.AddComponent<ProcessInnerMessageProxy>();
+            target = (Root)rootConstructor.Invoke(new object[]
+                { FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.Map, "internal-test" });
+            target.BeginInitialization();
+            target.Scene.AddComponent<NetworkEntityManagerComponent>();
+            target.Scene.AddComponent<TimerComponent>();
+            ProcessInnerMessageProxy targetProxy = target.Scene.AddComponent<ProcessInnerMessageProxy>();
+            target.Scene.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.UnOrderedMessage);
+
+            ETTask<IResponse> call = sender.Call(new ActorAddress(target.RootAddress), new ObjectAddRequest());
+            earlyUpdate(target);
+            update(target);
+            earlyUpdate(this.root);
+            update(this.root);
+
+            Assert.That(call.IsCompleted, Is.True, "An initializing Root must respond without waiting for Ready.");
+            Assert.That(call.GetAwaiter().GetResult().Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY));
+
+            sender.Send(new ActorAddress(target.RootAddress), new PingMessage());
+            Assert.That(logger.Warnings.Any(warning => warning.Contains(nameof(PingMessage))
+                && warning.Contains(target.RootAddress.ToString())
+                && warning.Contains(this.root.RootAddress.ToString())), Is.True,
+                "A rejected one-way message must be diagnosed without entering the target queue.");
+            List<ProcessMessageInfo> pendingMessages = new List<ProcessMessageInfo>();
+            messages.Fetch(target.Id, pendingMessages, 1000);
+            Assert.That(pendingMessages, Is.Empty, "A rejected one-way message must not enter the target queue.");
+            earlyUpdate(target);
+            update(target);
+            Assert.That(logger.Warnings.Any(warning => warning.Contains(nameof(PingMessage))
+                && warning.Contains(target.RootAddress.ToString())
+                && warning.Contains(this.root.RootAddress.ToString())), Is.True,
+                "A rejected one-way message must identify the target, type and sender.");
+            Assert.That(InternalPingHandler.Count, Is.Zero);
+            RootInitializationGateComponent gate = target.Scene.GetComponent<RootInitializationGateComponent>();
+            gate.AllowMessage(typeof(ObjectAddRequest), ERootMessageIngress.Internal);
+            ETTask<IResponse> allowlistedCall = sender.Call(new ActorAddress(target.RootAddress),
+                new ObjectAddRequest(), false);
+            earlyUpdate(target);
+            update(target);
+            earlyUpdate(this.root);
+            update(this.root);
+            Assert.That(allowlistedCall.IsCompleted, Is.True,
+                "An allowlisted RPC must be rejected during initialization.");
+            Assert.That(allowlistedCall.GetAwaiter().GetResult().Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY));
+            Assert.That(InternalRequestHandler.Count, Is.Zero,
+                "An initialization allowlist must not dispatch ordinary RPC requests.");
+            gate.AllowMessage(typeof(PingMessage), ERootMessageIngress.External);
+            sender.Send(new ActorAddress(target.RootAddress), new PingMessage());
+            earlyUpdate(target);
+            update(target);
+            Assert.That(InternalPingHandler.Count, Is.Zero, "External permission must not admit internal messages.");
+            gate.AllowMessage(typeof(PingMessage), ERootMessageIngress.Internal);
+            sender.Send(new ActorAddress(target.RootAddress), new PingMessage());
+            earlyUpdate(target);
+            update(target);
+            Assert.That(InternalPingHandler.Count, Is.EqualTo(1), "Explicit internal permission must admit the message.");
+
+            ObjectAddRequest outbound = new ObjectAddRequest();
+            ETTask<IResponse> pending = targetProxy.Call(new ActorAddress(this.root.RootAddress), outbound);
+            ActorAddress responseAddress = new ActorAddress(target.RootAddress, 0);
+            messages.Enqueue(this.root.RootAddress, responseAddress, new ObjectRemoveResponse { RpcId = outbound.RpcId });
+            earlyUpdate(target);
+            update(target);
+            Assert.That(pending.IsCompleted, Is.False, "A response of the wrong type must not complete the RPC.");
+            messages.Enqueue(new RootAddress(ROOT_ZONE, CHILD_ROOT_ID), responseAddress,
+                new ObjectAddResponse { RpcId = outbound.RpcId });
+            earlyUpdate(target);
+            update(target);
+            Assert.That(pending.IsCompleted, Is.False, "A response from a different Root must not complete the RPC.");
+            messages.Enqueue(this.root.RootAddress, responseAddress, new ObjectAddResponse { RpcId = outbound.RpcId });
+            earlyUpdate(target);
+            update(target);
+            Assert.That(pending.IsCompleted, Is.True, "A matching response must complete the outstanding RPC.");
+            Assert.That(pending.GetAwaiter().GetResult(), Is.InstanceOf<ObjectAddResponse>());
+
+            ETTask<IResponse> queuedCall = sender.Call(new ActorAddress(target.RootAddress), new ObjectAddRequest(), false);
+            sender.Send(new ActorAddress(target.RootAddress), new C2M_CharacterMoveData());
+            MethodInfo completeInitialization = typeof(Root).GetMethod("CompleteInitialization",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Root.CompleteInitialization was not found.");
+            completeInitialization.Invoke(target, null);
+            earlyUpdate(target);
+            update(target);
+            earlyUpdate(this.root);
+            update(this.root);
+            Assert.That(queuedCall.IsCompleted, Is.True);
+            Assert.That(queuedCall.GetAwaiter().GetResult().Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY),
+                "A request received before Ready must not be replayed after initialization.");
+            Assert.That(InternalLocationHandler.Count, Is.Zero, "One-way messages received before Ready must not be replayed.");
+            sender.Send(new ActorAddress(target.RootAddress), new PingMessage());
+            earlyUpdate(target);
+            update(target);
+            Assert.That(InternalPingHandler.Count, Is.EqualTo(2), "Ready Roots must route internal messages normally.");
+        }
+        finally
+        {
+            target?.Dispose();
+            this.root.Scene.RemoveComponent<ProcessInnerMessageProxy>();
+            this.root.Scene.RemoveComponent<NetworkEntityManagerComponent>();
+            dispatcher.Dispose();
+            logMessages.Dispose();
+            opcodes.Dispose();
+            messages.Dispose();
+            options.Dispose();
+            Log.Logger = previousLogger;
+        }
+    }
+
+    /// <summary>A failed Root rejects requests while processing only matching RPC responses.</summary>
+    [Test]
+    public void FailedInternalRootRejectsRpcWithoutUpdating()
+    {
+        const int EXPECTED_ROOT_NOT_READY = ErrorCode.ERR_ROOT_NOT_READY;
+        ProcessMessageManager messages = new ProcessMessageManager();
+        MessageOpcodeManager opcodes = new MessageOpcodeManager();
+        LogMsg logMessages = new LogMsg();
+        Options options = new Options { Process = ROOT_ZONE };
+        ILogger previousLogger = Log.Logger;
+        RecordingLogger logger = new RecordingLogger();
+        Root? target = null;
+        Root? requestDestination = null;
+        try
+        {
+            Log.Logger = logger;
+            InternalPingHandler.Count = 0;
+            registerSingleton.Invoke(options, null);
+            registerSingleton.Invoke(messages, null);
+            opcodes.Init();
+            registerSingleton.Invoke(opcodes, null);
+            logMessages.Init();
+            registerSingleton.Invoke(logMessages, null);
+            ProcessInnerMessageProxy sender = this.root.Scene.AddComponent<ProcessInnerMessageProxy>();
+            target = (Root)rootConstructor.Invoke(new object[]
+                { FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.Map, "failed-internal-test" });
+            target.BeginInitialization();
+            ETTask<IResponse> preRouteCall = sender.Call(new ActorAddress(target.RootAddress), new ObjectAddRequest(), false);
+            earlyUpdate(this.root);
+            update(this.root);
+            Assert.That(preRouteCall.IsCompleted, Is.True);
+            Assert.That(preRouteCall.GetAwaiter().GetResult().Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY),
+                "A known initializing Root without a route must reject RPCs as not ready.");
+            target.Scene.AddComponent<ProcessInnerMessageProxy>();
+            target.Scene.GetComponent<RootInitializationGateComponent>()
+                .AllowMessage(typeof(ObjectAddRequest), ERootMessageIngress.Internal);
+            target.Scene.GetComponent<RootInitializationGateComponent>()
+                .AllowMessage(typeof(PingMessage), ERootMessageIngress.Internal);
+            ETTask<IResponse> queuedCall = sender.Call(new ActorAddress(target.RootAddress), new ObjectAddRequest(), false);
+            sender.Send(new ActorAddress(target.RootAddress), new PingMessage());
+            requestDestination = (Root)rootConstructor.Invoke(new object[]
+                { CHILD_ROOT_ID, ROOT_ZONE, ELogicSceneType.Map, "failed-rpc-destination-test" });
+            ProcessInnerMessageProxy requestDestinationProxy =
+                requestDestination.Scene.AddComponent<ProcessInnerMessageProxy>();
+            ProcessInnerMessageProxy failedProxy = target.Scene.GetComponent<ProcessInnerMessageProxy>();
+            ObjectAddRequest initializingRequest = new ObjectAddRequest();
+            ETTask<IResponse> initializingCall = failedProxy.Call(
+                new ActorAddress(requestDestination.RootAddress), initializingRequest, 0, false);
+            IResponse initializingUnmatchedResponse = MessageOpcodeManager.Instance.CreateResponseBy(
+                typeof(ObjectAddRequest), initializingRequest.RpcId + 100, ErrorCode.ERR_Success);
+            requestDestinationProxy.Reply(target.RootAddress, initializingUnmatchedResponse);
+            IResponse initializingMatchingResponse = MessageOpcodeManager.Instance.CreateResponseBy(
+                typeof(ObjectAddRequest), initializingRequest.RpcId, ErrorCode.ERR_Success);
+            requestDestinationProxy.Reply(target.RootAddress, initializingMatchingResponse);
+
+            MethodInfo failInitialization = typeof(Root).GetMethod("FailInitialization",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Root.FailInitialization was not found.");
+            failInitialization.Invoke(target, null);
+
+            ETTask<IResponse> call = sender.Call(new ActorAddress(target.RootAddress), new ObjectAddRequest(), false);
+            earlyUpdate(this.root);
+            update(this.root);
+
+            ObjectAddRequest outstandingRequest = new ObjectAddRequest();
+            ETTask<IResponse> outstandingCall = failedProxy.Call(
+                new ActorAddress(this.root.RootAddress), outstandingRequest, 0, false);
+            IResponse unmatchedResponse = MessageOpcodeManager.Instance.CreateResponseBy(
+                typeof(ObjectAddRequest), outstandingRequest.RpcId + 1, ErrorCode.ERR_Success);
+            sender.Reply(target.RootAddress, unmatchedResponse);
+            earlyUpdate(target);
+            update(target);
+            Assert.That(outstandingCall.IsCompleted, Is.False,
+                "A failed Root must ignore responses that do not match an outstanding RPC.");
+            IResponse matchingResponse = MessageOpcodeManager.Instance.CreateResponseBy(
+                typeof(ObjectAddRequest), outstandingRequest.RpcId, ErrorCode.ERR_Success);
+            sender.Reply(target.RootAddress, matchingResponse);
+            earlyUpdate(target);
+            update(target);
+
+            Assert.That(outstandingCall.IsCompleted, Is.True,
+                "A failed Root must still complete an outstanding RPC from a matching response.");
+            Assert.That(outstandingCall.GetAwaiter().GetResult().RpcId, Is.EqualTo(outstandingRequest.RpcId));
+            Assert.That(initializingCall.IsCompleted, Is.True,
+                "A response queued before failure must remain available to an outstanding RPC.");
+            Assert.That(initializingCall.GetAwaiter().GetResult().RpcId, Is.EqualTo(initializingRequest.RpcId));
+            Assert.That(queuedCall.IsCompleted, Is.True, "A failed Root must reject requests queued before failure.");
+            Assert.That(queuedCall.GetAwaiter().GetResult().Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY));
+            Assert.That(call.IsCompleted, Is.True, "A failed Root cannot rely on its own message pump to reject RPCs.");
+            Assert.That(call.GetAwaiter().GetResult().Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY));
+            Assert.That(logger.Warnings.Any(warning => warning.Contains(nameof(PingMessage))
+                && warning.Contains(target.RootAddress.ToString())
+                && warning.Contains(this.root.RootAddress.ToString())), Is.True,
+                "A one-way message queued before failure must be discarded and diagnosed.");
+            Assert.That(InternalPingHandler.Count, Is.Zero,
+                "A failed Root must not run ordinary internal message handlers.");
+        }
+        finally
+        {
+            requestDestination?.Dispose();
+            target?.Dispose();
+            this.root.Scene.RemoveComponent<ProcessInnerMessageProxy>();
+            logMessages.Dispose();
+            opcodes.Dispose();
+            messages.Dispose();
+            options.Dispose();
+            Log.Logger = previousLogger;
+        }
+    }
+
+    /// <summary>A cross-process MessageSender call passes through the local Main and returns the payload response.</summary>
+    [Test]
+    public void MessageSenderCallRoutesThroughMainGateway()
+    {
+        const int REMOTE_PROCESS = 2;
+        const int REMOTE_ROOT = 900;
+        const int EXPECTED_ERROR = 0;
+        ProcessMessageManager messages = new ProcessMessageManager();
+        MessageOpcodeManager opcodes = new MessageOpcodeManager();
+        LogMsg logMessages = new LogMsg();
+        MessageDispatcher dispatcher = new MessageDispatcher();
+        Options options = new Options
+        {
+            Process = ROOT_ZONE,
+            InternalMessageForwardTimeoutMS = 3000,
+        };
+        Root? main = null;
+        Root? caller = null;
+        UdpNetDriver? peer = new UdpNetDriver();
+        bool oneWayReceived = false;
+        int expectedRpcId = 0;
+        try
+        {
+            registerSingleton.Invoke(options, null);
+            registerSingleton.Invoke(messages, null);
+            opcodes.Init();
+            registerSingleton.Invoke(opcodes, null);
+            logMessages.Init();
+            registerSingleton.Invoke(logMessages, null);
+            dispatcher.Init();
+            registerSingleton.Invoke(dispatcher, null);
+            MemoryPackSerializerRegister.Init();
+            TimeInfo.Instance.Init();
+            TimeInfo.Instance.Update();
+
+            int peerPort = getAvailableUdpPort();
+            int mainPort = getAvailableUdpPort();
+            peer.InitServer(new IPEndPoint(IPAddress.Loopback, peerPort));
+            peer.OnConnectionReceive += (connectionId, buffer) =>
+            {
+                try
+                {
+                    ActorAddress returnAddress = MessageSerializer.ReadInternalAddress(buffer);
+                    MessageObject received = MessageSerializer.NetStreamToMessage(buffer).Item2;
+                    if (received is InternalMessageCallEnvelope callEnvelope)
+                    {
+                        Assert.That(callEnvelope.TargetAddress, Is.EqualTo(new ActorAddress(
+                            REMOTE_PROCESS, REMOTE_ROOT, ActorAddress.CFirstInstanceId)));
+                        Assert.That(callEnvelope.OriginRoot,
+                            Is.EqualTo(new RootAddress(options.Process, SECOND_MANAGED_ROOT_ID)));
+                        Assert.That(callEnvelope.OriginRpcId, Is.GreaterThan(0));
+                        expectedRpcId = callEnvelope.OriginRpcId;
+                        MessageObject request = MessageSerializer.DeserializePayload(
+                            callEnvelope.PayloadOpcode, callEnvelope.Payload);
+                        Assert.That(request, Is.InstanceOf<ObjectAddRequest>());
+
+                        InternalMessageCallResponse response = new()
+                        {
+                            RpcId = callEnvelope.RpcId,
+                            Payload = MessageSerializer.SerializePayload(new ObjectAddResponse
+                            {
+                                Error = EXPECTED_ERROR,
+                                RpcId = expectedRpcId,
+                            }, out ushort responseOpcode),
+                            PayloadOpcode = responseOpcode,
+                        };
+                        peer.Send(connectionId, MessageSerializer.MessageToNetStream(peer, returnAddress, response), true);
+                    }
+                    else
+                    {
+                        Assert.That(received, Is.InstanceOf<InternalMessageSendEnvelope>());
+                        InternalMessageSendEnvelope sendEnvelope = (InternalMessageSendEnvelope)received;
+                        Assert.That(sendEnvelope.TargetAddress, Is.EqualTo(new ActorAddress(
+                            REMOTE_PROCESS, REMOTE_ROOT, ActorAddress.CFirstInstanceId)));
+                        Assert.That(MessageSerializer.DeserializePayload(sendEnvelope.PayloadOpcode,
+                            sendEnvelope.Payload), Is.InstanceOf<PingMessage>());
+                        oneWayReceived = true;
+                    }
+                }
+                finally
+                {
+                    buffer.Dispose();
+                }
+            };
+
+            configManager.Tables.TbServerProcess.DataMap.Add(REMOTE_PROCESS,
+                new ServerProcess(JsonDocument.Parse($$"""{"id":{{REMOTE_PROCESS}},"MachineId":1,"Port":{{peerPort}}}""")
+                    .RootElement));
+
+            main = (Root)rootConstructor.Invoke(new object[]
+                { InternalMessageGateway.ROOT_ID, ROOT_ZONE, ELogicSceneType.Main, "gateway-main-test" });
+            main.BeginInitialization();
+            main.Scene.AddComponent<NetworkEntityManagerComponent>();
+            main.Scene.AddComponent<TimerComponent>();
+            main.Scene.AddComponent<ProcessInnerMessageProxy>();
+            main.Scene.AddComponent<MessageSender>();
+            main.Scene.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.UnOrderedMessage);
+            main.Scene.AddComponent<NetworkComponent, NetworkServerParam>(new NetworkServerParam
+            {
+                BindEndPoint = new IPEndPoint(IPAddress.Loopback, mainPort),
+                DriverType = ENetDriverType.Udp,
+                UseNetThread = true,
+            });
+            MethodInfo completeInitialization = typeof(Root).GetMethod("CompleteInitialization",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Root.CompleteInitialization was not found.");
+            completeInitialization.Invoke(main, null);
+
+            caller = (Root)rootConstructor.Invoke(new object[]
+                { SECOND_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.Gate, "gateway-caller-test" });
+            caller.Scene.AddComponent<TimerComponent>();
+            caller.Scene.AddComponent<ProcessInnerMessageProxy>();
+            MessageSender sender = caller.Scene.AddComponent<MessageSender>();
+            ObjectAddRequest request = new ObjectAddRequest();
+            ETTask<IResponse> call = sender.Call(new ActorAddress(REMOTE_PROCESS, REMOTE_ROOT),
+                request, MESSAGE_TEST_RPC_TIMEOUT_MILLISECONDS, needException: false);
+            Stopwatch deadline = Stopwatch.StartNew();
+            while (!call.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(GATEWAY_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                peer.Update();
+                earlyUpdate(main);
+                update(main);
+                earlyUpdate(caller);
+                update(caller);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+
+            Assert.That(call.IsCompleted, Is.True, "The gateway did not complete the cross-process RPC.");
+            IResponse response = call.GetAwaiter().GetResult();
+            Assert.That(response, Is.InstanceOf<ObjectAddResponse>());
+            Assert.That(response.Error, Is.EqualTo(EXPECTED_ERROR));
+            Assert.That(expectedRpcId, Is.GreaterThan(0));
+            Assert.That(request.RpcId, Is.EqualTo(expectedRpcId));
+            Assert.That(response.RpcId, Is.EqualTo(expectedRpcId));
+
+            sender.Send(new ActorAddress(REMOTE_PROCESS, REMOTE_ROOT), new PingMessage());
+            deadline.Restart();
+            while (!oneWayReceived && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                peer.Update();
+                earlyUpdate(main);
+                update(main);
+                earlyUpdate(caller);
+                update(caller);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(oneWayReceived, Is.True, "One-way traffic must also be forwarded by Main.");
+        }
+        finally
+        {
+            caller?.Dispose();
+            main?.Dispose();
+            peer?.Dispose();
+            dispatcher.Dispose();
+            logMessages.Dispose();
+            opcodes.Dispose();
+            messages.Dispose();
+            options.Dispose();
+        }
+    }
+
+    /// <summary>An initializing Main responds to a routed internal RPC over UDP.</summary>
+    [Test]
+    public void InitializingMainRejectsInternalRpcOverUdp()
+    {
+        const int EXPECTED_ROOT_NOT_READY = 200004;
+        ProcessMessageManager messages = new ProcessMessageManager();
+        MessageOpcodeManager opcodes = new MessageOpcodeManager();
+        LogMsg logMessages = new LogMsg();
+        Options options = new Options { Process = ROOT_ZONE };
+        MessageDispatcher dispatcher = new MessageDispatcher();
+        ILogger previousLogger = Log.Logger;
+        RecordingLogger logger = new RecordingLogger();
+        Root? main = null;
+        Root? caller = null;
+        Root? target = null;
+        Root? failedTarget = null;
+        Root? preRouteTarget = null;
+        Root? replacementTarget = null;
+        try
+        {
+            Log.Logger = logger;
+            registerSingleton.Invoke(options, null);
+            registerSingleton.Invoke(messages, null);
+            MemoryPackSerializerRegister.Init();
+            opcodes.Init();
+            registerSingleton.Invoke(opcodes, null);
+            logMessages.Init();
+            registerSingleton.Invoke(logMessages, null);
+            dispatcher.Init();
+            registerSingleton.Invoke(dispatcher, null);
+            InternalPingHandler.Count = 0;
+            InternalLocationHandler.Count = 0;
+            InternalRequestHandler.Count = 0;
+            TimeInfo.Instance.Init();
+            TimeInfo.Instance.Update();
+            int port;
+            using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+            {
+                socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+                port = ((IPEndPoint)socket.LocalEndPoint!).Port;
+            }
+
+            main = (Root)rootConstructor.Invoke(new object[]
+                { FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.Main, "internal-main-test" });
+            main.BeginInitialization();
+            main.Scene.AddComponent<NetworkEntityManagerComponent>();
+            main.Scene.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.UnOrderedMessage);
+            main.Scene.AddComponent<TimerComponent>();
+            ProcessInnerMessageProxy mainProxy = main.Scene.AddComponent<ProcessInnerMessageProxy>();
+            main.Scene.AddComponent<NetworkComponent, NetworkServerParam>(new NetworkServerParam
+            {
+                BindEndPoint = new IPEndPoint(IPAddress.Loopback, port),
+                DriverType = ENetDriverType.Udp,
+                UseNetThread = true,
+            });
+            caller = (Root)rootConstructor.Invoke(new object[]
+                { SECOND_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.Gate, "internal-caller-test" });
+            caller.Scene.AddComponent<TimerComponent>();
+            NetworkComponent client = caller.Scene.AddComponent<NetworkComponent, NetworkClientParam>(new NetworkClientParam
+            {
+                AddressFamily = AddressFamily.InterNetwork,
+                DriverType = ENetDriverType.Udp,
+                UseNetThread = true,
+            });
+            Session session = client.CreateConnection(new IPEndPoint(IPAddress.Loopback, port));
+            session.IsInternal = true;
+            ActorAddress address = new ActorAddress(main.RootAddress);
+            NetworkComponent mainNetwork = main.Scene.GetComponent<NetworkComponent>();
+            ETTask<IResponse> call = session.Call(address, new ObjectAddRequest(), 0);
+            Stopwatch deadline = Stopwatch.StartNew();
+            while (!call.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                earlyUpdate(main);
+                update(main);
+                earlyUpdate(caller);
+                update(caller);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+
+            Assert.That(call.IsCompleted, Is.True, "Main must reject the RPC while initializing.");
+            Assert.That(call.GetAwaiter().GetResult().Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY));
+
+            main.Scene.GetComponent<RootInitializationGateComponent>()
+                .AllowMessage(typeof(ObjectAddRequest), ERootMessageIngress.Internal);
+            ETTask<IResponse> allowlistedMainCall = session.Call(address, new ObjectAddRequest(), 0, needException: false);
+            deadline.Restart();
+            while (!allowlistedMainCall.IsCompleted
+                && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                earlyUpdate(main);
+                update(main);
+                earlyUpdate(caller);
+                update(caller);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(allowlistedMainCall.IsCompleted, Is.True,
+                "Main must reject an allowlisted RPC while initializing.");
+            Assert.That(allowlistedMainCall.GetAwaiter().GetResult().Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY));
+
+            target = (Root)rootConstructor.Invoke(new object[]
+                { CHILD_ROOT_ID, ROOT_ZONE, ELogicSceneType.Map, "internal-destination-test" });
+            target.BeginInitialization();
+            target.Scene.AddComponent<NetworkEntityManagerComponent>();
+            target.Scene.AddComponent<ProcessInnerMessageProxy>();
+            target.Scene.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.UnOrderedMessage);
+            InternalMessageSendEnvelope mainRejectedEnvelope = new InternalMessageSendEnvelope
+            {
+                OriginRoot = caller.RootAddress,
+                TargetAddress = new ActorAddress(target.RootAddress),
+                Payload = MessageSerializer.SerializePayload(new PingMessage(), out ushort mainPingOpcode),
+                PayloadOpcode = mainPingOpcode,
+            };
+            int warningCountBeforeMainReject = logger.Warnings.Count;
+            session.Send(address, mainRejectedEnvelope);
+            deadline.Restart();
+            while (!mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage)
+                && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage),
+                Is.True, "The one-way envelope must reach the unready Main over UDP.");
+            earlyUpdate(main);
+            update(main);
+            Assert.That(logger.Warnings.Skip(warningCountBeforeMainReject).Any(warning =>
+                warning.Contains(target.RootAddress.ToString())
+                && warning.Contains(nameof(PingMessage))
+                && warning.Contains(caller.RootAddress.ToString())), Is.True,
+                $"Main must diagnose an unready gateway envelope with its target, business type and original sender. Warnings: {string.Join("; ", logger.Warnings.Skip(warningCountBeforeMainReject))}");
+
+            MethodInfo completeInitialization = typeof(Root).GetMethod("CompleteInitialization",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Root.CompleteInitialization was not found.");
+            completeInitialization.Invoke(main, null);
+            preRouteTarget = (Root)rootConstructor.Invoke(new object[]
+                { CHILD_ROOT_ID + 2, ROOT_ZONE, ELogicSceneType.Map, "pre-route-test" });
+            preRouteTarget.BeginInitialization();
+            ETTask<IResponse> preRouteCall = session.Call(new ActorAddress(preRouteTarget.RootAddress),
+                new ObjectAddRequest(), 0, needException: false);
+            deadline.Restart();
+            while (!mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage)
+                && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage),
+                Is.True, "The RPC must arrive before the target route is registered.");
+            preRouteTarget.Scene.AddComponent<NetworkEntityManagerComponent>();
+            preRouteTarget.Scene.AddComponent<ProcessInnerMessageProxy>();
+            preRouteTarget.Scene.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.UnOrderedMessage);
+            completeInitialization.Invoke(preRouteTarget, null);
+            deadline.Restart();
+            while (!preRouteCall.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                earlyUpdate(main);
+                update(main);
+                earlyUpdate(preRouteTarget);
+                update(preRouteTarget);
+                earlyUpdate(caller);
+                update(caller);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(preRouteCall.IsCompleted, Is.True);
+            Assert.That(preRouteCall.GetAwaiter().GetResult().Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY),
+                "A message received before route registration must not execute after Ready.");
+            Assert.That(InternalRequestHandler.Count, Is.Zero);
+            ActorAddress targetAddress = new ActorAddress(target.RootAddress);
+            ETTask<IResponse> targetCall = session.Call(targetAddress, new ObjectAddRequest(), 0);
+            deadline.Restart();
+            while (!targetCall.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                earlyUpdate(main);
+                update(main);
+                earlyUpdate(target);
+                update(target);
+                earlyUpdate(caller);
+                update(caller);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(targetCall.IsCompleted, Is.True, "Main must forward to the target Root.");
+            Assert.That(targetCall.GetAwaiter().GetResult().Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY));
+            Assert.That(InternalRequestHandler.Count, Is.Zero, "A rejected RPC must not execute its handler.");
+
+            session.Send(targetAddress, new PingMessage());
+            deadline.Restart();
+            while (!mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage)
+                && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage),
+                Is.True, "The message must arrive before the target becomes Ready.");
+            completeInitialization.Invoke(target, null);
+            earlyUpdate(main);
+            update(main);
+            earlyUpdate(target);
+            update(target);
+            Assert.That(InternalPingHandler.Count, Is.Zero, "A message received before target Ready must not be replayed.");
+            session.Send(targetAddress, new PingMessage());
+            deadline.Restart();
+            while (InternalPingHandler.Count == 0 && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                earlyUpdate(main);
+                update(main);
+                earlyUpdate(target);
+                update(target);
+                earlyUpdate(caller);
+                update(caller);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(InternalPingHandler.Count, Is.EqualTo(1), "Ready Main must route one-way traffic to the target.");
+            session.Send(targetAddress, new C2M_CharacterMoveData());
+            deadline.Restart();
+            while (InternalLocationHandler.Count == 0 && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                earlyUpdate(main);
+                update(main);
+                earlyUpdate(target);
+                update(target);
+                earlyUpdate(caller);
+                update(caller);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(InternalLocationHandler.Count, Is.EqualTo(1), "Location messages must remain one-way.");
+            Assert.That(mainProxy.RpcInfos, Is.Empty, "One-way messages must not leave an outstanding internal RPC.");
+
+            ETTask<IResponse> readyCall = session.Call(targetAddress, new ObjectAddRequest(), 0);
+            deadline.Restart();
+            while (!readyCall.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                earlyUpdate(main);
+                update(main);
+                earlyUpdate(target);
+                update(target);
+                earlyUpdate(caller);
+                update(caller);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(readyCall.IsCompleted, Is.True, "Ready target must reply to the forwarded RPC.");
+            Assert.That(readyCall.GetAwaiter().GetResult().Error, Is.Zero);
+            Assert.That(InternalRequestHandler.Count, Is.EqualTo(1));
+
+            ActorAddress missingActor = new ActorAddress(target.RootAddress, long.MaxValue);
+            ETTask<IResponse> missingCall = session.Call(missingActor, new ObjectAddRequest(), 0, needException: false);
+            deadline.Restart();
+            while (!missingCall.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                earlyUpdate(main);
+                update(main);
+                earlyUpdate(target);
+                update(target);
+                earlyUpdate(caller);
+                update(caller);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(missingCall.IsCompleted, Is.True, "Main must relay an actor-not-found response.");
+            Assert.That(missingCall.GetAwaiter().GetResult().Error, Is.EqualTo(ErrorCode.ERR_ACTOR_NOT_FOUND));
+
+            failedTarget = (Root)rootConstructor.Invoke(new object[]
+                { CHILD_ROOT_ID + 1, ROOT_ZONE, ELogicSceneType.Map, "failed-destination-test" });
+            failedTarget.BeginInitialization();
+            failedTarget.Scene.AddComponent<ProcessInnerMessageProxy>();
+            failedTarget.Scene.GetComponent<RootInitializationGateComponent>()
+                .AllowMessage(typeof(ObjectAddRequest), ERootMessageIngress.Internal);
+            ETTask<IResponse> failedCall = session.Call(new ActorAddress(failedTarget.RootAddress),
+                new ObjectAddRequest(), 0, needException: false);
+            deadline.Restart();
+            while (!mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage)
+                && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage),
+                Is.True, "The RPC must arrive while the target allows it.");
+            MethodInfo failInitialization = typeof(Root).GetMethod("FailInitialization",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Root.FailInitialization was not found.");
+            failInitialization.Invoke(failedTarget, null);
+            deadline.Restart();
+            while (!failedCall.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                earlyUpdate(main);
+                update(main);
+                earlyUpdate(caller);
+                update(caller);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(failedCall.IsCompleted, Is.True, "Main must relay a target's failure rejection.");
+            Assert.That(failedCall.GetAwaiter().GetResult().Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY));
+
+            InternalMessageSendEnvelope sendEnvelope = new InternalMessageSendEnvelope
+            {
+                OriginRoot = caller.RootAddress,
+                TargetAddress = new ActorAddress(failedTarget.RootAddress),
+                Payload = MessageSerializer.SerializePayload(new PingMessage(), out ushort pingOpcode),
+                PayloadOpcode = pingOpcode,
+            };
+            session.Send(new ActorAddress(main.RootAddress), sendEnvelope);
+            deadline.Restart();
+            while (!mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage)
+                && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage),
+                Is.True, "The one-way envelope must reach Main over UDP.");
+            earlyUpdate(main);
+            update(main);
+            Assert.That(logger.Warnings.Any(warning => warning.Contains(failedTarget.RootAddress.ToString())
+                && warning.Contains(nameof(PingMessage))
+                && warning.Contains(caller.RootAddress.ToString())), Is.True,
+                $"A gateway rejection must identify the original Root sender. Warnings: {string.Join("; ", logger.Warnings)}");
+
+            replacementTarget = (Root)rootConstructor.Invoke(new object[]
+                { CHILD_ROOT_ID + 3, ROOT_ZONE, ELogicSceneType.Map, "old-destination-test" });
+            replacementTarget.Scene.AddComponent<NetworkEntityManagerComponent>();
+            replacementTarget.Scene.AddComponent<ProcessInnerMessageProxy>();
+            replacementTarget.Scene.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.UnOrderedMessage);
+            ETTask<IResponse> replacedCall = session.Call(new ActorAddress(replacementTarget.RootAddress),
+                new ObjectAddRequest(), 0, needException: false);
+            deadline.Restart();
+            while (!mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage)
+                && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage),
+                Is.True, "The RPC must arrive before the target is replaced.");
+            replacementTarget.Dispose();
+            replacementTarget = (Root)rootConstructor.Invoke(new object[]
+                { CHILD_ROOT_ID + 3, ROOT_ZONE, ELogicSceneType.Map, "new-destination-test" });
+            replacementTarget.Scene.AddComponent<NetworkEntityManagerComponent>();
+            replacementTarget.Scene.AddComponent<ProcessInnerMessageProxy>();
+            replacementTarget.Scene.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.UnOrderedMessage);
+            deadline.Restart();
+            while (!replacedCall.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                earlyUpdate(main);
+                update(main);
+                earlyUpdate(replacementTarget);
+                update(replacementTarget);
+                earlyUpdate(caller);
+                update(caller);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(replacedCall.IsCompleted, Is.True);
+            Assert.That(replacedCall.GetAwaiter().GetResult().Error, Is.EqualTo(ErrorCode.ERR_ACTOR_NOT_FOUND),
+                "A message must not be replayed into a replacement Root with the same ID.");
+            Assert.That(InternalRequestHandler.Count, Is.EqualTo(1));
+
+            ETTask<IResponse> queuedBeforeReplacement = session.Call(new ActorAddress(replacementTarget.RootAddress),
+                new ObjectAddRequest(), 0, needException: false);
+            deadline.Restart();
+            while (mainProxy.RpcInfos.Count == 0 && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                earlyUpdate(main);
+                update(main);
+                earlyUpdate(caller);
+                update(caller);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(mainProxy.RpcInfos, Is.Not.Empty, "Main must have forwarded the RPC to the old Root.");
+            replacementTarget.Dispose();
+            replacementTarget = (Root)rootConstructor.Invoke(new object[]
+                { CHILD_ROOT_ID + 3, ROOT_ZONE, ELogicSceneType.Map, "next-destination-test" });
+            replacementTarget.Scene.AddComponent<NetworkEntityManagerComponent>();
+            replacementTarget.Scene.AddComponent<ProcessInnerMessageProxy>();
+            replacementTarget.Scene.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.UnOrderedMessage);
+            deadline.Restart();
+            while (!queuedBeforeReplacement.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                earlyUpdate(main);
+                update(main);
+                earlyUpdate(replacementTarget);
+                update(replacementTarget);
+                earlyUpdate(caller);
+                update(caller);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(queuedBeforeReplacement.IsCompleted, Is.True,
+                "A request queued for a destroyed Root must not remain pending.");
+            Assert.That(queuedBeforeReplacement.GetAwaiter().GetResult().Error, Is.EqualTo(ErrorCode.ERR_ACTOR_NOT_FOUND));
+            Assert.That(InternalRequestHandler.Count, Is.EqualTo(1));
+        }
+        finally
+        {
+            caller?.Dispose();
+            replacementTarget?.Dispose();
+            preRouteTarget?.Dispose();
+            failedTarget?.Dispose();
+            target?.Dispose();
+            main?.Dispose();
+            dispatcher.Dispose();
+            logMessages.Dispose();
+            opcodes.Dispose();
+            messages.Dispose();
+            options.Dispose();
+            Log.Logger = previousLogger;
+        }
+    }
+
+    /// <summary>A failed Main rejects internal RPCs received over UDP.</summary>
+    [Test]
+    public void FailedMainRejectsInternalRpcOverUdp()
+    {
+        const int EXPECTED_ROOT_NOT_READY = ErrorCode.ERR_ROOT_NOT_READY;
+        ProcessMessageManager messages = new ProcessMessageManager();
+        MessageOpcodeManager opcodes = new MessageOpcodeManager();
+        LogMsg logMessages = new LogMsg();
+        MessageDispatcher dispatcher = new MessageDispatcher();
+        Options options = new Options { Process = ROOT_ZONE };
+        ILogger previousLogger = Log.Logger;
+        Root? main = null;
+        Root? caller = null;
+        try
+        {
+            Log.Logger = new RecordingLogger();
+            registerSingleton.Invoke(options, null);
+            registerSingleton.Invoke(messages, null);
+            MemoryPackSerializerRegister.Init();
+            opcodes.Init();
+            registerSingleton.Invoke(opcodes, null);
+            logMessages.Init();
+            registerSingleton.Invoke(logMessages, null);
+            dispatcher.Init();
+            registerSingleton.Invoke(dispatcher, null);
+            TimeInfo.Instance.Init();
+            TimeInfo.Instance.Update();
+
+            int port;
+            using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+            {
+                socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+                port = ((IPEndPoint)socket.LocalEndPoint!).Port;
+            }
+
+            main = (Root)rootConstructor.Invoke(new object[]
+                { FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.Main, "failed-internal-main-test" });
+            main.BeginInitialization();
+            main.Scene.AddComponent<ProcessInnerMessageProxy>();
+            main.Scene.AddComponent<NetworkComponent, NetworkServerParam>(new NetworkServerParam
+            {
+                BindEndPoint = new IPEndPoint(IPAddress.Loopback, port),
+                DriverType = ENetDriverType.Udp,
+                UseNetThread = true,
+            });
+            MethodInfo failInitialization = typeof(Root).GetMethod("FailInitialization",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Root.FailInitialization was not found.");
+            failInitialization.Invoke(main, null);
+
+            caller = (Root)rootConstructor.Invoke(new object[]
+                { SECOND_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.Gate, "failed-internal-caller-test" });
+            NetworkComponent client = caller.Scene.AddComponent<NetworkComponent, NetworkClientParam>(new NetworkClientParam
+            {
+                AddressFamily = AddressFamily.InterNetwork,
+                DriverType = ENetDriverType.Udp,
+                UseNetThread = true,
+            });
+            Session session = client.CreateConnection(new IPEndPoint(IPAddress.Loopback, port));
+            session.IsInternal = true;
+            ETTask<IResponse> call = session.Call(new ActorAddress(main.RootAddress),
+                new ObjectAddRequest(), 0, needException: false);
+            Stopwatch deadline = Stopwatch.StartNew();
+            while (!call.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                TimeInfo.Instance.Update();
+                earlyUpdate(main);
+                update(main);
+                earlyUpdate(caller);
+                update(caller);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+
+            Assert.That(call.IsCompleted, Is.True, "A failed Main must process the internal ingress rejection.");
+            Assert.That(call.GetAwaiter().GetResult().Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY));
+
+            NetworkComponent mainNetwork = main.Scene.GetComponent<NetworkComponent>();
+            Session mainSession = mainNetwork.Children.Values.OfType<Session>().Single();
+            ObjectAddRequest pendingRequest = new ObjectAddRequest();
+            ETTask<IResponse> pendingCall = mainSession.Call(
+                new ActorAddress(caller.RootAddress), pendingRequest, 0, needException: false);
+            IResponse unmatchedResponse = MessageOpcodeManager.Instance.CreateResponseBy(
+                typeof(ObjectAddRequest), pendingRequest.RpcId + 100, ErrorCode.ERR_Success);
+            session.Send(new ActorAddress(main.RootAddress), (MessageObject)unmatchedResponse);
+            Stopwatch responseDeadline = Stopwatch.StartNew();
+            while (!mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage)
+                && responseDeadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage),
+                Is.True, "Main must receive the unmatched response over UDP.");
+            earlyUpdate(main);
+            update(main);
+            Assert.That(pendingCall.IsCompleted, Is.False, "Main must ignore responses with an unmatched RPC ID.");
+
+            IResponse wrongTypeResponse = MessageOpcodeManager.Instance.CreateResponseBy(
+                typeof(ObjectRemoveRequest), pendingRequest.RpcId, ErrorCode.ERR_Success);
+            session.Send(new ActorAddress(main.RootAddress), (MessageObject)wrongTypeResponse);
+            responseDeadline.Restart();
+            while (!mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage)
+                && responseDeadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage),
+                Is.True, "Main must receive the wrong-type response over UDP.");
+            earlyUpdate(main);
+            update(main);
+            Assert.That(pendingCall.IsCompleted, Is.False, "Main must ignore responses with the wrong response type.");
+
+            IResponse matchingResponse = MessageOpcodeManager.Instance.CreateResponseBy(
+                typeof(ObjectAddRequest), pendingRequest.RpcId, ErrorCode.ERR_Success);
+            session.Send(new ActorAddress(main.RootAddress), (MessageObject)matchingResponse);
+            responseDeadline.Restart();
+            while (!mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage)
+                && responseDeadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
+            {
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
+            }
+            Assert.That(mainNetwork.MainThreadOpQueue.Any(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage),
+                Is.True, "Main must receive the matching response over UDP.");
+            earlyUpdate(main);
+            update(main);
+            Assert.That(pendingCall.IsCompleted, Is.True, "Main must complete matching responses while failed.");
+            Assert.That(pendingCall.GetAwaiter().GetResult().RpcId, Is.EqualTo(pendingRequest.RpcId));
+        }
+        finally
+        {
+            caller?.Dispose();
+            main?.Dispose();
+            dispatcher.Dispose();
+            logMessages.Dispose();
+            opcodes.Dispose();
+            messages.Dispose();
+            options.Dispose();
+            Log.Logger = previousLogger;
+        }
+    }
+
     /// <summary>Initializing external Roots respond to ordinary RPCs without running their handlers.</summary>
     [TestCase(ELogicSceneType.Gate)]
     [TestCase(ELogicSceneType.Realm)]
@@ -2394,12 +3367,12 @@ public class MoverIntegrationTests
             client.Send(connectionId, MessageSerializer.MessageToNetStream(client,
                 new C2G_EnterLevel { RpcId = REQUEST_ID }), true);
             Stopwatch deadline = Stopwatch.StartNew();
-            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
             {
                 TimeInfo.Instance.Update();
                 client.Update();
                 earlyUpdate(externalRoot);
-                Thread.Sleep(1);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
             }
 
             Assert.That(received, Is.InstanceOf<G2C_EnterLevel>(), "The initializing Root did not reject the RPC.");
@@ -2413,12 +3386,12 @@ public class MoverIntegrationTests
                 client.Send(connectionId, MessageSerializer.MessageToNetStream(client,
                     new C2R_Login { RpcId = REQUEST_ID, Account = "test", Password = "test" }), true);
                 deadline.Restart();
-                while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(3))
+                while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
                 {
                     TimeInfo.Instance.Update();
                     client.Update();
                     earlyUpdate(externalRoot);
-                    Thread.Sleep(1);
+                    Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
                 }
                 Assert.That(received, Is.InstanceOf<R2C_Login>());
                 Assert.That(((R2C_Login)received!).Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY));
@@ -2430,12 +3403,12 @@ public class MoverIntegrationTests
             received = null;
             ETTask<IResponse> outboundCall = serverSession.Call(new C2G_EnterLevel(), null);
             deadline.Restart();
-            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
             {
                 TimeInfo.Instance.Update();
                 client.Update();
                 earlyUpdate(externalRoot);
-                Thread.Sleep(1);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
             }
             Assert.That(received, Is.InstanceOf<C2G_EnterLevel>());
             int outboundId = ((C2G_EnterLevel)received!).RpcId;
@@ -2448,18 +3421,18 @@ public class MoverIntegrationTests
                 TimeInfo.Instance.Update();
                 client.Update();
                 earlyUpdate(externalRoot);
-                Thread.Sleep(1);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
             }
             Assert.That(outboundCall.IsCompleted, Is.False, "A response of the wrong type must not complete an RPC.");
             client.Send(connectionId, MessageSerializer.MessageToNetStream(client,
                 new G2C_EnterLevel { RpcId = outboundId }), true);
             deadline.Restart();
-            while (!outboundCall.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            while (!outboundCall.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
             {
                 TimeInfo.Instance.Update();
                 client.Update();
                 earlyUpdate(externalRoot);
-                Thread.Sleep(1);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
             }
             Assert.That(outboundCall.IsCompleted, Is.True, "A matching response must complete the outstanding RPC.");
             Assert.That(outboundCall.GetAwaiter().GetResult(), Is.InstanceOf<G2C_EnterLevel>());
@@ -2469,12 +3442,12 @@ public class MoverIntegrationTests
             received = null;
             client.Send(connectionId, MessageSerializer.MessageToNetStream(client, new PingMessage()), true);
             deadline.Restart();
-            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
             {
                 TimeInfo.Instance.Update();
                 client.Update();
                 earlyUpdate(externalRoot);
-                Thread.Sleep(1);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
             }
 
             Assert.That(received, Is.InstanceOf<S2C_RootNotReady>());
@@ -2486,12 +3459,12 @@ public class MoverIntegrationTests
             received = null;
             client.Send(connectionId, MessageSerializer.MessageToNetStream(client, new C2M_CharacterMoveData()), true);
             deadline.Restart();
-            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
             {
                 TimeInfo.Instance.Update();
                 client.Update();
                 earlyUpdate(externalRoot);
-                Thread.Sleep(1);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
             }
             Assert.That(received, Is.InstanceOf<S2C_RootNotReady>());
             Assert.That(((S2C_RootNotReady)received!).RejectedOpcode,
@@ -2503,12 +3476,12 @@ public class MoverIntegrationTests
             client.Send(connectionId, MessageSerializer.MessageToNetStream(client,
                 new PingMessage { PacketId = REQUEST_ID }), true);
             deadline.Restart();
-            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
             {
                 TimeInfo.Instance.Update();
                 client.Update();
                 earlyUpdate(externalRoot);
-                Thread.Sleep(1);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
             }
             Assert.That(received, Is.InstanceOf<PongMessage>(), "An explicitly allowed message must reach its handler.");
             Assert.That(((PongMessage)received!).PacketId, Is.EqualTo(REQUEST_ID));
@@ -2521,11 +3494,11 @@ public class MoverIntegrationTests
                 new PingMessage { PacketId = REQUEST_ID + 2 }), true);
             deadline.Restart();
             while (network.MainThreadOpQueue.Count(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage) < 2
-                && deadline.Elapsed < TimeSpan.FromSeconds(3))
+                && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
             {
                 TimeInfo.Instance.Update();
                 client.Update();
-                Thread.Sleep(1);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
             }
             Assert.That(network.MainThreadOpQueue.Count(operation => operation.OpType == EMainTreadOpType.OnReceiveMessage),
                 Is.EqualTo(2), "The messages were not received during initialization.");
@@ -2534,12 +3507,12 @@ public class MoverIntegrationTests
                 ?? throw new InvalidOperationException("Root.CompleteInitialization was not found.");
             completeInitialization.Invoke(externalRoot, null);
             deadline.Restart();
-            while (receivedMessages.Count < 2 && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            while (receivedMessages.Count < 2 && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
             {
                 TimeInfo.Instance.Update();
                 client.Update();
                 earlyUpdate(externalRoot);
-                Thread.Sleep(1);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
             }
 
             Assert.That(receivedMessages.OfType<G2C_EnterLevel>().Single().Error, Is.EqualTo(EXPECTED_ROOT_NOT_READY),
@@ -2551,12 +3524,12 @@ public class MoverIntegrationTests
             client.Send(connectionId, MessageSerializer.MessageToNetStream(client,
                 new PingMessage { PacketId = REQUEST_ID + 1 }), true);
             deadline.Restart();
-            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(3))
+            while (received == null && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
             {
                 TimeInfo.Instance.Update();
                 client.Update();
                 earlyUpdate(externalRoot);
-                Thread.Sleep(1);
+                Thread.Sleep(MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS);
             }
             Assert.That(received, Is.InstanceOf<PongMessage>(), "Ready Roots must retain their normal routing.");
             Assert.That(((PongMessage)received!).PacketId, Is.EqualTo(REQUEST_ID + 1));
@@ -3527,6 +4500,13 @@ public class MoverIntegrationTests
     private static void setServerTime(long time) =>
         TimeInfo.Instance.ServerMinusClientTime = time - TimeInfo.Instance.FrameTime;
 
+    private static int getAvailableUdpPort()
+    {
+        using Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        return ((IPEndPoint)socket.LocalEndPoint!).Port;
+    }
+
     /// <summary>Ordinary cargo representing the current Bullet ownership path.</summary>
     public sealed class TestCargo : Entity
     {
@@ -4120,17 +5100,63 @@ public class MoverIntegrationTests
         }
     }
 
+    /// <summary>Records delivery of an internal test message to a Map Root.</summary>
+    [MessageHandler(ELogicSceneType.Map)]
+    public sealed class InternalPingHandler : MessageHandler<LogicScene, PingMessage>
+    {
+        /// <summary>Number of delivered messages.</summary>
+        public static int Count;
+
+        /// <inheritdoc />
+        protected override async ETTask Run(LogicScene scene, PingMessage message)
+        {
+            Count++;
+            await ETTask.CompletedTask;
+        }
+    }
+
+    /// <summary>Records delivery of a one-way location message to a Map Root.</summary>
+    [MessageHandler(ELogicSceneType.Map)]
+    public sealed class InternalLocationHandler : MessageHandler<LogicScene, C2M_CharacterMoveData>
+    {
+        /// <summary>Number of delivered messages.</summary>
+        public static int Count;
+
+        /// <inheritdoc />
+        protected override async ETTask Run(LogicScene scene, C2M_CharacterMoveData message)
+        {
+            Count++;
+            await ETTask.CompletedTask;
+        }
+    }
+
+    /// <summary>Records delivery of an internal RPC to a Map Root.</summary>
+    [MessageHandler(ELogicSceneType.Map)]
+    public sealed class InternalRequestHandler : MessageHandler<LogicScene, ObjectAddRequest, ObjectAddResponse>
+    {
+        /// <summary>Number of delivered requests.</summary>
+        public static int Count;
+
+        /// <inheritdoc />
+        protected override async ETTask Run(LogicScene scene, ObjectAddRequest request, ObjectAddResponse response)
+        {
+            Count++;
+            await ETTask.CompletedTask;
+        }
+    }
+
     private sealed class RecordingLogger : ILogger
     {
         internal readonly List<string> Errors = new List<string>();
+        internal readonly List<string> Warnings = new List<string>();
         public void Trace(string message) { }
-        public void Warning(string message) { }
+        public void Warning(string message) => this.Warnings.Add(message);
         public void Info(string message) { }
         public void Debug(string message) { }
         public void Error(string message) => this.Errors.Add(message);
         public void Error(Exception exception) => this.Errors.Add(exception.ToString());
         public void Trace(ref System.Runtime.CompilerServices.DefaultInterpolatedStringHandler message) { }
-        public void Warning(ref System.Runtime.CompilerServices.DefaultInterpolatedStringHandler message) { }
+        public void Warning(ref System.Runtime.CompilerServices.DefaultInterpolatedStringHandler message) => this.Warnings.Add(message.ToStringAndClear());
         public void Info(ref System.Runtime.CompilerServices.DefaultInterpolatedStringHandler message) { }
         public void Debug(ref System.Runtime.CompilerServices.DefaultInterpolatedStringHandler message) { }
         public void Error(ref System.Runtime.CompilerServices.DefaultInterpolatedStringHandler message) => this.Errors.Add(message.ToStringAndClear());

@@ -12,12 +12,15 @@ namespace Bliss
         private static void Awake(this ProcessInnerMessageProxy self)
         {
             var root = self.LogicScene.Root;
-            ProcessMessageManager.Instance.Register(root.Id);
+            ProcessMessageManager.Instance.Register(root);
+            RootInitializationGateComponent gate = self.RootScene().GetComponent<RootInitializationGateComponent>();
+            gate?.AllowSystem(typeof(ProcessInnerMessageProxy_UpdateSystem));
+            gate?.AllowSystemAfterFailure(typeof(ProcessInnerMessageProxy_UpdateSystem));
         }
         private static void Destroy(this ProcessInnerMessageProxy self)
         {
             var root = self.LogicScene.Root;
-            ProcessMessageManager.Instance.Unregister(root.Id);
+            ProcessMessageManager.Instance.Unregister(root);
         }
         private static void Update(this ProcessInnerMessageProxy self)
         {
@@ -54,8 +57,33 @@ namespace Bliss
             self.SendInner(new ActorAddress(fromAddress, 0), (MessageObject)response);
         }
     
-        public static async ETTask<IResponse> Call(this ProcessInnerMessageProxy self, ActorAddress targetAddress, IRequest request, bool needException = true)
+        /// <summary>Sends an internal RPC using the proxy's default timeout.</summary>
+        /// <param name="self">The sender's internal message proxy.</param>
+        /// <param name="targetAddress">The destination Actor.</param>
+        /// <param name="request">The RPC request.</param>
+        /// <param name="needException">Whether RPC failures should complete the task with an exception.</param>
+        /// <returns>The response returned by the destination Actor.</returns>
+        /// <exception cref="ArgumentNullException">The request is null.</exception>
+        public static ETTask<IResponse> Call(this ProcessInnerMessageProxy self, ActorAddress targetAddress,
+            IRequest request, bool needException = true)
         {
+            ArgumentNullException.ThrowIfNull(request);
+            return self.Call(targetAddress, request, ProcessInnerMessageProxy.TimeOutMS, needException);
+        }
+
+        /// <summary>Sends an internal RPC with an explicit bounded wait.</summary>
+        /// <param name="self">The sending Root's internal message proxy.</param>
+        /// <param name="targetAddress">The target Actor.</param>
+        /// <param name="request">The request to send.</param>
+        /// <param name="timeOutMs">The maximum wait in milliseconds; zero disables the timer.</param>
+        /// <param name="needException">Whether timeout should complete the task with an exception.</param>
+        /// <returns>The response from the target Actor.</returns>
+        /// <exception cref="ArgumentNullException">The request is null.</exception>
+        /// <exception cref="Exception">The target belongs to another process, or the request times out while exceptions are enabled.</exception>
+        public static async ETTask<IResponse> Call(this ProcessInnerMessageProxy self, ActorAddress targetAddress,
+            IRequest request, long timeOutMs, bool needException = true)
+        {
+            ArgumentNullException.ThrowIfNull(request);
             var root = self.LogicScene.Root;
             if (root.Process != targetAddress.Process)
             {
@@ -71,6 +99,7 @@ namespace Bliss
 
             if (!self.SendInner(targetAddress, (MessageObject)request))
             {
+                self.RpcInfos.Remove(rpcId);
                 IResponse errorResponse = (IResponse)ObjectPool.Instance.Fetch(responseType);
                 errorResponse.Error = ErrorCode.ERR_ACTOR_NOT_FOUND;
                 errorResponse.RpcId = rpcId;
@@ -79,7 +108,7 @@ namespace Bliss
 
             async ETTask Timeout()
             {
-                await self.Scene().GetComponent<TimerComponent>().WaitDurationAsync(ProcessInnerMessageProxy.TimeOutMS);
+                await self.Scene().GetComponent<TimerComponent>().WaitDurationAsync(timeOutMs);
 
                 if (!self.RpcInfos.Remove(rpcId, out var action))
                 {
@@ -101,7 +130,10 @@ namespace Bliss
         
             long beginTime = TimeInfo.Instance.ServerFrameTime();
         
-            Timeout().Coroutine();
+            if (timeOutMs > 0)
+            {
+                Timeout().Coroutine();
+            }
             var response = await rpcInfo.RpcInfo.Wait();
         
             long endTime = TimeInfo.Instance.ServerFrameTime();
@@ -123,6 +155,48 @@ namespace Bliss
         private static void DistributeMessage(this ProcessInnerMessageProxy self, in ProcessMessageInfo messageInfo)
         {
             LogMsg.Instance.DebugInnerMsg(self, messageInfo.TargetAddress, messageInfo.MessageObject, false);
+            Root root = self.LogicScene.Root;
+            RootInitializationSnapshot snapshot = messageInfo.InitializationSnapshot;
+            bool receivedBeforeReady = snapshot.State == ERootInitializationState.Initializing
+                || snapshot.State == ERootInitializationState.Failed;
+            bool isNotReady = root.InitializationState == ERootInitializationState.Initializing
+                || root.InitializationState == ERootInitializationState.Failed;
+            if (receivedBeforeReady || isNotReady)
+            {
+                if (messageInfo.MessageObject is IResponse pendingResponse)
+                {
+                    if (!self.RpcInfos.TryGetValue(pendingResponse.RpcId, out ProcessInnerPrcInfo rpc)
+                        || rpc.ActorAddress.RootAddress != messageInfo.TargetAddress.RootAddress
+                        || MessageOpcodeManager.Instance.GetResponseTypeBy(rpc.RequestType) != pendingResponse.GetType())
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    RootInitializationMessagePolicy policy = receivedBeforeReady
+                        ? snapshot.MessagePolicy : root.InitializationMessagePolicy;
+                    bool isRpcRequest = messageInfo.MessageObject is IRequest
+                        && messageInfo.MessageObject is not ILocationMessage;
+                    if (root.InitializationState == ERootInitializationState.Failed
+                        || snapshot.State == ERootInitializationState.Failed
+                        || isRpcRequest
+                        || !policy.Allows(messageInfo.MessageObject.GetType(), ERootMessageIngress.Internal))
+                    {
+                        if (messageInfo.MessageObject is IRequest request && messageInfo.MessageObject is not ILocationMessage)
+                        {
+                            IResponse rejection = MessageOpcodeManager.Instance.CreateResponseBy(
+                                request.GetType(), request.RpcId, ErrorCode.ERR_ROOT_NOT_READY);
+                            self.Reply(messageInfo.TargetAddress.RootAddress, rejection);
+                        }
+                        else
+                        {
+                            Log.Warning($"Root {root.RootAddress} rejected internal message {messageInfo.MessageObject.GetType().FullName} from {messageInfo.TargetAddress.RootAddress}");
+                        }
+                        return;
+                    }
+                }
+            }
             if (messageInfo.MessageObject is IResponse response)
             {
                 self.HandleResponse(response);
@@ -183,6 +257,5 @@ namespace Bliss
         
             rpcInfo.RpcInfo.SetResult(response);
         }
-    
     }
 }

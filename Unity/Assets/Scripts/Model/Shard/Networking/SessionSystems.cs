@@ -31,14 +31,19 @@ namespace Bliss
         public static void Send(this Session self, MessageObject message, bool isReliable = true)
         {
             var networkComponent = self.NetworkComponent;
-            SocketBufferRef netStreamRef = MessageSerializer.MessageToNetStream(networkComponent.NetDriver,  message);
+            SocketBufferRef netStreamRef = MessageSerializer.MessageToNetStream(networkComponent.NetDriver, message);
             self.SendRaw(netStreamRef, isReliable);
         }
         
+        /// <summary>Sends a routed message to an Actor over an internal Session.</summary>
+        /// <param name="self">The Session used to send the message.</param>
+        /// <param name="actorAddress">The destination Actor address included in the internal header.</param>
+        /// <param name="message">The message to send.</param>
+        /// <param name="isReliable">Whether the transport should send the packet reliably.</param>
         public static void Send(this Session self, ActorAddress actorAddress, MessageObject message, bool isReliable = true)
         {
             var networkComponent = self.NetworkComponent;
-            SocketBufferRef netStreamRef = MessageSerializer.MessageToNetStream(networkComponent.NetDriver,  message);
+            SocketBufferRef netStreamRef = MessageSerializer.MessageToNetStream(networkComponent.NetDriver, actorAddress, message);
             self.SendRaw(netStreamRef, isReliable);
         }
         

@@ -43,11 +43,12 @@ namespace Bliss
     }
 
     /// <summary>
-    /// Restricts update systems and message admission while a Server Root is initializing.
+    /// Restricts update systems and message admission during Root initialization and failure handling.
     /// </summary>
     public sealed class RootInitializationGateComponent : Entity, IAwake, IDestroy
     {
         private readonly HashSet<Type> _allowedSystemTypes = new HashSet<Type>();
+        private readonly HashSet<Type> _allowedFailedSystemTypes = new HashSet<Type>();
 
         /// <summary>Allows a concrete message type from a specific ingress during initialization.</summary>
         /// <param name="messageType">The concrete message type.</param>
@@ -92,14 +93,45 @@ namespace Bliss
             _allowedSystemTypes.Add(systemType);
         }
 
+        /// <summary>Allows a previously admitted update system to run while the Root is failed.</summary>
+        /// <param name="systemType">The concrete update-system type.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="systemType"/> is null.</exception>
+        /// <exception cref="ArgumentException"><paramref name="systemType"/> is not a concrete update system.</exception>
+        /// <exception cref="InvalidOperationException"><paramref name="systemType"/> is not allowed during initialization.</exception>
+        public void AllowSystemAfterFailure(Type systemType)
+        {
+            if (systemType == null)
+            {
+                throw new ArgumentNullException(nameof(systemType));
+            }
+
+            if (systemType.IsAbstract || !typeof(IUpdateGroupSystem).IsAssignableFrom(systemType))
+            {
+                throw new ArgumentException("A concrete update-system type is required.", nameof(systemType));
+            }
+
+            if (!_allowedSystemTypes.Contains(systemType))
+            {
+                throw new InvalidOperationException("A system must be allowed during initialization before failure.");
+            }
+
+            _allowedFailedSystemTypes.Add(systemType);
+        }
+
         internal bool AllowsSystem(Type systemType)
         {
             return _allowedSystemTypes.Contains(systemType);
         }
 
+        internal bool AllowsSystemAfterFailure(Type systemType)
+        {
+            return _allowedFailedSystemTypes.Contains(systemType);
+        }
+
         internal void ClearAllowedSystems()
         {
             _allowedSystemTypes.Clear();
+            _allowedFailedSystemTypes.Clear();
         }
     }
 

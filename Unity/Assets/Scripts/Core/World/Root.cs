@@ -112,6 +112,7 @@ namespace Bliss
             }
 
             InitializationState = ERootInitializationState.Initializing;
+            ProcessMessageManager.Instance?.trackRoot(this);
             Scene.AddComponent<RootInitializationGateComponent>();
         }
 
@@ -136,6 +137,7 @@ namespace Bliss
             if (InitializationState == ERootInitializationState.Initializing)
             {
                 InitializationState = ERootInitializationState.Failed;
+                ProcessMessageManager.Instance?.rejectFailedMessages(this);
             }
         }
 
@@ -261,6 +263,7 @@ namespace Bliss
             }
             
             IsDisposed = true;
+            ProcessMessageManager.Instance?.untrackRoot(this);
             
             Scene.Dispose();
 

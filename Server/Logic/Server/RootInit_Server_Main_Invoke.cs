@@ -13,12 +13,21 @@ namespace Bliss
     {
         public override async ETTask Handle(Invoke_RootInit args)
         {
+            if (Options.Instance.InternalMessageForwardTimeoutMS <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(Options.InternalMessageForwardTimeoutMS),
+                    Options.Instance.InternalMessageForwardTimeoutMS,
+                    "Internal message forwarding timeout must be greater than zero.");
+            }
+
             LogicScene rootScene = args.Root.Scene;
             
             World.Instance.AddSingletonNoInit<ProcessMessageManager>();
             rootScene.AddComponent<NetworkEntityManagerComponent>();
             rootScene.AddComponent<TimerComponent>();
             rootScene.AddComponent<ProcessInnerMessageProxy>();
+            rootScene.AddComponent<MessageSender>();
+            rootScene.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.UnOrderedMessage);
             
             var processCfg = ConfigManager.Instance.Tables.TbServerProcess.Get(args.Root.Process);
             

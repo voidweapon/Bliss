@@ -10,6 +10,8 @@ namespace Bliss
     {
         public NetworkComponent NetworkComponent;
         public IPEndPoint RemoteEndPoint;
+        /// <summary>Whether this session carries addressed Server-internal messages.</summary>
+        public bool IsInternal;
         public int ErrorCode;
         public int RPCId;
         public long LastReceiveTime;
