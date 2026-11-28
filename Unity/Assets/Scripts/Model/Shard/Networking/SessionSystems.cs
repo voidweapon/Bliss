@@ -61,8 +61,20 @@ namespace Bliss
             networkComponent.Send((uint)self.Id, buffer, isReliable);
         }
 
+        /// <summary>Sends an RPC request and waits for its response or cooperative cancellation.</summary>
+        /// <param name="self">The Session used to send the request.</param>
+        /// <param name="request">The RPC request to send.</param>
+        /// <param name="cancellation">The optional cooperative cancellation source.</param>
+        /// <param name="needException">Whether failures are surfaced as exceptions when supported by this overload.</param>
+        /// <returns>The response matching the request type.</returns>
+        /// <exception cref="TaskAbortedException">The RPC was canceled.</exception>
         public static async ETTask<IResponse> Call(this Session self, IRequest request, ETCancellationToken cancellation, bool needException = true)
         {
+            if (cancellation?.IsCancel() == true)
+            {
+                throw new TaskAbortedException("Session call canceled.", cancellation);
+            }
+
             var responseType = MessageOpcodeManager.Instance.GetResponseTypeBy(request.GetType());
             int rpcId = self.GenRpcId();
             var rpcInfo = new RpcInfo(request.GetType());
@@ -81,7 +93,7 @@ namespace Bliss
                 {
                     return;
                 }
-                pendingRcp.SetException(new TaskAbortedException());   
+                pendingRcp.SetException(new TaskAbortedException("Session call canceled.", cancellation));
             }
 
             try
@@ -96,12 +108,37 @@ namespace Bliss
             }
         }
         
+        /// <summary>Sends an RPC request to an Actor and waits for its response, timeout, or cancellation.</summary>
+        /// <param name="self">The Session used to send the request.</param>
+        /// <param name="actorAddress">The destination Actor address included in the internal header.</param>
+        /// <param name="request">The RPC request to send.</param>
+        /// <param name="timeOutMS">The maximum time to wait, or a non-positive value for no timeout.</param>
+        /// <param name="cancellation">The optional cooperative cancellation source.</param>
+        /// <param name="needException">Whether timeout and cancellation are surfaced as exceptions instead of error responses.</param>
+        /// <returns>The response matching the request type, including an error response when exceptions are disabled.</returns>
+        /// <exception cref="TaskAbortedException">The RPC was canceled and exceptions are enabled.</exception>
+        /// <exception cref="TaskTimeoutException">The RPC timed out and exceptions are enabled.</exception>
         public static async ETTask<IResponse> Call(this Session self, 
             ActorAddress actorAddress,
             IRequest request,
             long timeOutMS, 
             ETCancellationToken cancellation = null, bool needException = true)
         {
+            if (cancellation?.IsCancel() == true)
+            {
+                if (needException)
+                {
+                    throw new TaskAbortedException("Session call canceled.", cancellation);
+                }
+
+                Type canceledResponseType = MessageOpcodeManager.Instance.GetResponseTypeBy(request.GetType());
+                IResponse canceledResponse = (IResponse)ObjectPool.Instance.Fetch(canceledResponseType);
+                request.RpcId = self.GenRpcId();
+                canceledResponse.Error = ErrorCode.ERR_TASK_ABORTED;
+                canceledResponse.RpcId = request.RpcId;
+                return canceledResponse;
+            }
+
             var responseType = MessageOpcodeManager.Instance.GetResponseTypeBy(request.GetType());
             int rpcId = self.GenRpcId();
             var rpcInfo = new RpcInfo(request.GetType());
@@ -123,7 +160,7 @@ namespace Bliss
 
                 if (needException)
                 {
-                    pendingRcp.SetException(new TaskAbortedException());
+                    pendingRcp.SetException(new TaskAbortedException("Session call canceled.", cancellation));
                 }
                 else
                 {
@@ -146,19 +183,19 @@ namespace Bliss
                     {
                         return;
                     }
-                    if (!self.RpcInfos.Remove(rpcId, out var timeoutRpc))
+                    if (!isTimeOut)
                     {
                         return;
                     }
 
-                    if (!isTimeOut)
+                    if (!self.RpcInfos.Remove(rpcId, out var timeoutRpc))
                     {
                         return;
                     }
                     
                     if (needException)
                     {
-                        timeoutRpc.SetException(new TaskCanceledException($"session call timeout: requestType={responseType} rpcId={rpcId} timeMS={timeOutMS}"));
+                        timeoutRpc.SetException(new TaskTimeoutException($"Session call timed out: requestType={responseType} rpcId={rpcId} timeMS={timeOutMS}."));
                     }
                     else
                     {

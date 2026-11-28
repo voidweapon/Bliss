@@ -18,8 +18,14 @@ namespace Bliss
         /// <param name="configId">The Level configuration identifier.</param>
         /// <param name="id">The scene identifier within its parent.</param>
         /// <param name="name">The scene name.</param>
+        /// <param name="cancellationToken">Optional cooperative cancellation source for preparation.</param>
         /// <returns>The prepared scene.</returns>
-        public static async ETTask<LogicScene> Create(Entity parent, GameplayWorld gameplayWorld, int configId, long id, string name)
+        /// <exception cref="ArgumentNullException">The parent or GameplayWorld is null.</exception>
+        /// <exception cref="TaskAbortedException">Preparation was canceled.</exception>
+        /// <exception cref="InvalidOperationException">The parent and world ownership constraints are invalid.</exception>
+        /// <remarks>Cleanup failures are logged separately; the original preparation failure is rethrown.</remarks>
+        public static async ETTask<LogicScene> Create(Entity parent, GameplayWorld gameplayWorld, int configId, long id,
+            string name, ETCancellationToken cancellationToken = null)
         {
             if (parent == null)
             {
@@ -68,6 +74,11 @@ namespace Bliss
                 throw new InvalidOperationException("A LevelScene must be within its GameplayWorld subtree.");
             }
 
+            if (cancellationToken?.IsCancel() == true)
+            {
+                throw new TaskAbortedException("LevelScene creation was canceled.", cancellationToken);
+            }
+
             if (parent.GetChild<Entity>(id) != null)
             {
                 throw new InvalidOperationException($"A child with identifier {id} already exists under the LevelScene parent.");
@@ -86,6 +97,11 @@ namespace Bliss
                     LevelConfigId = configId,
                 });
 
+                if (cancellationToken?.IsCancel() == true)
+                {
+                    throw new TaskAbortedException("LevelScene creation was canceled.", cancellationToken);
+                }
+
                 levelGameWorldComponent.MarkPrepared();
                 levelGameWorldComponent.ValidateOwnership(gameplayWorld);
                 return levelScene;
@@ -102,10 +118,9 @@ namespace Bliss
                     cleanupExceptions.Add(cleanupException);
                 }
 
-                if (cleanupExceptions.Count > 0)
+                foreach (Exception cleanupException in cleanupExceptions)
                 {
-                    cleanupExceptions.Insert(0, exception);
-                    throw new AggregateException("LevelScene preparation and cleanup failed.", cleanupExceptions);
+                    logCleanupFailure("LevelScene preparation", exception, cleanupException);
                 }
 
                 throw;
@@ -117,10 +132,13 @@ namespace Bliss
         /// </summary>
         /// <param name="levelScene">The root of the prepared subtree to enable.</param>
         /// <param name="localUnit">Optional minimally prepared local client unit to complete during root enabling.</param>
+        /// <param name="cancellationToken">Optional cooperative cancellation source for enabling.</param>
         /// <exception cref="ArgumentNullException">The scene is null.</exception>
         /// <exception cref="InvalidOperationException">The scene tree is not ready to enable.</exception>
-        /// <exception cref="AggregateException">Enabling and cleanup both fail.</exception>
-        public static async ETTask Enable(LogicScene levelScene, Entity localUnit = null)
+        /// <exception cref="TaskAbortedException">Enabling was canceled.</exception>
+        /// <remarks>Cleanup failures are logged separately; the original enabling failure is rethrown.</remarks>
+        public static async ETTask Enable(LogicScene levelScene, Entity localUnit = null,
+            ETCancellationToken cancellationToken = null)
         {
             if (levelScene == null)
             {
@@ -152,6 +170,11 @@ namespace Bliss
 
             foreach (LogicScene scene in levelScenes)
             {
+                if (cancellationToken?.IsCancel() == true)
+                {
+                    throw new TaskAbortedException("LevelScene enabling was canceled.", cancellationToken);
+                }
+
                 LevelGameWorldComponent association = scene.GetComponent<LevelGameWorldComponent>();
                 if (association == null)
                 {
@@ -177,6 +200,10 @@ namespace Bliss
                     }
 
                     await EventSystem.Instance.PushRequiredAsync(scene, enableEvent);
+                    if (cancellationToken?.IsCancel() == true)
+                    {
+                        throw new TaskAbortedException("LevelScene enabling was canceled.", cancellationToken);
+                    }
                 }
 
                 foreach (LogicScene scene in levelScenes)
@@ -210,14 +237,22 @@ namespace Bliss
                     cleanupExceptions.Add(cleanupException);
                 }
 
-                if (cleanupExceptions.Count > 0)
+                foreach (Exception cleanupException in cleanupExceptions)
                 {
-                    cleanupExceptions.Insert(0, exception);
-                    throw new AggregateException("LevelScene enabling and cleanup failed.", cleanupExceptions);
+                    logCleanupFailure("LevelScene enabling", exception, cleanupException);
                 }
 
                 throw;
             }
+        }
+
+        private static void logCleanupFailure(
+            string operation, Exception primaryException, Exception cleanupException)
+        {
+            Log.Error(new InvalidOperationException(
+                $"{operation} cleanup failed while handling " +
+                $"{primaryException.GetType().FullName}: {primaryException.Message}.",
+                cleanupException));
         }
 
         private static void collectLevelScenes(Entity entity, List<LogicScene> levelScenes)

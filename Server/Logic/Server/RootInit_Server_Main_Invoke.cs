@@ -13,6 +13,8 @@ namespace Bliss
     {
         public override async ETTask Handle(Invoke_RootInit args)
         {
+            args.ThrowIfCancellationRequested();
+
             if (Options.Instance.InternalMessageForwardTimeoutMS <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(Options.InternalMessageForwardTimeoutMS),
@@ -42,6 +44,8 @@ namespace Bliss
 
             GameplayPhysics.GameplayPhysicsHandler = new GameplayPhysicsHandler_Server();
 
+            args.ThrowIfCancellationRequested();
+
             await ETTask.CompletedTask;
         }
     }
@@ -53,8 +57,18 @@ namespace Bliss
         /// <inheritdoc />
         public override async ETTask Handle(Invoke_CreateConfiguredServerRoots args)
         {
+            if (RootManager.Instance.IsStopping)
+            {
+                return;
+            }
+
             foreach (var sceneCfg in ConfigManager.Instance.Tables.TbServerScene.DataList)
             {
+                if (RootManager.Instance.IsStopping)
+                {
+                    return;
+                }
+
                 if (sceneCfg.Process == Options.Instance.Process)
                 {
                     await RootManager.Instance.Create(sceneCfg.Id, sceneCfg.Zone,

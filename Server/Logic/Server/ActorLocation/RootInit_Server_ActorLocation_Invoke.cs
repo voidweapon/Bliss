@@ -10,6 +10,8 @@ namespace Bliss
     {
         public override async ETTask Handle(Invoke_RootInit args)
         {
+            args.ThrowIfCancellationRequested();
+
             LogicScene rootScene = args.Root.Scene;
 
             rootScene.AddComponent<TimerComponent>();

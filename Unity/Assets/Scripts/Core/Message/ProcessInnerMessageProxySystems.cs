@@ -30,6 +30,11 @@ namespace Bliss
 
             foreach (var message in self.Messages)
             {
+                if (RootManager.Instance?.IsStopping == true)
+                {
+                    break;
+                }
+
                 self.DistributeMessage(in message);
             }
         }
@@ -40,7 +45,8 @@ namespace Bliss
             self.SendInner(targetAddress, message);
         }
 
-        private static bool SendInner(this ProcessInnerMessageProxy self, ActorAddress targetAddress, MessageObject message)
+        private static EProcessMessageEnqueueResult SendInner(
+            this ProcessInnerMessageProxy self, ActorAddress targetAddress, MessageObject message)
         {
             var root = self.LogicScene.Root;
             if (root.Process != targetAddress.Process)
@@ -79,7 +85,9 @@ namespace Bliss
         /// <param name="needException">Whether timeout should complete the task with an exception.</param>
         /// <returns>The response from the target Actor.</returns>
         /// <exception cref="ArgumentNullException">The request is null.</exception>
-        /// <exception cref="Exception">The target belongs to another process, or the request times out while exceptions are enabled.</exception>
+        /// <exception cref="Exception">The target belongs to another process.</exception>
+        /// <exception cref="TaskAbortedException">The Server entered fatal stopping before the request was enqueued.</exception>
+        /// <exception cref="TaskTimeoutException">The request times out while exceptions are enabled.</exception>
         public static async ETTask<IResponse> Call(this ProcessInnerMessageProxy self, ActorAddress targetAddress,
             IRequest request, long timeOutMs, bool needException = true)
         {
@@ -97,13 +105,31 @@ namespace Bliss
             self.RpcInfos.Add(rpcId, rpcInfo);
             request.RpcId = rpcId;
 
-            if (!self.SendInner(targetAddress, (MessageObject)request))
+            EProcessMessageEnqueueResult enqueueResult =
+                self.SendInner(targetAddress, (MessageObject)request);
+            switch (enqueueResult)
             {
-                self.RpcInfos.Remove(rpcId);
-                IResponse errorResponse = (IResponse)ObjectPool.Instance.Fetch(responseType);
-                errorResponse.Error = ErrorCode.ERR_ACTOR_NOT_FOUND;
-                errorResponse.RpcId = rpcId;
-                return errorResponse;
+                case EProcessMessageEnqueueResult.Enqueued:
+                case EProcessMessageEnqueueResult.RejectedRootNotReady:
+                    break;
+                case EProcessMessageEnqueueResult.RejectedWhileStopping:
+                    self.RpcInfos.Remove(rpcId);
+                    throw new TaskAbortedException(
+                        "Internal RPC was rejected because the Server is stopping.");
+                case EProcessMessageEnqueueResult.RejectedByInitializationPolicy:
+                case EProcessMessageEnqueueResult.TargetRootNotFound:
+                case EProcessMessageEnqueueResult.TargetRouteUnavailable:
+                    self.RpcInfos.Remove(rpcId);
+                    IResponse errorResponse = (IResponse)ObjectPool.Instance.Fetch(responseType);
+                    errorResponse.Error = enqueueResult == EProcessMessageEnqueueResult.RejectedByInitializationPolicy
+                        ? ErrorCode.ERR_ROOT_NOT_READY
+                        : ErrorCode.ERR_ACTOR_NOT_FOUND;
+                    errorResponse.RpcId = rpcId;
+                    return errorResponse;
+                default:
+                    self.RpcInfos.Remove(rpcId);
+                    throw new InvalidOperationException(
+                        $"Internal message enqueue returned an unknown result: {enqueueResult}.");
             }
 
             async ETTask Timeout()
@@ -117,7 +143,8 @@ namespace Bliss
                 
                 if (needException)
                 {
-                    action.RpcInfo.SetException(new Exception($"actor sender timeout: {request.GetType().FullName}"));
+                    action.RpcInfo.SetException(new TaskTimeoutException(
+                        $"Actor RPC timed out: requestType={request.GetType().FullName}, rpcId={rpcId}, timeoutMilliseconds={timeOutMs}."));
                 }
                 else
                 {

@@ -12,6 +12,11 @@ public static class ExternalMessageAdmission
     public static bool RejectWhileInitializing(Session session, object message, bool receivedBeforeRootReady,
         RootInitializationMessagePolicy messagePolicy)
     {
+        if (RootManager.Instance?.IsStopping == true)
+        {
+            return true;
+        }
+
         ERootInitializationState state = session.Root().InitializationState;
         if (!receivedBeforeRootReady && (state == ERootInitializationState.Ready || state == ERootInitializationState.Unmanaged))
         {

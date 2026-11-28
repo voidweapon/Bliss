@@ -1,16 +1,46 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace Bliss
 {
+    /// <summary>Describes whether an internal message was queued or why admission was rejected.</summary>
+    public enum EProcessMessageEnqueueResult
+    {
+        /// <summary>The message was added to the target Root's queue.</summary>
+        Enqueued,
+
+        /// <summary>The message was rejected because the Server is stopping.</summary>
+        RejectedWhileStopping,
+
+        /// <summary>The Root is initializing or failed; an RPC rejection response may have been queued.</summary>
+        RejectedRootNotReady,
+
+        /// <summary>The message was rejected by the Root's internal initialization message policy.</summary>
+        RejectedByInitializationPolicy,
+
+        /// <summary>No live Root exists for the target identifier.</summary>
+        TargetRootNotFound,
+
+        /// <summary>A live Root exists, but its message route is not available.</summary>
+        TargetRouteUnavailable,
+    }
+
     public class ProcessMessageManager : Singleton<ProcessMessageManager>
     {
         // Root ID to the queue responsible for dispatching messages to that Root.
         private readonly ConcurrentDictionary<int, RootMessageQueue> _messageQueues = new();
         // Root ID to the live Root, including the interval before its message route is registered.
         private readonly ConcurrentDictionary<int, Root> _roots = new();
+        // Serializes the final enqueue with stopping so no message is added after admission closes.
+        private readonly object _enqueueAdmissionLock = new();
+        private int _isStopping;
 
-        public bool Enqueue(ActorAddress targetAddress, MessageObject message)
+        /// <summary>Attempts to enqueue an internal message using the target Root as its sender.</summary>
+        /// <param name="targetAddress">The destination Actor address.</param>
+        /// <param name="message">The message to enqueue.</param>
+        /// <returns>The enqueue outcome.</returns>
+        public EProcessMessageEnqueueResult Enqueue(ActorAddress targetAddress, MessageObject message)
         {
             return Enqueue(targetAddress.RootAddress, targetAddress, message);
         }
@@ -42,12 +72,30 @@ namespace Bliss
             ((ICollection<KeyValuePair<int, Root>>)_roots).Remove(new KeyValuePair<int, Root>(root.Id, root));
         }
     
-        /// <summary>Queues admitted messages and pending RPC responses, or rejects them when initialization admission is closed.</summary>
+        /// <summary>Attempts to enqueue an internal message or rejects it according to Root lifecycle state.</summary>
         /// <param name="fromAddress">The Root that originated the message.</param>
         /// <param name="targetAddress">The destination Actor address.</param>
         /// <param name="message">The message to enqueue.</param>
-        /// <returns>True when the message was queued or rejected; false when the target Root is unknown.</returns>
-        public bool Enqueue(RootAddress fromAddress, ActorAddress targetAddress, MessageObject message)
+        /// <returns>The enqueue outcome, distinguishing success from each admission rejection.</returns>
+        public EProcessMessageEnqueueResult Enqueue(
+            RootAddress fromAddress, ActorAddress targetAddress, MessageObject message)
+        {
+            if (Volatile.Read(ref _isStopping) != 0)
+            {
+                return EProcessMessageEnqueueResult.RejectedWhileStopping;
+            }
+
+            if (RootManager.Instance?.IsStopping == true)
+            {
+                StopAcceptingMessages();
+                return EProcessMessageEnqueueResult.RejectedWhileStopping;
+            }
+
+            return enqueueMessage(fromAddress, targetAddress, message);
+        }
+
+        private EProcessMessageEnqueueResult enqueueMessage(
+            RootAddress fromAddress, ActorAddress targetAddress, MessageObject message)
         {
             if(!_messageQueues.TryGetValue(targetAddress.Root, out var queue))
             {
@@ -57,17 +105,20 @@ namespace Bliss
                     if (state == ERootInitializationState.Initializing || state == ERootInitializationState.Failed)
                     {
                         rejectMessage(targetAddress.RootAddress, fromAddress, message, ErrorCode.ERR_ROOT_NOT_READY);
-                        return true;
+                        return EProcessMessageEnqueueResult.RejectedRootNotReady;
                     }
+
+                    return EProcessMessageEnqueueResult.TargetRouteUnavailable;
                 }
-                return false;
+
+                return EProcessMessageEnqueueResult.TargetRootNotFound;
             }
         
             lock (queue)
             {
                 if (!queue.IsRegistered)
                 {
-                    return false;
+                    return EProcessMessageEnqueueResult.TargetRouteUnavailable;
                 }
                 RootInitializationSnapshot snapshot = queue.Root.InitializationSnapshot;
                 bool isOneWay = message is not IResponse && (message is not IRequest || message is ILocationMessage);
@@ -75,7 +126,7 @@ namespace Bliss
                 if (snapshot.State == ERootInitializationState.Initializing && isRpcRequest)
                 {
                     rejectMessage(targetAddress.RootAddress, fromAddress, message, ErrorCode.ERR_ROOT_NOT_READY);
-                    return true;
+                    return EProcessMessageEnqueueResult.RejectedRootNotReady;
                 }
 
                 if (snapshot.State != ERootInitializationState.Failed || message is IResponse)
@@ -84,21 +135,37 @@ namespace Bliss
                         && !snapshot.MessagePolicy.Allows(message.GetType(), ERootMessageIngress.Internal))
                     {
                         Log.Warning($"Root {targetAddress.RootAddress} rejected internal message {message.GetType().FullName} from {fromAddress}");
-                        return true;
+                        return EProcessMessageEnqueueResult.RejectedByInitializationPolicy;
                     }
 
-                    queue.Messages.Enqueue(new ProcessMessageInfo()
+                    lock (_enqueueAdmissionLock)
                     {
-                        TargetAddress = new ActorAddress(fromAddress, targetAddress.InstanceId),
-                        MessageObject = message,
-                        InitializationSnapshot = snapshot,
-                    });
-                    return true;
+                        if (_isStopping != 0 || RootManager.Instance?.IsStopping == true)
+                        {
+                            return EProcessMessageEnqueueResult.RejectedWhileStopping;
+                        }
+
+                        queue.Messages.Enqueue(new ProcessMessageInfo()
+                        {
+                            TargetAddress = new ActorAddress(fromAddress, targetAddress.InstanceId),
+                            MessageObject = message,
+                            InitializationSnapshot = snapshot,
+                        });
+                    }
+                    return EProcessMessageEnqueueResult.Enqueued;
                 }
             }
 
             rejectMessage(targetAddress.RootAddress, fromAddress, message, ErrorCode.ERR_ROOT_NOT_READY);
-            return true;
+            return EProcessMessageEnqueueResult.RejectedRootNotReady;
+        }
+
+        internal void StopAcceptingMessages()
+        {
+            lock (_enqueueAdmissionLock)
+            {
+                Volatile.Write(ref _isStopping, 1);
+            }
         }
 
         internal void rejectFailedMessages(Root root)
@@ -147,9 +214,12 @@ namespace Bliss
             {
                 MessageObject rejection = (MessageObject)MessageOpcodeManager.Instance.CreateResponseBy(
                     request.GetType(), request.RpcId, error);
-                if (!Enqueue(target, new ActorAddress(from), rejection))
+                EProcessMessageEnqueueResult enqueueResult =
+                    Enqueue(target, new ActorAddress(from), rejection);
+                if (enqueueResult != EProcessMessageEnqueueResult.Enqueued)
                 {
-                    Log.Warning($"Root {target} could not reply to {from} for rejected internal message {message.GetType().FullName}");
+                    Log.Warning(
+                        $"Root {target} could not reply to {from} for rejected internal message {message.GetType().FullName}: {enqueueResult}.");
                 }
                 return;
             }

@@ -12,6 +12,11 @@ namespace Bliss
     {
         public override void Handle(Invoke_OnReceiveMessage args)
         {
+            if (RootManager.Instance?.IsStopping == true)
+            {
+                return;
+            }
+
             Session session = args.Session;
             ActorAddress  actorAddress = args.TargetAddress;
             

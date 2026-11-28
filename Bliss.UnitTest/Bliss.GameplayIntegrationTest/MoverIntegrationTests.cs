@@ -94,8 +94,11 @@ public class MoverIntegrationTests
     private const long FAULTED_WORLD_TIMER_INTERVAL = 200;
     private const int MESSAGE_TEST_TIMEOUT_SECONDS = 3;
     private const int GATEWAY_TEST_TIMEOUT_SECONDS = 4;
+    private const int MAX_MESSAGES_PER_FETCH = 1000;
     private const int MESSAGE_TEST_RPC_TIMEOUT_MILLISECONDS = 3000;
     private const int MESSAGE_TEST_POLL_INTERVAL_MILLISECONDS = 1;
+    private const int FATAL_PUBLICATION_LOCK_TEST_WAIT_MILLISECONDS = 50;
+    private const int FATAL_CANCELLATION_GRACE_TEST_MARGIN_MILLISECONDS = 50;
     private static readonly float3 moveDirection = new float3(UNIT_AXIS, ZERO_AXIS, ZERO_AXIS);
     private static readonly Action<Entity, float> recordLogicCallback = recordLogicUpdate;
     private static readonly ConstructorInfo rootConstructor =
@@ -120,6 +123,14 @@ public class MoverIntegrationTests
         (typeof(Root).GetMethod("LateUpdate", BindingFlags.Instance | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException("Root.LateUpdate was not found."))
         .CreateDelegate<Action<Root>>();
+    private static readonly Action<RootManager> rootManagerEarlyUpdate =
+        (typeof(RootManager).GetMethod("EarlyUpdate", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("RootManager.EarlyUpdate was not found."))
+        .CreateDelegate<Action<RootManager>>();
+    private static readonly Action<RootManager> rootManagerUpdate =
+        (typeof(RootManager).GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("RootManager.Update was not found."))
+        .CreateDelegate<Action<RootManager>>();
 
     private TypeManager typeManager = null!;
     private EntitySystemManager entitySystemManager = null!;
@@ -2814,6 +2825,25 @@ public class MoverIntegrationTests
             session.IsInternal = true;
             ActorAddress address = new ActorAddress(main.RootAddress);
             NetworkComponent mainNetwork = main.Scene.GetComponent<NetworkComponent>();
+            ETCancellationToken cancellation = new ETCancellationToken();
+            ETTask<IResponse> canceledCall = session.Call(
+                address, new ObjectAddRequest(), MESSAGE_TEST_RPC_TIMEOUT_MILLISECONDS, cancellation);
+            cancellation.Cancel();
+            Assert.That(canceledCall.IsCompleted, Is.True, "Canceling a timed RPC must complete its waiter.");
+            Bliss.TaskAbortedException canceled = Assert.Throws<Bliss.TaskAbortedException>(
+                () => canceledCall.GetAwaiter().GetResult())!;
+            Assert.That(canceled.ETCancellationToken, Is.SameAs(cancellation));
+            ETTask<IResponse> alreadyCanceledCall = session.Call(
+                address, new ObjectAddRequest(), MESSAGE_TEST_RPC_TIMEOUT_MILLISECONDS, cancellation);
+            Assert.That(alreadyCanceledCall.IsCompleted, Is.True);
+            Bliss.TaskAbortedException alreadyCanceled = Assert.Throws<Bliss.TaskAbortedException>(
+                () => alreadyCanceledCall.GetAwaiter().GetResult())!;
+            Assert.That(alreadyCanceled.ETCancellationToken, Is.SameAs(cancellation));
+            ETTask<IResponse> alreadyCanceledWithoutExceptions = session.Call(
+                address, new ObjectAddRequest(), MESSAGE_TEST_RPC_TIMEOUT_MILLISECONDS, cancellation, needException: false);
+            Assert.That(alreadyCanceledWithoutExceptions.GetAwaiter().GetResult().Error,
+                Is.EqualTo(ErrorCode.ERR_TASK_ABORTED));
+
             ETTask<IResponse> call = session.Call(address, new ObjectAddRequest(), 0);
             Stopwatch deadline = Stopwatch.StartNew();
             while (!call.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(MESSAGE_TEST_TIMEOUT_SECONDS))
@@ -3544,6 +3574,502 @@ public class MoverIntegrationTests
         }
     }
 
+    /// <summary>Callers can distinguish cooperative cancellation from a timeout.</summary>
+    [Test]
+    public void CancellationAndTimeoutHaveDistinctExceptionSemantics()
+    {
+        ETCancellationToken token = new ETCancellationToken();
+        Bliss.TaskAbortedException cancellation = new Bliss.TaskAbortedException("Initialization canceled.", token);
+        Bliss.TaskTimeoutException timeout = new Bliss.TaskTimeoutException("Initialization timed out.");
+
+        Assert.That(RootManager.ROOT_INITIALIZATION_TIMEOUT_MILLISECONDS, Is.EqualTo(60000));
+        Assert.That(RootManager.FATAL_CANCELLATION_GRACE_PERIOD_MILLISECONDS, Is.EqualTo(1000));
+        Assert.That(RootManager.FATAL_CLEANUP_DEADLINE_MILLISECONDS, Is.EqualTo(5000));
+        Assert.That(cancellation, Is.InstanceOf<OperationCanceledException>());
+        Assert.That(cancellation.ETCancellationToken, Is.SameAs(token));
+        Assert.That(timeout, Is.InstanceOf<TimeoutException>());
+        Assert.That(timeout, Is.Not.InstanceOf<OperationCanceledException>());
+        Assert.DoesNotThrow(() => new Invoke_RootInit().ThrowIfCancellationRequested());
+    }
+
+    /// <summary>A fatal transition cannot race past an in-progress startup success publication.</summary>
+    [Test]
+    public void FatalTransitionWaitsForStartupSuccessPublication()
+    {
+        RootManager manager = new RootManager();
+        manager.Init();
+        ManualResetEventSlim publicationStarted = new ManualResetEventSlim();
+        ManualResetEventSlim finishPublication = new ManualResetEventSlim();
+        ManualResetEventSlim fatalReportStarted = new ManualResetEventSlim();
+        Task<bool> publication = null!;
+        Task fatalReport = null!;
+        try
+        {
+            publication = Task.Run(() => manager.TryRunIfNotStopping(() =>
+            {
+                publicationStarted.Set();
+                finishPublication.Wait();
+            }));
+            Assert.That(publicationStarted.Wait(TimeSpan.FromMilliseconds(
+                RootManager.FATAL_CANCELLATION_GRACE_PERIOD_MILLISECONDS)), Is.True);
+
+            fatalReport = Task.Run(() =>
+            {
+                fatalReportStarted.Set();
+                manager.ReportFatal(new InvalidOperationException("fatal during startup publication."));
+            });
+            Assert.That(fatalReportStarted.Wait(TimeSpan.FromMilliseconds(
+                RootManager.FATAL_CANCELLATION_GRACE_PERIOD_MILLISECONDS)), Is.True);
+            Assert.That(fatalReport.Wait(TimeSpan.FromMilliseconds(
+                FATAL_PUBLICATION_LOCK_TEST_WAIT_MILLISECONDS)), Is.False);
+            Assert.That(manager.IsStopping, Is.False);
+
+            finishPublication.Set();
+            Task.WaitAll(publication, fatalReport);
+
+            Assert.That(publication.Result, Is.True);
+            Assert.That(manager.IsStopping, Is.True);
+        }
+        finally
+        {
+            finishPublication.Set();
+            if (publication != null && fatalReport != null)
+            {
+                Task.WaitAll(publication, fatalReport);
+            }
+
+            publicationStarted.Dispose();
+            finishPublication.Dispose();
+            fatalReportStarted.Dispose();
+            manager.Dispose();
+        }
+    }
+
+    /// <summary>An initialization exceeding the fatal grace period remains alive until it cooperatively stops.</summary>
+    [Test]
+    public void FatalCleanupWaitsForActiveInitializationAfterGracePeriod()
+    {
+        int previousLogLevel = Log.LogLevel;
+        ILogger previousLogger = Log.Logger;
+        Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+        Log.Logger = new RecordingLogger();
+        RootManager manager = new RootManager();
+        manager.Init();
+        registerSingleton.Invoke(manager, null);
+        Options options = new Options { Process = ROOT_ZONE };
+        registerSingleton.Invoke(options, null);
+        ETTask initialization = ETTask.Create();
+        manager.ConfigureFatalLifecycle(_ => { }, () => { });
+        try
+        {
+            TestRootInit.IgnoreCancellation = true;
+            TestRootInit.PendingInitialization = initialization;
+            ETTask<int> create = manager.Create(
+                FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.None, "grace-period", useInitializationGate: true);
+            Root root = TestRootInit.LastCreatedRoot!;
+            manager.ReportFatal(new InvalidOperationException("stop while initialization is active."));
+
+            rootManagerEarlyUpdate(manager);
+            Assert.That(manager.FatalCancellationGraceExpired, Is.False);
+            Assert.That(root.IsDisposed, Is.False);
+            Assert.That(manager.FatalCleanupCompleted, Is.False);
+
+            Thread.Sleep(RootManager.FATAL_CANCELLATION_GRACE_PERIOD_MILLISECONDS
+                + FATAL_CANCELLATION_GRACE_TEST_MARGIN_MILLISECONDS);
+            rootManagerEarlyUpdate(manager);
+            Assert.That(manager.FatalCancellationGraceExpired, Is.True);
+            Assert.That(root.IsDisposed, Is.False);
+            Assert.That(manager.FatalCleanupCompleted, Is.False);
+
+            initialization.SetResult();
+            Assert.Throws<Bliss.TaskAbortedException>(() => create.GetAwaiter().GetResult());
+            rootManagerEarlyUpdate(manager);
+
+            Assert.That(root.IsDisposed, Is.True);
+            Assert.That(manager.FatalCleanupCompleted, Is.True);
+        }
+        finally
+        {
+            if (!initialization.IsCompleted)
+            {
+                initialization.SetResult();
+            }
+
+            TestRootInit.IgnoreCancellation = false;
+            TestRootInit.PendingInitialization = null;
+            if (manager.IsStopping)
+            {
+                rootManagerEarlyUpdate(manager);
+            }
+
+            manager.Dispose();
+            options.Dispose();
+            Log.Logger = previousLogger;
+            Log.LogLevel = previousLogLevel;
+        }
+    }
+
+    /// <summary>A fatal initialization failure stops Root updates and cleans up on the next owner-thread pulse.</summary>
+    [Test]
+    public void FatalInitializationFailureStopsAndCleansUpRoots()
+    {
+        int previousLogLevel = Log.LogLevel;
+        Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+        RootManager manager = new RootManager();
+        manager.Init();
+        registerSingleton.Invoke(manager, null);
+        ETTask initialization = ETTask.Create();
+        Exception? reportedFailure = null;
+        int cleanupCount = 0;
+        manager.ConfigureFatalLifecycle(exception => reportedFailure = exception, () => cleanupCount++);
+        try
+        {
+            TestRootInit.PendingInitialization = initialization;
+            ETTask<int> create = manager.Create(
+                FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.None, "fatal", useInitializationGate: true);
+            Root root = TestRootInit.LastCreatedRoot!;
+            TestRootUpdateProbe probe = root.Scene.AddChild<TestRootUpdateProbe>();
+            InvalidOperationException failure = new InvalidOperationException("initialization failed.");
+            int ownerThreadId = Environment.CurrentManagedThreadId;
+            manager.ReportFatal(failure);
+
+            Assert.That(manager.IsStopping, Is.True);
+            Assert.That(manager.FatalException, Is.SameAs(failure));
+            Assert.That(reportedFailure, Is.SameAs(failure));
+            rootManagerEarlyUpdate(manager);
+
+            Assert.That(Assert.Throws<Bliss.TaskAbortedException>(() => create.GetAwaiter().GetResult()), Is.Not.Null);
+            Assert.That(TestRootInit.CancellationThreadId, Is.EqualTo(ownerThreadId));
+            Assert.That(probe.UpdateCount, Is.Zero);
+            Assert.That(root.IsDisposed, Is.True);
+            Assert.That(manager.Get(FIRST_MANAGED_ROOT_ID), Is.Null);
+            Assert.That(manager.FatalCleanupCompleted, Is.True);
+            Assert.That(cleanupCount, Is.EqualTo(1));
+        }
+        finally
+        {
+            TestRootInit.PendingInitialization = null;
+            manager.Dispose();
+            Log.LogLevel = previousLogLevel;
+        }
+    }
+
+    /// <summary>An unhandled update failure in a Ready Root enters the same fatal lifecycle.</summary>
+    [Test]
+    public void ReadyRootUpdateFailureEntersFatalLifecycle()
+    {
+        int previousLogLevel = Log.LogLevel;
+        Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+        RootManager manager = new RootManager();
+        manager.Init();
+        registerSingleton.Invoke(manager, null);
+        Exception? reportedFailure = null;
+        int cleanupCount = 0;
+        manager.ConfigureFatalLifecycle(exception => reportedFailure = exception, () => cleanupCount++);
+        try
+        {
+            manager.Create(FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.None, "update-failure",
+                useInitializationGate: true).GetAwaiter().GetResult();
+            Root root = manager.Get(FIRST_MANAGED_ROOT_ID);
+            TestRootUpdateProbe failingProbe = root.Scene.AddChild<TestRootUpdateProbe>();
+            failingProbe.Failure = new InvalidOperationException("unhandled update failure.");
+
+            rootManagerEarlyUpdate(manager);
+            rootManagerEarlyUpdate(manager);
+            Assert.Catch(() => rootManagerUpdate(manager));
+
+            Assert.That(manager.IsStopping, Is.True);
+            Assert.That(manager.FatalException, Is.Not.Null);
+            Assert.That(reportedFailure, Is.SameAs(manager.FatalException));
+
+            rootManagerEarlyUpdate(manager);
+            Assert.That(root.IsDisposed, Is.True);
+            Assert.That(manager.Get(FIRST_MANAGED_ROOT_ID), Is.Null);
+            Assert.That(manager.FatalCleanupCompleted, Is.True);
+            Assert.That(cleanupCount, Is.EqualTo(1));
+        }
+        finally
+        {
+            manager.Dispose();
+            Log.LogLevel = previousLogLevel;
+        }
+    }
+
+    /// <summary>A handled business RPC error does not enter the fatal lifecycle.</summary>
+    [Test]
+    public void HandledBusinessErrorDoesNotEnterFatalLifecycle()
+    {
+        int previousLogLevel = Log.LogLevel;
+        Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+        RootManager manager = new RootManager();
+        manager.Init();
+        registerSingleton.Invoke(manager, null);
+        Options options = new Options { Process = ROOT_ZONE };
+        registerSingleton.Invoke(options, null);
+        try
+        {
+            TestRootInit.PendingInitialization = null;
+            manager.Create(FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.None, "handled-business-error",
+                useInitializationGate: true).GetAwaiter().GetResult();
+            Root root = manager.Get(FIRST_MANAGED_ROOT_ID);
+            TestRootUpdateProbe probe = root.Scene.AddChild<TestRootUpdateProbe>();
+            probe.HandledBusinessError = new RpcException(
+                ErrorCode.ERR_NOT_FOUND_MAP, "The requested map was not available.");
+
+            rootManagerEarlyUpdate(manager);
+            rootManagerEarlyUpdate(manager);
+            rootManagerUpdate(manager);
+
+            Assert.That(probe.HandledBusinessErrorCount, Is.EqualTo(1));
+            Assert.That(manager.IsStopping, Is.False);
+            Assert.That(manager.FatalException, Is.Null);
+        }
+        finally
+        {
+            TestRootInit.PendingInitialization = null;
+            manager.Dispose();
+            options.Dispose();
+            Log.LogLevel = previousLogLevel;
+        }
+    }
+
+    /// <summary>A timeout remains the first fatal cause while cooperative cancellation completes initialization.</summary>
+    [Test]
+    public void RootInitializationTimeoutRemainsFatalCauseDuringCancellation()
+    {
+        int previousLogLevel = Log.LogLevel;
+        Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+        RootManager manager = new RootManager();
+        manager.Init();
+        registerSingleton.Invoke(manager, null);
+        Options options = new Options { Process = ROOT_ZONE };
+        registerSingleton.Invoke(options, null);
+        ETTask initialization = ETTask.Create();
+        Exception? reportedFailure = null;
+        int cleanupCount = 0;
+        manager.ConfigureFatalLifecycle(exception => reportedFailure = exception, () => cleanupCount++);
+        try
+        {
+            TestRootInit.CancellationThreadId = 0;
+            TestRootInit.PendingInitialization = initialization;
+            ETTask<int> create = manager.Create(
+                FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.None, "timeout", useInitializationGate: true);
+            Root root = TestRootInit.LastCreatedRoot!;
+            // Invoke the registered timer callback without waiting a full minute in the suite.
+            FieldInfo activeInitializationsField = typeof(RootManager).GetField("_activeInitializations",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("RootManager active initializations were not found.");
+            System.Collections.IDictionary activeInitializations =
+                (System.Collections.IDictionary)activeInitializationsField.GetValue(manager)!;
+            object initializationOperation = activeInitializations[root]
+                ?? throw new InvalidOperationException("Root initialization timeout operation was not found.");
+            MethodInfo timeoutCallback = initializationOperation.GetType().GetMethod("onTimeout",
+                BindingFlags.Static | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Root initialization timeout callback was not found.");
+            Task.Run(() => timeoutCallback.Invoke(null, new[] { initializationOperation })).GetAwaiter().GetResult();
+
+            rootManagerEarlyUpdate(manager);
+
+            Assert.That(manager.FatalException, Is.InstanceOf<Bliss.TaskTimeoutException>());
+            Assert.That(reportedFailure, Is.SameAs(manager.FatalException));
+            Assert.That(Assert.Throws<Bliss.TaskAbortedException>(() => create.GetAwaiter().GetResult()), Is.Not.Null);
+            Assert.That(TestRootInit.CancellationThreadId, Is.EqualTo(Environment.CurrentManagedThreadId));
+            Assert.That(root.IsDisposed, Is.True);
+            Assert.That(manager.FatalCleanupCompleted, Is.True);
+            Assert.That(cleanupCount, Is.EqualTo(1));
+        }
+        finally
+        {
+            TestRootInit.PendingInitialization = null;
+            manager.Dispose();
+            options.Dispose();
+            Log.LogLevel = previousLogLevel;
+        }
+    }
+
+    /// <summary>Stopping drops newly routed internal messages and owner cleanup unregisters the Root.</summary>
+    [Test]
+    public void StoppingRejectsInternalMessagesAndUnregistersRoots()
+    {
+        int previousLogLevel = Log.LogLevel;
+        Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+        RootManager manager = new RootManager();
+        manager.Init();
+        registerSingleton.Invoke(manager, null);
+        Options options = new Options { Process = ROOT_ZONE };
+        registerSingleton.Invoke(options, null);
+        ProcessMessageManager messages = new ProcessMessageManager();
+        registerSingleton.Invoke(messages, null);
+        try
+        {
+            manager.Create(FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.None, "stopping",
+                useInitializationGate: false).GetAwaiter().GetResult();
+            Root root = manager.Get(FIRST_MANAGED_ROOT_ID);
+            root.Scene.AddComponent<ProcessInnerMessageProxy>();
+
+            manager.ReportFatal(new InvalidOperationException("stop dispatch."));
+            EProcessMessageEnqueueResult enqueueResult = messages.Enqueue(new RootAddress(ROOT_ZONE, ROOT_ID),
+                new ActorAddress(root.RootAddress), new PingMessage());
+            List<ProcessMessageInfo> pendingMessages = new List<ProcessMessageInfo>();
+            messages.Fetch(root.Id, pendingMessages, MAX_MESSAGES_PER_FETCH);
+
+            Assert.That(enqueueResult, Is.EqualTo(EProcessMessageEnqueueResult.RejectedWhileStopping));
+            Assert.That(pendingMessages, Is.Empty);
+
+            rootManagerEarlyUpdate(manager);
+
+            Assert.That(root.IsDisposed, Is.True);
+            Assert.That(messages.CaptureAdmission(root.Id), Is.Null);
+        }
+        finally
+        {
+            manager.Dispose();
+            messages.Dispose();
+            options.Dispose();
+            Log.LogLevel = previousLogLevel;
+        }
+    }
+
+    /// <summary>Enqueue reports queued, lifecycle-rejected, and unavailable-route outcomes distinctly.</summary>
+    [Test]
+    public void EnqueueReportsDistinctAdmissionOutcomes()
+    {
+        int previousLogLevel = Log.LogLevel;
+        ILogger previousLogger = Log.Logger;
+        Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+        Log.Logger = new RecordingLogger();
+        RootManager manager = new RootManager();
+        manager.Init();
+        registerSingleton.Invoke(manager, null);
+        ProcessMessageManager messages = new ProcessMessageManager();
+        registerSingleton.Invoke(messages, null);
+        MessageOpcodeManager opcodes = new MessageOpcodeManager();
+        Options options = new Options { Process = ROOT_ZONE };
+        Root? target = null;
+        try
+        {
+            registerSingleton.Invoke(options, null);
+            opcodes.Init();
+            registerSingleton.Invoke(opcodes, null);
+
+            ActorAddress targetAddress = new ActorAddress(
+                new RootAddress(ROOT_ZONE, FIRST_MANAGED_ROOT_ID));
+            Assert.That(messages.Enqueue(this.root.RootAddress, targetAddress, new PingMessage()),
+                Is.EqualTo(EProcessMessageEnqueueResult.TargetRootNotFound));
+
+            target = (Root)rootConstructor.Invoke(new object[]
+                { FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.Map, "enqueue-outcomes" });
+            target.BeginInitialization();
+            target.Scene.AddComponent<ProcessInnerMessageProxy>();
+            targetAddress = new ActorAddress(target.RootAddress);
+
+            Assert.That(messages.Enqueue(target.RootAddress, targetAddress, new PingMessage()),
+                Is.EqualTo(EProcessMessageEnqueueResult.RejectedByInitializationPolicy));
+            Assert.That(messages.Enqueue(target.RootAddress, targetAddress, new ObjectAddRequest()),
+                Is.EqualTo(EProcessMessageEnqueueResult.RejectedRootNotReady));
+
+            MethodInfo completeInitialization = typeof(Root).GetMethod("CompleteInitialization",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Root.CompleteInitialization was not found.");
+            completeInitialization.Invoke(target, null);
+            Assert.That(messages.Enqueue(target.RootAddress, targetAddress, new PingMessage()),
+                Is.EqualTo(EProcessMessageEnqueueResult.Enqueued));
+
+            target.Scene.RemoveComponent<ProcessInnerMessageProxy>();
+            Assert.That(messages.Enqueue(target.RootAddress, targetAddress, new PingMessage()),
+                Is.EqualTo(EProcessMessageEnqueueResult.TargetRouteUnavailable));
+
+            target.Dispose();
+            target = null;
+            Assert.That(messages.Enqueue(this.root.RootAddress, targetAddress, new PingMessage()),
+                Is.EqualTo(EProcessMessageEnqueueResult.TargetRootNotFound));
+
+            manager.ReportFatal(new InvalidOperationException("Reject enqueues after fatal stopping."));
+            Assert.That(messages.Enqueue(this.root.RootAddress, targetAddress, new PingMessage()),
+                Is.EqualTo(EProcessMessageEnqueueResult.RejectedWhileStopping));
+        }
+        finally
+        {
+            target?.Dispose();
+            opcodes.Dispose();
+            messages.Dispose();
+            options.Dispose();
+            manager.Dispose();
+            Log.Logger = previousLogger;
+            Log.LogLevel = previousLogLevel;
+        }
+    }
+
+    /// <summary>A fatal message handler prevents later messages in the fetched batch from being dispatched.</summary>
+    [Test]
+    public void FatalFailureStopsRemainingFetchedInternalMessages()
+    {
+        int previousLogLevel = Log.LogLevel;
+        ILogger previousLogger = Log.Logger;
+        Log.LogLevel = SUPPRESS_INFO_LOG_LEVEL;
+        Log.Logger = new RecordingLogger();
+        RootManager manager = new RootManager();
+        manager.Init();
+        registerSingleton.Invoke(manager, null);
+        ProcessMessageManager messages = new ProcessMessageManager();
+        MessageOpcodeManager opcodes = new MessageOpcodeManager();
+        LogMsg logMessages = new LogMsg();
+        MessageDispatcher dispatcher = new MessageDispatcher();
+        Options options = new Options { Process = ROOT_ZONE };
+        Root? target = null;
+        try
+        {
+            registerSingleton.Invoke(options, null);
+            registerSingleton.Invoke(messages, null);
+            opcodes.Init();
+            registerSingleton.Invoke(opcodes, null);
+            logMessages.Init();
+            registerSingleton.Invoke(logMessages, null);
+            dispatcher.Init();
+            registerSingleton.Invoke(dispatcher, null);
+            manager.ConfigureFatalLifecycle(_ => { }, () => { });
+            InternalPingHandler.Count = 0;
+            InternalPingHandler.OnMessage = () => manager.ReportFatal(
+                new InvalidOperationException("fatal failure during message dispatch."));
+
+            target = (Root)rootConstructor.Invoke(new object[]
+                { FIRST_MANAGED_ROOT_ID, ROOT_ZONE, ELogicSceneType.Map, "fatal-message-dispatch" });
+            target.BeginInitialization();
+            target.Scene.AddComponent<NetworkEntityManagerComponent>();
+            target.Scene.AddComponent<ProcessInnerMessageProxy>();
+            target.Scene.AddComponent<MailBoxComponent, EMailBoxType>(EMailBoxType.UnOrderedMessage);
+            MethodInfo completeInitialization = typeof(Root).GetMethod("CompleteInitialization",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Root.CompleteInitialization was not found.");
+            completeInitialization.Invoke(target, null);
+
+            ActorAddress targetAddress = new ActorAddress(target.RootAddress);
+            Assert.That(messages.Enqueue(this.root.RootAddress, targetAddress, new PingMessage()),
+                Is.EqualTo(EProcessMessageEnqueueResult.Enqueued));
+            Assert.That(messages.Enqueue(this.root.RootAddress, targetAddress, new PingMessage()),
+                Is.EqualTo(EProcessMessageEnqueueResult.Enqueued));
+
+            earlyUpdate(target);
+            update(target);
+
+            Assert.That(manager.IsStopping, Is.True);
+            Assert.That(InternalPingHandler.Count, Is.EqualTo(1));
+        }
+        finally
+        {
+            InternalPingHandler.OnMessage = null;
+            target?.Dispose();
+            dispatcher.Dispose();
+            logMessages.Dispose();
+            opcodes.Dispose();
+            messages.Dispose();
+            options.Dispose();
+            manager.Dispose();
+            Log.Logger = previousLogger;
+            Log.LogLevel = previousLogLevel;
+        }
+    }
+
     /// <summary>Each managed Root becomes ready only after its own initialization completes.</summary>
     [Test]
     public void ManagedRootsBecomeReadyIndependently()
@@ -3694,7 +4220,7 @@ public class MoverIntegrationTests
             Root root = TestRootInit.LastCreatedRoot!;
             TestRootUpdateProbe probe = root.Scene.AddChild<TestRootUpdateProbe>();
             root.Scene.GetComponent<RootInitializationGateComponent>().AllowSystem(typeof(TestRootUpdateProbeSystem));
-            InvalidOperationException failure = new InvalidOperationException("initialization failed");
+            InvalidOperationException failure = new InvalidOperationException("initialization failed.");
             initialization.SetException(failure);
 
             Assert.That(Assert.Throws<InvalidOperationException>(() => create.GetAwaiter().GetResult()), Is.SameAs(failure));
@@ -4737,6 +5263,12 @@ public class MoverIntegrationTests
         /// <summary>Optional test-controlled initialization task.</summary>
         public static ETTask? PendingInitialization { get; set; }
 
+        /// <summary>Owner thread that observed cancellation for the pending initialization.</summary>
+        public static int CancellationThreadId { get; set; }
+
+        /// <summary>Whether the test initializer deliberately ignores cooperative cancellation.</summary>
+        public static bool IgnoreCancellation { get; set; }
+
         /// <inheritdoc />
         public override async ETTask Handle(Invoke_RootInit args)
         {
@@ -4744,7 +5276,25 @@ public class MoverIntegrationTests
             ETTask? pending = PendingInitialization;
             if (pending != null)
             {
-                await pending;
+                void CancelInitialization()
+                {
+                    CancellationThreadId = Environment.CurrentManagedThreadId;
+                    pending.SetException(new Bliss.TaskAbortedException(
+                        "Test initialization canceled.", args.CancellationToken));
+                }
+
+                if (!IgnoreCancellation)
+                {
+                    args.CancellationToken?.Add(CancelInitialization);
+                }
+                try
+                {
+                    await pending;
+                }
+                finally
+                {
+                    args.CancellationToken?.Remove(CancelInitialization);
+                }
             }
         }
     }
@@ -4821,6 +5371,15 @@ public class MoverIntegrationTests
         /// <summary>Optional initialization to fail from the next update.</summary>
         public ETTask? InitializationToFail;
 
+        /// <summary>Optional unhandled failure raised from the next update.</summary>
+        public Exception? Failure;
+
+        /// <summary>Optional business RPC error that the probe handles during its next update.</summary>
+        public RpcException? HandledBusinessError;
+
+        /// <summary>Number of handled business RPC errors.</summary>
+        public int HandledBusinessErrorCount;
+
         /// <summary>Whether the next update mounts a Root initialization gate.</summary>
         public bool MountGateOnUpdate;
     }
@@ -4847,9 +5406,29 @@ public class MoverIntegrationTests
                 entity.RootScene().AddComponent<RootInitializationGateComponent>();
             }
 
+            RpcException? businessError = entity.HandledBusinessError;
+            entity.HandledBusinessError = null;
+            if (businessError != null)
+            {
+                try
+                {
+                    throw businessError;
+                }
+                catch (RpcException)
+                {
+                    entity.HandledBusinessErrorCount++;
+                }
+            }
+
             ETTask? initialization = entity.InitializationToFail;
             entity.InitializationToFail = null;
             initialization?.SetException(new InvalidOperationException("initialization failed"));
+            Exception? failure = entity.Failure;
+            entity.Failure = null;
+            if (failure != null)
+            {
+                throw failure;
+            }
         }
     }
 
@@ -5107,10 +5686,14 @@ public class MoverIntegrationTests
         /// <summary>Number of delivered messages.</summary>
         public static int Count;
 
+        /// <summary>Optional test callback invoked after a message is counted.</summary>
+        public static Action? OnMessage;
+
         /// <inheritdoc />
         protected override async ETTask Run(LogicScene scene, PingMessage message)
         {
             Count++;
+            OnMessage?.Invoke();
             await ETTask.CompletedTask;
         }
     }

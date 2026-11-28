@@ -16,6 +16,8 @@ namespace Bliss
         /// <param name="args">The root initialization request.</param>
         public override async ETTask Handle(Invoke_RootInit args)
         {
+            args.ThrowIfCancellationRequested();
+
             Log.Info($"Init Map Start");
             
             LogicScene rootScene = args.Root.Scene;
@@ -56,8 +58,12 @@ namespace Bliss
                 gameplayWorld,
                 defaultLevelConfig.Id,
                 defaultLevelConfig.Id,
-                defaultLevelConfig.Name);
-            await LevelSceneFactory.Enable(levelScene);
+                defaultLevelConfig.Name,
+                args.CancellationToken);
+            args.ThrowIfCancellationRequested();
+
+            await LevelSceneFactory.Enable(levelScene, cancellationToken: args.CancellationToken);
+            args.ThrowIfCancellationRequested();
             
             await ETTask.CompletedTask;
         }

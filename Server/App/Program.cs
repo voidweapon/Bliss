@@ -9,6 +9,8 @@ namespace Bliss
     {
         public static void Main()
         {
+            RootManager rootManager = null;
+            bool fatalLifecycleConfigured = false;
             try
             {
                 AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
@@ -26,13 +28,21 @@ namespace Bliss
                 Log.Debug($"Use Logger:{Log.Logger.GetType()}"); 
 
                 TimeInfo.Instance.Init();
-                World.Instance.AddSingleton<RootManager>();
+                rootManager = World.Instance.AddSingleton<RootManager>();
+                rootManager.ConfigureFatalLifecycle(ServerFatalWatchdog.Arm, ServerFatalWatchdog.CompleteCleanup);
+                fatalLifecycleConfigured = true;
                 World.Instance.AddSingleton<CodeLoader>();
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                Log.Error(ex);
-                return;
+                if (rootManager == null || !fatalLifecycleConfigured)
+                {
+                    Log.Error(exception);
+                    Environment.ExitCode = 1;
+                    return;
+                }
+
+                rootManager.ReportFatal(exception);
             }
 
             while (true)
@@ -46,7 +56,13 @@ namespace Bliss
                 }
                 catch (Exception e)
                 {
-                    Log.Error(e);
+                    rootManager.ReportFatal(e);
+                }
+
+                if (rootManager.FatalCleanupCompleted)
+                {
+                    Environment.ExitCode = 1;
+                    return;
                 }
             }
         }

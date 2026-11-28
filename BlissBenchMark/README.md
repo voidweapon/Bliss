@@ -50,3 +50,16 @@ Environment: macOS Darwin 25.6.0, Apple M1 Pro (10 processors), .NET SDK 8.0.413
 | One-way | 16 | 9.97 ms | 9.98 ms | +0.12% | 202,698 B | 230,297 B |
 
 One-way timing is effectively unchanged. RPC batch 1 is also inconclusive: baseline and candidate 99.9% confidence intervals overlap (10.30–12.55 ms and 10.25–11.63 ms). RPC batch 16 is noisy and the intervals overlap (11.16–15.99 ms and 13.64–18.89 ms); do not infer a definite timing regression from its +19.82% mean. Managed allocation increased in all candidate cases except that one-way batch 1 remained nearly flat; most notably RPC batch 1 increased by about 76%. This loopback benchmark includes UDP scheduling and polling and does not isolate gateway CPU cost. Treat the results as an end-to-end local comparison, not a claim about production network latency.
+
+## Internal message enqueue results for #40
+
+Formal comparison: `issue40-enqueue-baseline-v2` against `issue40-enqueue-candidate-v2`. Both runs measured one-message and 16-message internal queue admission batches, draining the target queue immediately after each batch. The live unmanaged Root route, process options, reusable message, and drain list were prepared outside measurement. Configuration was BenchmarkDotNet 0.15.2 on .NET 8.0.19, three launches, five warmups, and ten measurement iterations, with `MemoryDiagnoser`.
+
+Environment: macOS Darwin 25.6.0, Apple M1 Pro (10 processors), .NET SDK 8.0.413. Mean time and managed allocation are per message; confidence intervals are 99.9%.
+
+| Workload | Baseline mean | Candidate mean | Time change | Baseline allocated | Candidate allocated |
+|---|---:|---:|---:|---:|---:|
+| Single-message admission and drain | 44.87 ns | 44.16 ns | -1.58% | 0 B | 0 B |
+| 16-message admission batch and drain | 39.68 ns | 39.73 ns | +0.13% | 0 B | 0 B |
+
+Both confidence intervals overlap (single-message baseline 44.13–45.61 ns, candidate 43.98–44.35 ns; batch baseline 39.58–39.77 ns, candidate 39.62–39.84 ns). The measurements do not show a clear timing change or managed allocation from the admission lock. This benchmark includes queue draining and does not isolate concurrent stop transitions or network dispatch.

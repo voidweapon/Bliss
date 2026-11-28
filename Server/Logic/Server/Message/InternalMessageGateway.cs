@@ -44,10 +44,13 @@ public sealed class InternalMessageSendEnvelopeHandler :
         }
 
         MessageObject message = MessageSerializer.DeserializePayload(envelope.PayloadOpcode, envelope.Payload);
-        if (!ProcessMessageManager.Instance.Enqueue(envelope.OriginRoot, envelope.TargetAddress, message))
+        EProcessMessageEnqueueResult enqueueResult =
+            ProcessMessageManager.Instance.Enqueue(envelope.OriginRoot, envelope.TargetAddress, message);
+        if (enqueueResult is EProcessMessageEnqueueResult.TargetRootNotFound
+            or EProcessMessageEnqueueResult.TargetRouteUnavailable)
         {
             Log.Warning(
-                $"Root {envelope.TargetAddress.RootAddress} could not route internal message {message.GetType().FullName} from {envelope.OriginRoot}");
+                $"Root {envelope.TargetAddress.RootAddress} could not route internal message {message.GetType().FullName} from {envelope.OriginRoot}: {enqueueResult}.");
         }
 
         await ETTask.CompletedTask;

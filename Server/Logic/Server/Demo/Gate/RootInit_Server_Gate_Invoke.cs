@@ -16,6 +16,8 @@ namespace Bliss
         /// <param name="args">The Root initialization request.</param>
         public override async ETTask Handle(Invoke_RootInit args)
         {
+            args.ThrowIfCancellationRequested();
+
             LogicScene rootScene = args.Root.Scene;
 
             rootScene.AddComponent<TimerComponent>();

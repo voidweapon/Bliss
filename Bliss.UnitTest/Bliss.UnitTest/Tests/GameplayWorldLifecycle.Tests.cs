@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Bliss.Core;
 using ET;
 
@@ -319,7 +320,7 @@ public class GameplayWorldLifecycleTests
     }
 
     [Test]
-    public void EnableCleanupFailureReportsBothTheEnableAndCleanupErrors()
+    public void EnableCleanupFailurePreservesEnableErrorAndLogsCleanupError()
     {
         GameplayWorld gameplayWorld = GameplayWorldFactory.Create(
             _root.Scene,
@@ -331,6 +332,9 @@ public class GameplayWorldLifecycleTests
         eventSystem.Register();
         TestLevelEnableHandler.Fail = true;
         TestLevelStopEnableHandler.Fail = true;
+        ILogger previousLogger = Log.Logger;
+        RecordingLogger logger = new RecordingLogger();
+        Log.Logger = logger;
 
         try
         {
@@ -341,15 +345,18 @@ public class GameplayWorldLifecycleTests
                 LEVEL_SCENE_ID,
                 nameof(LEVEL_SCENE_ID)).GetAwaiter().GetResult();
 
-            AggregateException exception = Assert.Throws<AggregateException>(
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
                 () => LevelSceneFactory.Enable(levelScene).GetAwaiter().GetResult());
 
-            Assert.That(exception.InnerExceptions[0].Message, Is.EqualTo("level enable failed"));
-            Assert.That(exception.InnerExceptions[1].Message, Is.EqualTo("level cleanup failed"));
+            Assert.That(exception.Message, Is.EqualTo("level enable failed"));
+            Assert.That(logger.Errors, Has.Count.EqualTo(1));
+            StringAssert.Contains("level enable failed", logger.Errors[0]);
+            StringAssert.Contains("level cleanup failed", logger.Errors[0]);
             Assert.That(gameplayWorld.GetChild<LogicScene>(LEVEL_SCENE_ID), Is.Null);
         }
         finally
         {
+            Log.Logger = previousLogger;
             TestLevelEnableHandler.Fail = false;
             TestLevelStopEnableHandler.Fail = false;
             eventSystem.Dispose();
@@ -672,6 +679,26 @@ public class GameplayWorldLifecycleTests
 
             await ETTask.CompletedTask;
         }
+    }
+
+    private sealed class RecordingLogger : ILogger
+    {
+        public List<string> Errors { get; } = new List<string>();
+
+        public void Trace(string message) { }
+        public void Warning(string message) { }
+        public void Info(string message) { }
+        public void Debug(string message) { }
+        public void Error(string message) => Errors.Add(message);
+        public void Error(Exception exception) => Errors.Add(exception.ToString());
+
+#if DOTNET
+        public void Trace(ref DefaultInterpolatedStringHandler message) { }
+        public void Warning(ref DefaultInterpolatedStringHandler message) { }
+        public void Info(ref DefaultInterpolatedStringHandler message) { }
+        public void Debug(ref DefaultInterpolatedStringHandler message) { }
+        public void Error(ref DefaultInterpolatedStringHandler message) { }
+#endif
     }
 
     [EntitySystem]
